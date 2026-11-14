@@ -430,7 +430,12 @@ export async function feedSessionChanged() {
   if (apiKeys().length === 0) void loadKeys();
 }
 
-// The feed follows the engine: reloads when something arrives or a session starts.
+// The feed follows the engine: reloads when something arrives or a session starts. Events come
+// in bursts (a sync's folders, a stream catching up after a reconnect), so one reload serves them.
+let changeTimer: ReturnType<typeof setTimeout> | undefined;
 onSession(() => void feedSessionChanged());
-onFeedChanged(() => void loadFeed());
+onFeedChanged(() => {
+  clearTimeout(changeTimer);
+  changeTimer = setTimeout(() => void loadFeed(), 150);
+});
 void loadRules();
