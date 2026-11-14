@@ -155,7 +155,7 @@ Generated from the route definitions (`utoipa`), served at `/openapi.json` and r
 ## 4. For people: the app
 
 - A new **All notifications** view beside the mail inbox: one feed of every source, with the source's icon and colour, priority and tags; filter by source; search across everything.
-- **Sources** in Settings: add a webhook / Gotify / ntfy / IM source, copy its ingest URL (or token), send a test message, pause it, delete it.
+- **Sources** in Settings: add a webhook / Gotify / ntfy source, copy its ingest URL (or token), send a test message, pause it, delete it. IM sources arrive in M2.
 - **API keys** in Settings: create (name, scope, sources, expiry), copy once, see last use, revoke.
 - **Notifications**: per source and priority — notify / silent / off, on top of the existing per-account mail settings.
 - Mail keeps its current screens; the mail inbox stays the default view for people who only have mail.

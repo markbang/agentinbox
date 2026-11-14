@@ -951,14 +951,14 @@ notify.noSources:
   en: No sources yet
   zh-CN: 还没有来源
 notify.noSourcesHint:
-  en: A webhook, Gotify, ntfy or a chat bot writes into this feed. Add a source to start.
-  zh-CN: Webhook、Gotify、ntfy 或聊天机器人都会写进这个收件箱。先添加一个来源。
+  en: A webhook, Gotify or ntfy source writes into this feed. Add one to start.
+  zh-CN: Webhook、Gotify 或 ntfy 会把消息写进这个收件箱。先添加一个来源。
 notify.noAccounts:
   en: No mail accounts yet
   zh-CN: 还没有邮箱账号
 notify.noAccountsHint:
-  en: Add a mail account and its mail lands here. Webhooks and bots need an AgentInbox server.
-  zh-CN: 添加邮箱账号后，它的邮件就会出现在这里。Webhook 和机器人需要 AgentInbox 服务器。
+  en: Add a mail account and its mail lands here. Webhook, Gotify and ntfy sources need an AgentInbox server.
+  zh-CN: 添加邮箱账号后，它的邮件就会出现在这里。Webhook、Gotify 和 ntfy 来源需要 AgentInbox 服务器。
 notify.empty:
   en: No notifications
   zh-CN: 没有通知
@@ -1110,8 +1110,8 @@ sources.list:
   en: Your sources
   zh-CN: 已连接的来源
 sources.intro:
-  en: "Anything that can send a message lands in the feed: a webhook, Gotify, ntfy or a chat bot. Mail accounts are sources too."
-  zh-CN: 任何能发消息的服务都会进入收件箱：Webhook、Gotify、ntfy 或聊天机器人。邮箱账号也算来源。
+  en: "Webhook, Gotify and ntfy sources land in the feed, and so does every mail account's mail. More kinds of source are on the way."
+  zh-CN: Webhook、Gotify、ntfy 和每个邮箱账号的邮件都会进入收件箱。更多来源类型正在路上。
 sources.empty:
   en: No sources yet
   zh-CN: 还没有来源
@@ -1122,8 +1122,8 @@ sources.localTitle:
   en: Only your mail on this device
   zh-CN: 本机只有邮件
 sources.localBody:
-  en: Webhooks, Gotify, ntfy and chat bots live on an AgentInbox server, which gives each one its own ingest URL. Sign in to cloud mode to add them; your mail stays in the feed either way.
-  zh-CN: Webhook、Gotify、ntfy 和聊天机器人由 AgentInbox 服务器接收，每个来源有独立的接收地址。登录云端模式后即可添加；无论哪种模式，邮件都会出现在收件箱里。
+  en: Webhook, Gotify and ntfy sources live on an AgentInbox server, which gives each one its own ingest URL. Sign in to cloud mode to add them; your mail stays in the feed either way.
+  zh-CN: Webhook、Gotify 和 ntfy 来源由 AgentInbox 服务器接收，每个来源有独立的接收地址。登录云端模式后即可添加；无论哪种模式，邮件都会出现在收件箱里。
 sources.localEmpty:
   en: No mail accounts yet
   zh-CN: 还没有邮箱账号

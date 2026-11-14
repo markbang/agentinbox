@@ -2,7 +2,7 @@
 
 # agentinbox-mcp
 
-AgentInbox **通知收件箱**的 [Model Context Protocol](https://modelcontextprotocol.io) 服务器：邮件、Webhook（GitHub、GitLab、Sentry、Grafana、Uptime Kuma）、Gotify、ntfy 和聊天机器人全都汇聚到一个信息流里，agent 用一个以 `nb_` 开头的 API key 就能读取。
+AgentInbox **通知收件箱**的 [Model Context Protocol](https://modelcontextprotocol.io) 服务器：邮件、Webhook（GitHub、GitLab、Sentry、Grafana、Uptime Kuma）、Gotify 和 ntfy 全都汇聚到一个信息流里，agent 用一个以 `nb_` 开头的 API key 就能读取。
 
 它只是一个薄而诚实的客户端：五个工具、两种传输（stdio 和 streamable HTTP），服务端返回的错误原样透出。
 
