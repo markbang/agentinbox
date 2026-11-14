@@ -1,5 +1,5 @@
 {
-  "name": "nsh-mail-m3e-tokens",
+  "name": "agentinbox-m3e-tokens",
   "private": true,
   "type": "module",
   "scripts": { "gen": "node gen.mjs" },

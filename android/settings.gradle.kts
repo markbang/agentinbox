@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "nsh-mail"
+rootProject.name = "AgentInbox"
 include(":app")

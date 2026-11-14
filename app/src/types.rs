@@ -1,4 +1,4 @@
-//! The values `nsh-mail/native` exchanges with TSX are `mail_core::types`
+//! The values `agentinbox/native` exchanges with TSX are `mail_core::types`
 //! (docs/design.md §3). They cross as their serde JSON in [`Js`], and
 //! [`DECLARATIONS`] is that JSON's TypeScript.
 
@@ -97,7 +97,7 @@ impl<T: Ts + Serialize + DeserializeOwned + 'static> JsValue for Js<T> {
 const DECLARATIONS: &[(&str, &str)] = &[
     (
         "Mode",
-        "/** Where mail comes from: not chosen yet, this device, or an nsh-mail server. */\n\
+        "/** Where mail comes from: not chosen yet, this device, or an AgentInbox server. */\n\
          export type Mode = \"none\" | \"local\" | \"cloud\";",
     ),
     (

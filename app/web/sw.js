@@ -1,4 +1,4 @@
-// nsh-mail's service worker: shows Web Push notifications of new mail while
+// AgentInbox's service worker: shows Web Push notifications of new mail while
 // no page has the server's event stream open, and brings the app forward
 // when one is pressed. `nsh package --target web` does not ship extra files:
 // it is copied next to index.html (see app/README.md); the server serves it
@@ -16,7 +16,7 @@ self.addEventListener("push", (event) => {
   } catch {
     // Not ours to read: still say something arrived.
   }
-  const title = data.from || "nsh-mail";
+  const title = data.from || "AgentInbox";
   event.waitUntil(
     self.registration.showNotification(title, {
       body: data.subject || "New mail",

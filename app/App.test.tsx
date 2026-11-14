@@ -212,7 +212,7 @@ test("phones: the inbox, a message and back", async () => {
   await app.waitFor("id:messages");
 });
 
-test("desktops: closing the window keeps nsh-mail running in the tray", async () => {
+test("desktops: closing the window keeps AgentInbox running in the tray", async () => {
   const app = await open("./App.tsx", { ...desktop, ...demo });
   await app.waitFor("text:Q4 roadmap draft");
   await app.window("main").pressClose();

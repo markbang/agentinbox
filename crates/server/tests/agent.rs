@@ -4,8 +4,8 @@
 
 use std::{net::SocketAddr, path::PathBuf, time::Duration};
 
+use agentinbox_server::{Config, build, router};
 use futures_util::{StreamExt, stream::BoxStream};
-use nsh_mail_server::{Config, build, router};
 use reqwest::{Client, StatusCode, header};
 use serde_json::{Value, json};
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
@@ -15,7 +15,7 @@ fn temp_dir() -> PathBuf {
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
         .as_nanos();
-    let dir = std::env::temp_dir().join(format!("nsh-mail-agent-{n}"));
+    let dir = std::env::temp_dir().join(format!("agentinbox-agent-{n}"));
     std::fs::create_dir_all(dir.join("users")).unwrap();
     dir
 }
@@ -739,7 +739,7 @@ async fn mcp_answers_tools_over_http_with_a_key() {
     )
     .await;
     assert_eq!(status, StatusCode::OK, "{handshake}");
-    assert_eq!(handshake["result"]["serverInfo"]["name"], "nsh-notify");
+    assert_eq!(handshake["result"]["serverInfo"]["name"], "agentinbox");
 
     let (_, tools) = mcp(
         &s,
@@ -817,7 +817,7 @@ async fn mcp_answers_tools_over_http_with_a_key() {
 
 #[tokio::test]
 async fn openapi_document_is_current() {
-    let document = nsh_mail_server::agent::openapi_json();
+    let document = agentinbox_server::agent::openapi_json();
     let value: Value = serde_json::from_str(&document).unwrap();
     assert!(value["paths"]["/v1/feed"].is_object());
     assert!(value["paths"]["/v1/stream"].is_object());
@@ -835,7 +835,7 @@ async fn openapi_document_is_current() {
     assert_eq!(
         committed.trim(),
         document.trim(),
-        "docs/openapi.json is stale: run `cargo run -p nsh-mail-server -- openapi > docs/openapi.json`"
+        "docs/openapi.json is stale: run `cargo run -p agentinbox-server -- openapi > docs/openapi.json`"
     );
 }
 

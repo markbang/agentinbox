@@ -136,7 +136,7 @@ impl EncryptedFileStore {
         ))
     }
 
-    /// For callers that manage the key themselves (the server's `NSHMAIL_MASTER_KEY`).
+    /// For callers that manage the key themselves (the server's `AGENTINBOX_MASTER_KEY`).
     pub fn with_key(path: PathBuf, key: [u8; 32]) -> Self {
         Self {
             path,
@@ -308,6 +308,7 @@ pub enum Backend {
 /// (always on Android). The UI should tell the user when it fell back.
 pub fn platform_store(data_dir: &Path) -> Result<(Arc<dyn SecretStore>, Backend)> {
     #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
+    // The keyring entry's name is where existing installs keep their credentials: never rename it.
     if let Ok(k) = KeyringStore::new("nsh-mail") {
         // Secret Service can be present yet locked or broken; probe before trusting it.
         if k.get("probe").is_ok() {

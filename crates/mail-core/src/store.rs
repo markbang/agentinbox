@@ -226,7 +226,7 @@ impl MailDb {
         Self::open_inner(path, true)
     }
 
-    /// Opens without migrating the feed, for `nsh-mail-server rebuild-feed`: that command must be
+    /// Opens without migrating the feed, for `agentinbox-server rebuild-feed`: that command must be
     /// able to repair a projection the migration would refuse to accept.
     pub fn open_unmigrated(path: &Path) -> Result<Self> {
         Self::open_inner(path, false)
@@ -454,7 +454,7 @@ fn import(conn: &mut Connection, user: i64) -> Result<ImportCounts> {
         if !has_table(conn, "legacy", table)? {
             return Err(err(
                 ErrorCode::Storage,
-                format!("not an nsh-mail database: it has no {table} table"),
+                format!("not an AgentInbox database: it has no {table} table"),
             ));
         }
     }

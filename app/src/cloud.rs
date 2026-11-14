@@ -1,4 +1,4 @@
-//! `CloudBackend`: mail through an nsh-mail server (docs/design.md §4). REST
+//! `CloudBackend`: mail through an AgentInbox server (docs/design.md §4). REST
 //! goes through the engine's `fetch`, events come over a WebSocket that
 //! reconnects with backoff, and on the web Web Push covers a closed page.
 //! Nothing is cached on the device yet: without the server, lists are empty.
@@ -345,7 +345,7 @@ async fn listen(url: String, sys: System, emit: Events) {
     }
 }
 
-/// Mail through an nsh-mail server (see the module's docs).
+/// Mail through an AgentInbox server (see the module's docs).
 pub struct CloudBackend(Rc<Inner>);
 
 impl CloudBackend {

@@ -42,11 +42,12 @@ pub fn rotate_secrets(
     }
     if !failures.is_empty() {
         let hint = if old.is_some() {
-            "Neither NSHMAIL_MASTER_KEY nor NSHMAIL_MASTER_KEY_OLD opens them: set \
-             NSHMAIL_MASTER_KEY_OLD to the key they were written with"
+            "Neither AGENTINBOX_MASTER_KEY nor AGENTINBOX_MASTER_KEY_OLD (NSHMAIL_MASTER_KEY_OLD) \
+             opens them: set AGENTINBOX_MASTER_KEY_OLD to the key they were written with"
         } else {
-            "If NSHMAIL_MASTER_KEY was changed, set NSHMAIL_MASTER_KEY_OLD to the previous key so \
-             they are re-encrypted at start; otherwise restore the previous NSHMAIL_MASTER_KEY"
+            "If AGENTINBOX_MASTER_KEY was changed, set AGENTINBOX_MASTER_KEY_OLD (NSHMAIL_MASTER_KEY_OLD) \
+             to the previous key so they are re-encrypted at start; otherwise restore the previous \
+             AGENTINBOX_MASTER_KEY"
         };
         bail!(
             "stored mail credentials do not decrypt: {}. {hint}. No file was changed.",
@@ -107,14 +108,14 @@ pub fn rotate_secrets(
             secrets = entries_total,
             rotated_files,
             rotated_secrets = rotated_entries,
-            "master key rotation done: every stored secret was verified under NSHMAIL_MASTER_KEY; \
-             NSHMAIL_MASTER_KEY_OLD can be removed"
+            "master key rotation done: every stored secret was verified under AGENTINBOX_MASTER_KEY; \
+             AGENTINBOX_MASTER_KEY_OLD (NSHMAIL_MASTER_KEY_OLD) can be removed"
         );
     } else {
         tracing::info!(
             files = plans.len(),
             secrets = entries_total,
-            "stored secrets verified under NSHMAIL_MASTER_KEY"
+            "stored secrets verified under AGENTINBOX_MASTER_KEY"
         );
     }
     Ok(())

@@ -24,9 +24,10 @@ env:
   CARGO_PROFILE_DEV_DEBUG: "0"
   CARGO_TERM_COLOR: always
   # Local mode's OAuth clients, baked in at build time (crates/mail-core/src/oauth.rs); unset secrets mean no OAuth sign-in.
-  NSHMAIL_GOOGLE_CLIENT_ID: ${{ secrets.NSHMAIL_GOOGLE_CLIENT_ID }}
-  NSHMAIL_GOOGLE_CLIENT_SECRET: ${{ secrets.NSHMAIL_GOOGLE_CLIENT_SECRET }}
-  NSHMAIL_MS_CLIENT_ID: ${{ secrets.NSHMAIL_MS_CLIENT_ID }}
+  # The repository secrets keep their old names: only the env names the build reads are new.
+  AGENTINBOX_GOOGLE_CLIENT_ID: ${{ secrets.NSHMAIL_GOOGLE_CLIENT_ID }}
+  AGENTINBOX_GOOGLE_CLIENT_SECRET: ${{ secrets.NSHMAIL_GOOGLE_CLIENT_SECRET }}
+  AGENTINBOX_MS_CLIENT_ID: ${{ secrets.NSHMAIL_MS_CLIENT_ID }}
 
 defaults:
   run:
@@ -82,7 +83,7 @@ jobs:
         with:
           shared-key: e2e-server
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - name: Cloud mode end to end (app, nsh-mail-server, GreenMail)
+      - name: Cloud mode end to end (app, agentinbox-server, GreenMail)
         run: .e2e/run.sh
       - &save-cache
         if: github.ref == 'refs/heads/main' && steps.cache.outputs.cache-hit != 'true'
@@ -224,14 +225,15 @@ jobs:
           fi
           android/prepare.sh --build "$(code $first)" "${sign[@]}"
           out=app/.nsh/out
-          mv "$out/nsh-mail.apk" "$out/nsh-mail-$first.apk"
+          mv "$out/AgentInbox.apk" "$out/agentinbox-$first.apk"
           [ "$RELEASE" = true ] || exit 0
           for abi in arm64-v8a armeabi-v7a x86_64; do
             (cd app && nsh package App.tsx --target android --abi "$abi" --build "$(code "$abi")" "${sign[@]}")
-            mv "$out/nsh-mail.apk" "$out/nsh-mail-$abi.apk"
+            mv "$out/AgentInbox.apk" "$out/agentinbox-$abi.apk"
           done
           # Google Play delivers each phone only its own libnsh.so.
           (cd app && nsh package App.tsx --target android --format aab --abi arm64-v8a,armeabi-v7a --build "$(code universal)" "${sign[@]}")
+          mv "$out/AgentInbox.aab" "$out/agentinbox.aab"
       - uses: actions/upload-artifact@v7
         with:
           name: android
@@ -321,7 +323,7 @@ jobs:
       # `nsh package` ships no extra files: the Web Push service worker goes next to index.html.
       - name: Add the service worker
         run: |
-          site="$RUNNER_TEMP/web/nsh-mail"
+          site="$RUNNER_TEMP/web/AgentInbox"
           cp web/sw.js "$site/sw.js"
           test -f "$site/index.html" && test -f "$site/sw.js"
           ls "$site"/nsh-bindgen.*.js
@@ -357,9 +359,12 @@ jobs:
           context: .
           file: crates/server/Dockerfile
           target: web
-          build-contexts: site=${{ runner.temp }}/web/nsh-mail
+          build-contexts: site=${{ runner.temp }}/web/AgentInbox
           push: ${{ github.ref == 'refs/heads/main' }}
+          # The old image name stays published for one release cycle, so a deployment can roll back.
           tags: |
+            ghcr.io/markbang/agentinbox:latest
+            ghcr.io/markbang/agentinbox:sha-${{ github.sha }}
             ghcr.io/markbang/nsh-mail:latest
             ghcr.io/markbang/nsh-mail:sha-${{ github.sha }}
           cache-from: type=gha
@@ -409,8 +414,8 @@ jobs:
           [ -f "$notes" ] && [ -f "docs/releases/$v.zh-CN.md" ] || { echo "::error::Write $notes and docs/releases/$v.zh-CN.md first."; exit 1; }
           a=$RUNNER_TEMP/a d=$RUNNER_TEMP/dist
           mkdir "$d"
-          for abi in arm64-v8a armeabi-v7a x86_64 universal; do cp "$a/android/nsh-mail-$abi.apk" "$d/nsh-mail-$v-$abi.apk"; done
-          cp "$a/android/nsh-mail.aab" "$d/nsh-mail-$v.aab"
+          for abi in arm64-v8a armeabi-v7a x86_64 universal; do cp "$a/android/agentinbox-$abi.apk" "$d/agentinbox-$v-$abi.apk"; done
+          cp "$a/android/agentinbox.aab" "$d/agentinbox-$v.aab"
           cp "docs/releases/$v.zh-CN.md" "$d/RELEASE_NOTES.zh-CN.md"
           if [ -n "$UPLOAD_TO" ]; then
             gh release upload "$tag" "$d"/* --clobber
@@ -421,8 +426,8 @@ jobs:
             gh release upload "$tag" "$d/SHA256SUMS.txt" --clobber
             exit 0
           fi
-          cp "$a/linux/nsh-mail.tar.gz" "$d/nsh-mail-$v-linux-x86_64.tar.gz"
-          cp "$a/windows/nsh-mail.zip" "$d/nsh-mail-$v-windows-x64.zip"
-          cp "$a/windows/nsh-mail-setup.exe" "$d/nsh-mail-$v-windows-x64-setup.exe"
+          cp "$a/linux/AgentInbox.tar.gz" "$d/agentinbox-$v-linux-x86_64.tar.gz"
+          cp "$a/windows/AgentInbox.zip" "$d/agentinbox-$v-windows-x64.zip"
+          cp "$a/windows/AgentInbox-setup.exe" "$d/agentinbox-$v-windows-x64-setup.exe"
           (cd "$d" && sha256sum -- * > SHA256SUMS.txt && cat SHA256SUMS.txt)
-          gh release create "$tag" "$d"/* --title "nsh-mail $v" --notes-file "$notes" --verify-tag
+          gh release create "$tag" "$d"/* --title "AgentInbox $v" --notes-file "$notes" --verify-tag

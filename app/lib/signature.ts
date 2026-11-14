@@ -2,7 +2,7 @@
 // composer shows the plain form under the "-- " delimiter (RFC 3676), editable
 // like the rest of the body; sending turns the body into an HTML part as well,
 // with the signature's formatting, as long as its block is still as added.
-import type { Account } from "nsh-mail/native";
+import type { Account } from "agentinbox/native";
 import type { ComposeInit, ComposeMode } from "./format";
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);

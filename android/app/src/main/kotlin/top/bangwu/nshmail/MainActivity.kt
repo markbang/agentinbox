@@ -104,6 +104,6 @@ class MainActivity : Activity() {
     }
 
     private companion object {
-        const val TAG = "nsh-mail"
+        const val TAG = "AgentInbox"
     }
 }

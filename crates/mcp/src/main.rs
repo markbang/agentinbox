@@ -6,15 +6,15 @@ use std::time::Duration;
 use notify_mcp::api::{DEFAULT_TIMEOUT, NotifyApi};
 
 const USAGE: &str = "\
-nsh-notify-mcp — the notification inbox of nsh-mail, for agents
+agentinbox-mcp — the AgentInbox notification feed, for agents
 
 Usage:
-  nsh-notify-mcp --server URL --key nb_…                stdio (what MCP clients launch)
-  nsh-notify-mcp --http 127.0.0.1:8099 --server URL      streamable HTTP at POST /mcp
+  agentinbox-mcp --server URL --key nb_…                stdio (what MCP clients launch)
+  agentinbox-mcp --http 127.0.0.1:8099 --server URL      streamable HTTP at POST /mcp
 
 Options:
-  --server URL    base URL of the nsh-mail server (env NSH_NOTIFY_SERVER)
-  --key KEY       API key starting with nb_ (env NSH_NOTIFY_KEY); required for
+  --server URL    base URL of the AgentInbox server (env AGENTINBOX_SERVER)
+  --key KEY       API key starting with nb_ (env AGENTINBOX_KEY); required for
                   stdio, optional for --http, where each request may bring its own
   --http ADDR     listen for MCP over HTTP instead of stdio
   --timeout SECS  give up on a REST call after this many seconds (default 15)
@@ -22,11 +22,11 @@ Options:
   -V, --version   the version
 
 Environment:
-  NSH_NOTIFY_SERVER, NSH_NOTIFY_KEY   the same as --server and --key
+  AGENTINBOX_SERVER, AGENTINBOX_KEY   the same as --server and --key
 
 Examples:
-  nsh-notify-mcp --server https://mail-api.bangwu.me --key nb_xxxxxxxx
-  nsh-notify-mcp --http 127.0.0.1:8099 --server http://127.0.0.1:8080 --key nb_xxxxxxxx
+  agentinbox-mcp --server https://mail-api.bangwu.me --key nb_xxxxxxxx
+  agentinbox-mcp --http 127.0.0.1:8099 --server http://127.0.0.1:8080 --key nb_xxxxxxxx
 ";
 
 struct Options {
@@ -46,7 +46,7 @@ async fn main() -> ExitCode {
             return ExitCode::SUCCESS;
         }
         Err(message) => {
-            eprintln!("nsh-notify-mcp: {message}\n\n{USAGE}");
+            eprintln!("agentinbox-mcp: {message}\n\n{USAGE}");
             return ExitCode::from(2);
         }
     };
@@ -54,7 +54,7 @@ async fn main() -> ExitCode {
     match run(&options).await {
         Ok(()) => ExitCode::SUCCESS,
         Err(message) => {
-            eprintln!("nsh-notify-mcp: {message}");
+            eprintln!("agentinbox-mcp: {message}");
             ExitCode::FAILURE
         }
     }
@@ -76,7 +76,7 @@ async fn run(options: &Options) -> Result<(), String> {
                 None => "each request's own Bearer key",
             };
             eprintln!(
-                "nsh-notify-mcp {}: {addr} over HTTP, inbox {}, auth: {auth}",
+                "agentinbox-mcp {}: {addr} over HTTP, inbox {}, auth: {auth}",
                 env!("CARGO_PKG_VERSION"),
                 options.server
             );
@@ -86,12 +86,12 @@ async fn run(options: &Options) -> Result<(), String> {
         }
         None => {
             let key = options.key.clone().ok_or(
-                "stdio mode needs an API key: pass --key nb_… or set NSH_NOTIFY_KEY \
+                "stdio mode needs an API key: pass --key nb_… or set AGENTINBOX_KEY \
                  (an MCP client's config can provide either)",
             )?;
             let backend = NotifyApi::new(options.server.clone(), key).with_timeout(options.timeout);
             eprintln!(
-                "nsh-notify-mcp {}: stdio, inbox {}",
+                "agentinbox-mcp {}: stdio, inbox {}",
                 env!("CARGO_PKG_VERSION"),
                 options.server
             );
@@ -103,8 +103,8 @@ async fn run(options: &Options) -> Result<(), String> {
 }
 
 fn parse(args: &[String]) -> Result<Option<Options>, String> {
-    let mut server = std::env::var("NSH_NOTIFY_SERVER").ok();
-    let mut key = std::env::var("NSH_NOTIFY_KEY").ok();
+    let mut server = std::env::var("AGENTINBOX_SERVER").ok();
+    let mut key = std::env::var("AGENTINBOX_KEY").ok();
     let mut http = None;
     let mut timeout = DEFAULT_TIMEOUT;
     let mut index = 0;
@@ -127,7 +127,7 @@ fn parse(args: &[String]) -> Result<Option<Options>, String> {
         match name {
             "-h" | "--help" => return Ok(None),
             "-V" | "--version" => {
-                println!("nsh-notify-mcp {}", env!("CARGO_PKG_VERSION"));
+                println!("agentinbox-mcp {}", env!("CARGO_PKG_VERSION"));
                 return Ok(None);
             }
             "--server" => server = Some(value(&mut index)?),
@@ -160,7 +160,7 @@ fn parse(args: &[String]) -> Result<Option<Options>, String> {
     let server = server
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty())
-        .ok_or("no inbox server: pass --server https://… or set NSH_NOTIFY_SERVER")?;
+        .ok_or("no inbox server: pass --server https://… or set AGENTINBOX_SERVER")?;
     if !(server.starts_with("http://") || server.starts_with("https://")) {
         return Err(format!(
             "--server {server}: start it with http:// or https://"

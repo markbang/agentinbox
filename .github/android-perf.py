@@ -16,7 +16,7 @@ import time
 
 PKG = "top.bangwu.nshmail"
 apk_dir, swipes = sys.argv[1], int(sys.argv[2]) if len(sys.argv) > 2 else 24
-apk = os.path.join(apk_dir, "nsh-mail.apk")
+apk = os.path.join(apk_dir, "AgentInbox.apk")
 
 
 def adb(*args, check=True):

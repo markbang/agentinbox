@@ -1,5 +1,5 @@
 {
-  "receiver": "nsh-mail",
+  "receiver": "agentinbox",
   "status": "firing",
   "state": "alerting",
   "title": "[FIRING:1] HighErrorRate",

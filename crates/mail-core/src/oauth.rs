@@ -32,18 +32,37 @@ fn baked(v: Option<&'static str>) -> Option<&'static str> {
     v.filter(|s| !s.is_empty())
 }
 
+/// The build-time setting under its new name, else its older `NSHMAIL_*` spelling.
+macro_rules! baked_var {
+    ($new:literal, $old:literal $(,)?) => {
+        option_env!($new).or(option_env!($old))
+    };
+}
+
 impl OAuthApps {
-    /// Client ids baked in at build time: `NSHMAIL_GOOGLE_CLIENT_ID`, `NSHMAIL_GOOGLE_CLIENT_SECRET`,
-    /// `NSHMAIL_MS_CLIENT_ID`.
+    /// Client ids baked in at build time: `AGENTINBOX_GOOGLE_CLIENT_ID`,
+    /// `AGENTINBOX_GOOGLE_CLIENT_SECRET`, `AGENTINBOX_MS_CLIENT_ID`; the older `NSHMAIL_*`
+    /// spellings still work.
     pub fn builtin() -> Self {
         Self {
             // CI sets unconfigured secrets to "": treat that as unset.
-            google: baked(option_env!("NSHMAIL_GOOGLE_CLIENT_ID")).map(|id| OAuthApp {
+            google: baked(baked_var!(
+                "AGENTINBOX_GOOGLE_CLIENT_ID",
+                "NSHMAIL_GOOGLE_CLIENT_ID"
+            ))
+            .map(|id| OAuthApp {
                 client_id: id.to_string(),
-                client_secret: baked(option_env!("NSHMAIL_GOOGLE_CLIENT_SECRET"))
-                    .map(str::to_string),
+                client_secret: baked(baked_var!(
+                    "AGENTINBOX_GOOGLE_CLIENT_SECRET",
+                    "NSHMAIL_GOOGLE_CLIENT_SECRET",
+                ))
+                .map(str::to_string),
             }),
-            microsoft: baked(option_env!("NSHMAIL_MS_CLIENT_ID")).map(|id| OAuthApp {
+            microsoft: baked(baked_var!(
+                "AGENTINBOX_MS_CLIENT_ID",
+                "NSHMAIL_MS_CLIENT_ID"
+            ))
+            .map(|id| OAuthApp {
                 client_id: id.to_string(),
                 client_secret: None,
             }),
@@ -52,8 +71,8 @@ impl OAuthApps {
 
     pub fn get(&self, provider: OAuthProvider) -> Result<&OAuthApp> {
         let (app, var) = match provider {
-            OAuthProvider::Google => (&self.google, "NSHMAIL_GOOGLE_CLIENT_ID"),
-            OAuthProvider::Microsoft => (&self.microsoft, "NSHMAIL_MS_CLIENT_ID"),
+            OAuthProvider::Google => (&self.google, "AGENTINBOX_GOOGLE_CLIENT_ID"),
+            OAuthProvider::Microsoft => (&self.microsoft, "AGENTINBOX_MS_CLIENT_ID"),
         };
         app.as_ref().ok_or_else(|| {
             err(
@@ -450,12 +469,12 @@ impl LoopbackAuthorization {
     }
 }
 
-const PAGE_DONE: &str = "<!doctype html><meta charset=utf-8><title>nsh-mail</title>\
-<p>Signed in. You can close this window and return to nsh-mail.</p>\
-<p>登录成功，可以关闭此页面并返回 nsh-mail。</p>";
-const PAGE_FAILED: &str = "<!doctype html><meta charset=utf-8><title>nsh-mail</title>\
-<p>Sign-in was not completed. Return to nsh-mail to try again.</p>\
-<p>登录未完成，请返回 nsh-mail 重试。</p>";
+const PAGE_DONE: &str = "<!doctype html><meta charset=utf-8><title>AgentInbox</title>\
+<p>Signed in. You can close this window and return to AgentInbox.</p>\
+<p>登录成功，可以关闭此页面并返回 AgentInbox。</p>";
+const PAGE_FAILED: &str = "<!doctype html><meta charset=utf-8><title>AgentInbox</title>\
+<p>Sign-in was not completed. Return to AgentInbox to try again.</p>\
+<p>登录未完成，请返回 AgentInbox 重试。</p>";
 
 async fn respond(sock: &mut tokio::net::TcpStream, status: &str, body: &str) {
     let resp = format!(

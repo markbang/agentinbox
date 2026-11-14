@@ -6,7 +6,7 @@
 import { List, signal, Text, View, type JSX } from "nsh";
 import { Haptics } from "nsh/mobile";
 import { t } from "nsh/i18n";
-import type { Notification } from "nsh-mail/native";
+import type { Notification } from "agentinbox/native";
 import { Icon, ListItem, material, Row, Sheet, touch } from "../ui";
 import { dayLabel, dayOf, relativeDate } from "../lib/format";
 import { wide } from "../layout";

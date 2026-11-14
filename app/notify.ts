@@ -4,7 +4,7 @@
 // module keeps what the screens choose and what Undo awaits.
 import { batch, signal, Storage } from "nsh";
 import { t } from "nsh/i18n";
-import { Mail, type ApiKey, type CreatedApiKey, type CreatedSource, type NewApiKey, type NewSource, type Notification, type Source } from "nsh-mail/native";
+import { Mail, type ApiKey, type CreatedApiKey, type CreatedSource, type NewApiKey, type NewSource, type Notification, type Source } from "agentinbox/native";
 import { errorText, notificationsEnabled, onFeedChanged, onSession, showToast, UNDO_MS } from "./store";
 
 /** A page of the feed. */

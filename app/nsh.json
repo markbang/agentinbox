@@ -1,5 +1,5 @@
 {
-  "name": "nsh-mail",
+  "name": "AgentInbox",
   "id": "top.bangwu.nshmail",
   "version": "0.0.2",
   "build": 5,
@@ -35,7 +35,7 @@
     }
   },
   "window": {
-    "title": "nsh-mail",
+    "title": "AgentInbox",
     "defaultSize": { "width": 1180, "height": 760 },
     "minSize": { "width": 380, "height": 520 },
     "closeOnPress": false

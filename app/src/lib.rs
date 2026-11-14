@@ -1,5 +1,5 @@
-//! nsh-mail's Rust side: the `Mail` interface TSX imports from
-//! `nsh-mail/native` (docs/design.md §3) and its backends.
+//! AgentInbox's Rust side: the `Mail` interface TSX imports from
+//! `agentinbox/native` (docs/design.md §3) and its backends.
 
 mod attachments;
 mod backend;
@@ -28,8 +28,8 @@ pub use crate::{
     types::Js,
 };
 
-/// What `App.tsx` imports from `nsh-mail/native`.
-#[native_module("nsh-mail/native")]
+/// What `App.tsx` imports from `agentinbox/native`.
+#[native_module("agentinbox/native")]
 fn native(registry: &mut Registry) {
     registry.module::<Mail>();
     registry.module::<Push>();

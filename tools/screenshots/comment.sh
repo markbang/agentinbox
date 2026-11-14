@@ -4,7 +4,7 @@
 # Usage: comment.sh <pr> <dir> <url> <title>   (needs GH_TOKEN, GITHUB_REPOSITORY)
 set -euo pipefail
 pr=$1 dir=$2 url=$3 title=$4
-marker="<!-- nsh-mail-screenshots -->"
+marker="<!-- agentinbox-screenshots -->"
 body=$(mktemp)
 trap 'rm -f "$body"' EXIT
 {

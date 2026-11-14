@@ -484,7 +484,7 @@ fn check_mail_projection(conn: &Connection) -> Result<()> {
             ErrorCode::Storage,
             format!(
                 "the mail projection holds {projected} of {mail} mail messages; run \
-                 `nsh-mail-server rebuild-feed`"
+                 `agentinbox-server rebuild-feed`"
             ),
         ));
     }

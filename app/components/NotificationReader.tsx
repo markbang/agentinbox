@@ -2,7 +2,7 @@
 // and its actions (read, archive, open the link, open the mail it came from).
 import { openUrl, Text, View } from "nsh";
 import { t } from "nsh/i18n";
-import type { Notification, Source } from "nsh-mail/native";
+import type { Notification, Source } from "agentinbox/native";
 import { Button, Divider, IconButton } from "../ui";
 import { PageScroll } from "./PageHeader";
 import { fullDate } from "../lib/format";

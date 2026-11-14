@@ -1,7 +1,7 @@
 // Formatting for people: dates, names and addresses, reply quoting.
 import { locale } from "nsh";
 import { t } from "nsh/i18n";
-import type { Address, Message, Outgoing } from "nsh-mail/native";
+import type { Address, Message, Outgoing } from "agentinbox/native";
 
 const DAY = 86_400_000;
 

@@ -68,7 +68,7 @@ androidComponents {
 
 dependencies {
     // prepare.sh writes it: nsh.aar with the libnsh.so nsh builds for the app's crate.
-    implementation(files("libs/nsh-mail.aar"))
+    implementation(files("libs/agentinbox.aar"))
     implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
     implementation("com.google.firebase:firebase-messaging")
 }

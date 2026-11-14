@@ -1,4 +1,4 @@
-use nsh_mail_server::{Config, build, router};
+use agentinbox_server::{Config, build, config::var, router};
 use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
@@ -13,7 +13,7 @@ async fn main() {
     }
     // Writes the OpenAPI document to stdout; CI keeps docs/openapi.json in step with it.
     if std::env::args().nth(1).as_deref() == Some("openapi") {
-        println!("{}", nsh_mail_server::agent::openapi_json());
+        println!("{}", agentinbox_server::agent::openapi_json());
         return;
     }
     tracing_subscriber::fmt()
@@ -22,7 +22,7 @@ async fn main() {
         )
         .init();
     if let Err(e) = run().await {
-        eprintln!("nsh-mail-server: {e:#}");
+        eprintln!("agentinbox-server: {e:#}");
         std::process::exit(1);
     }
 }
@@ -49,7 +49,7 @@ async fn run() -> anyhow::Result<()> {
 /// `rebuild-feed`: the projection is derived data, so this is the repair for a feed that is wrong
 /// or was written by a buggy version. Counts go to stdout as JSON for an operator to keep.
 fn rebuild_feed() -> i32 {
-    let dir = std::env::var("NSHMAIL_DATA_DIR").unwrap_or_else(|_| "data".into());
+    let dir = var("AGENTINBOX_DATA_DIR").unwrap_or_else(|| "data".into());
     let path = std::path::Path::new(&dir).join("server.sqlite");
     let counts = mail_core::MailDb::open_unmigrated(&path).and_then(|db| db.rebuild_feed());
     match counts {
@@ -58,15 +58,14 @@ fn rebuild_feed() -> i32 {
             0
         }
         Err(e) => {
-            eprintln!("nsh-mail-server rebuild-feed: {}", e.message);
+            eprintln!("agentinbox-server rebuild-feed: {}", e.message);
             1
         }
     }
 }
 
 async fn healthcheck() -> i32 {
-    let port = std::env::var("NSHMAIL_BIND")
-        .ok()
+    let port = var("AGENTINBOX_BIND")
         .and_then(|b| b.parse::<std::net::SocketAddr>().ok())
         .map_or(8080, |a| a.port());
     match reqwest::get(format!("http://127.0.0.1:{port}/healthz")).await {

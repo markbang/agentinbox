@@ -2,7 +2,7 @@
 // with IMAP and an app password.
 import { signal, Text, View } from "nsh";
 import { t } from "nsh/i18n";
-import { Mail, type OAuthProvider } from "nsh-mail/native";
+import { Mail, type OAuthProvider } from "agentinbox/native";
 import { Button, Page, touch } from "../ui";
 import { PageHeader, PageScroll } from "../components/PageHeader";
 import { NavContext } from "../nav";

@@ -4,7 +4,7 @@
 // dialog with a stack of its own.
 import { context, signal } from "nsh";
 import { createNavStack, type NavStackState } from "nsh/base";
-import type { ApiKey, Source, SourceKind } from "nsh-mail/native";
+import type { ApiKey, Source, SourceKind } from "agentinbox/native";
 import type { ComposeInit } from "./lib/format";
 
 export type Route =

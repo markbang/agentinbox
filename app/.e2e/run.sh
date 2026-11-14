@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs the cloud-mode end-to-end test (.e2e/cloud.test.tsx): nsh-mail-server,
+# Runs the cloud-mode end-to-end test (.e2e/cloud.test.tsx): agentinbox-server,
 # built with `insecure-test-tls` to accept GreenMail's certificate, in a
 # fresh data directory, then `nsh test .e2e/cloud.test.tsx`. GreenMail must listen on 3993 /
 # 3465, or GREENMAIL_JAR names greenmail-standalone.jar to start it with java.
@@ -26,15 +26,16 @@ if ! listening 3993; then
   java -Dgreenmail.setup.test.all -Dgreenmail.auth.disabled -jar "$GREENMAIL_JAR" > "$data/greenmail.log" 2>&1 &
   pids+=($!)
 fi
-cargo build --manifest-path "$root/Cargo.toml" -p nsh-mail-server --features insecure-test-tls
+cargo build --manifest-path "$root/Cargo.toml" -p agentinbox-server --features insecure-test-tls
+# The old NSHMAIL_* spellings on purpose: this run proves they still work as aliases.
 NSHMAIL_MASTER_KEY=$(head -c 32 /dev/urandom | base64) \
   NSHMAIL_DATA_DIR="$data" \
   NSHMAIL_BIND="127.0.0.1:$port" \
   NSHMAIL_PUBLIC_URL="http://127.0.0.1:$port" \
-  "$root/target/debug/nsh-mail-server" > "$data/server.log" 2>&1 &
+  "$root/target/debug/agentinbox-server" > "$data/server.log" 2>&1 &
 pids+=($!)
 wait_for 3993 "GreenMail"
-wait_for "$port" "nsh-mail-server (log: $data/server.log)"
+wait_for "$port" "agentinbox-server (log: $data/server.log)"
 
 nsh test .e2e/cloud.test.tsx "$@" || {
   echo "--- server log" >&2

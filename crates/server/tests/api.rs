@@ -8,10 +8,10 @@ use std::{
     time::Duration,
 };
 
+use agentinbox_server::{Config, build, router};
 use axum::{Router, body::Bytes, extract::State, http::HeaderMap, routing::post};
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use futures_util::StreamExt;
-use nsh_mail_server::{Config, build, router};
 use reqwest::{Client, StatusCode};
 use serde_json::{Value, json};
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
@@ -32,7 +32,7 @@ fn unique(name: &str) -> String {
 }
 
 fn temp_dir() -> PathBuf {
-    let dir = std::env::temp_dir().join(unique("nsh-mail-server-"));
+    let dir = std::env::temp_dir().join(unique("agentinbox-server-"));
     std::fs::create_dir_all(&dir).unwrap();
     dir
 }

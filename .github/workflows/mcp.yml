@@ -23,5 +23,5 @@ jobs:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
       - run: cargo fmt --all --check
-      - run: cargo clippy -p nsh-notify-mcp --all-targets -- -D warnings
-      - run: cargo test -p nsh-notify-mcp
+      - run: cargo clippy -p agentinbox-mcp --all-targets -- -D warnings
+      - run: cargo test -p agentinbox-mcp

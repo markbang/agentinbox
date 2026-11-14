@@ -7,7 +7,7 @@
 // the user added. A message taken out of the outbox to edit ("edit:") is kept
 // in memory only: its composer puts it back in the outbox when it closes.
 import { cleanup, effect, signal, Storage, untracked, type Signal } from "nsh";
-import type { Account, DraftAttachment } from "nsh-mail/native";
+import type { Account, DraftAttachment } from "agentinbox/native";
 import { createAttachments, type Attachments } from "./lib/attachments";
 import { draftFor, type ComposeInit, type DraftFields } from "./lib/format";
 import { signatureBlock, withSignature } from "./lib/signature";

@@ -28,7 +28,7 @@ fn endpoint(host: &str, port: u16) -> Endpoint {
 }
 
 fn scratch(name: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("nshmail-{name}-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("agentinbox-{name}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     dir
@@ -140,7 +140,7 @@ fn local_mode_reads_replies_and_searches_real_mail() {
     let bob = format!("bob{}@test.local", std::process::id());
     deliver(&host, &bob, "Lunch on Friday?");
 
-    let ui_sets: Vec<Registry> = vec![nsh_base::registry(), nsh_app_nsh_mail::registry()];
+    let ui_sets: Vec<Registry> = vec![nsh_base::registry(), nsh_app_agentinbox::registry()];
     let entry = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("App.tsx");
     let bundle = nsh_testing::compile_tsx(entry, &ui_sets).expect("App.tsx builds");
     let mut config = EngineConfig {

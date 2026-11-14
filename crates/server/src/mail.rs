@@ -17,7 +17,7 @@ use crate::push::Push;
 
 /// One mail-core `Engine` per user over the shared mail tables in `server.sqlite`, with
 /// `users/<id>.secrets.json` for passwords and OAuth tokens (AES-256-GCM under
-/// `NSHMAIL_MASTER_KEY`). Opened lazily, then kept for the process lifetime so its sync and IDLE
+/// `AGENTINBOX_MASTER_KEY`). Opened lazily, then kept for the process lifetime so its sync and IDLE
 /// loops keep running.
 pub struct Mailboxes {
     db: MailDb,

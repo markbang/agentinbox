@@ -7,11 +7,11 @@ use std::{
     time::Duration,
 };
 
+use agentinbox_server::{Config, build, crypto::sha256, db::Db, router};
 use lettre::message::{Attachment, MultiPart, SinglePart, header::ContentType};
 use lettre::transport::smtp::client::{Tls, TlsParameters};
 use lettre::{AsyncSmtpTransport, AsyncTransport, Tokio1Executor};
 use mail_core_v0 as v0;
-use nsh_mail_server::{Config, build, crypto::sha256, db::Db, router};
 use reqwest::{Client, StatusCode};
 use serde_json::{Value, json};
 
@@ -30,7 +30,7 @@ fn unique(name: &str) -> String {
 }
 
 fn temp_dir() -> PathBuf {
-    let dir = std::env::temp_dir().join(unique("nsh-mail-migrate-"));
+    let dir = std::env::temp_dir().join(unique("agentinbox-migrate-"));
     std::fs::create_dir_all(dir.join("users")).unwrap();
     dir
 }

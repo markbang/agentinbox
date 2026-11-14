@@ -3,7 +3,7 @@ name = "mail-core"
 version = "0.1.0"
 edition = "2024"
 license = "MIT OR Apache-2.0"
-description = "Mail engine shared by the nsh-mail app (local mode) and server: IMAP sync, SMTP, MIME, SQLite store, OAuth, secrets."
+description = "Mail engine shared by the AgentInbox app (local mode) and server: IMAP sync, SMTP, MIME, SQLite store, OAuth, secrets."
 publish = false
 
 [features]

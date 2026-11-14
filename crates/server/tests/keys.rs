@@ -1,13 +1,13 @@
-//! Rotating NSHMAIL_MASTER_KEY and the VAPID key. No mail server needed.
+//! Rotating AGENTINBOX_MASTER_KEY and the VAPID key. No mail server needed.
 
 use std::{
     collections::BTreeMap,
     path::{Path, PathBuf},
 };
 
+use agentinbox_server::{Config, build, router};
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use mail_core::secrets::{EncryptedFileStore, SecretStore};
-use nsh_mail_server::{Config, build, router};
 use reqwest::{Client, StatusCode};
 use serde_json::{Value, json};
 use web_push_native::{
@@ -24,7 +24,7 @@ fn temp_dir() -> PathBuf {
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
         .as_nanos();
-    let dir = std::env::temp_dir().join(format!("nsh-mail-keys-{n}"));
+    let dir = std::env::temp_dir().join(format!("agentinbox-keys-{n}"));
     std::fs::create_dir_all(dir.join("users")).unwrap();
     dir
 }
@@ -115,6 +115,7 @@ async fn refuses_to_start_when_a_secret_opens_with_neither_key() {
             e.contains("4.secrets.json") && e.contains("6.secrets.json"),
             "{e}"
         );
+        // The error still names the old setting too, for a deployment that has not renamed its .env.
         assert!(e.contains("NSHMAIL_MASTER_KEY_OLD"), "{e}");
         assert_eq!(files(&dir), before, "files changed");
     }

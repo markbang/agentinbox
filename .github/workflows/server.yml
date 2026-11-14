@@ -45,16 +45,16 @@ jobs:
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
-      - run: cargo fmt -p nsh-mail-server --check
-      - run: cargo clippy -p nsh-mail-server --all-targets --locked -- -D warnings
+      - run: cargo fmt -p agentinbox-server --check
+      - run: cargo clippy -p agentinbox-server --all-targets --locked -- -D warnings
       - name: wait for GreenMail
         run: for i in $(seq 60); do (echo > /dev/tcp/127.0.0.1/3993) 2>/dev/null && exit 0; sleep 1; done; exit 1
-      - run: cargo test -p nsh-mail-server --locked
+      - run: cargo test -p agentinbox-server --locked
       - name: docs/openapi.json is current
         run: |
-          cargo run -p nsh-mail-server --locked -- openapi > /tmp/openapi.json
+          cargo run -p agentinbox-server --locked -- openapi > /tmp/openapi.json
           if ! diff -u docs/openapi.json /tmp/openapi.json; then
-            echo "::error file=docs/openapi.json::stale; run cargo run -p nsh-mail-server -- openapi > docs/openapi.json"
+            echo "::error file=docs/openapi.json::stale; run cargo run -p agentinbox-server -- openapi > docs/openapi.json"
             exit 1
           fi
 
@@ -78,7 +78,10 @@ jobs:
           context: .
           file: crates/server/Dockerfile
           push: ${{ github.event_name == 'push' }}
+          # The old image name stays published for one release cycle, so a deployment can roll back.
           tags: |
+            ghcr.io/markbang/agentinbox-server:latest
+            ghcr.io/markbang/agentinbox-server:sha-${{ github.sha }}
             ghcr.io/markbang/nsh-mail-server:latest
             ghcr.io/markbang/nsh-mail-server:sha-${{ github.sha }}
           cache-from: type=gha

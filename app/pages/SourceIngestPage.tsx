@@ -2,7 +2,7 @@
 // service's webhook field (or a script), send a test message, done.
 import { Clipboard, Text, View } from "nsh";
 import { t } from "nsh/i18n";
-import type { Source } from "nsh-mail/native";
+import type { Source } from "agentinbox/native";
 import { AppBar, Button, Card, Icon, IconButton, Page, SectionLabel } from "../ui";
 import { PageHeader, PageScroll } from "../components/PageHeader";
 import { SourceMark } from "../components/SourceMark";

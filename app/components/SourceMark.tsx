@@ -2,7 +2,7 @@
 // the priority dot of a high-priority notification, and a tag's pill. Colours
 // are the theme's chart roles, so light and dark come from the same token.
 import { Text, View } from "nsh";
-import type { Source } from "nsh-mail/native";
+import type { Source } from "agentinbox/native";
 import { Icon, type IconName } from "../ui";
 
 /** The icon of each kind, as its service is drawn everywhere. */

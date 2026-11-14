@@ -4,7 +4,7 @@
 import { Text, View } from "nsh";
 import { AlertDialog } from "nsh/base";
 import { t } from "nsh/i18n";
-import type { Source } from "nsh-mail/native";
+import type { Source } from "agentinbox/native";
 import { AppBar, Button, Card, Divider, Icon, IconButton, Menu, Page, SectionLabel } from "../ui";
 import { PageHeader, PageScroll } from "../components/PageHeader";
 import { SourceMark } from "../components/SourceMark";

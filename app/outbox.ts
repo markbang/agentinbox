@@ -4,7 +4,7 @@
 // Rust (local mode: the app's database) or on the server (cloud mode).
 import { signal, Storage } from "nsh";
 import { t } from "nsh/i18n";
-import { Mail, type Draft, type MailEvent, type Outgoing, type SendAt } from "nsh-mail/native";
+import { Mail, type Draft, type MailEvent, type Outgoing, type SendAt } from "agentinbox/native";
 import { sendDate } from "./lib/format";
 import { dismissToast, errorText, mailStatus, onSession, showToast, UNDO_MS } from "./store";
 
