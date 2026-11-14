@@ -1,4 +1,4 @@
-# nsh-mail client design
+# AgentInbox client design
 
 Calm, dense and quiet: a mail app people keep open all day. Content (senders, subjects, the message) carries the
 screen; color is spent on unread, flags, the account a message belongs to, and the one primary action.

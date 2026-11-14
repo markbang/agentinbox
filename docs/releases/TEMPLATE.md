@@ -1,4 +1,4 @@
-English | [简体中文](https://github.com/markbang/nsh-mail/releases/download/vX.Y.Z/RELEASE_NOTES.zh-CN.md)
+English | [简体中文](https://github.com/markbang/agentinbox/releases/download/vX.Y.Z/RELEASE_NOTES.zh-CN.md)
 
 <!-- Copy to docs/releases/X.Y.Z.md (and TEMPLATE.zh-CN.md to X.Y.Z.zh-CN.md), replace X.Y.Z, bump "build" in app/nsh.json, then push the tag vX.Y.Z. -->
 
@@ -10,11 +10,11 @@ English | [简体中文](https://github.com/markbang/nsh-mail/releases/download/
 
 | Platform | File | Notes |
 |---|---|---|
-| Android 8+ | `nsh-mail-X.Y.Z-arm64-v8a.apk`, `-armeabi-v7a.apk`, `-x86_64.apk`, `-universal.apk` | Release-signed. |
-| Android (Google Play) | `nsh-mail-X.Y.Z.aab` | App bundle with arm64-v8a and armeabi-v7a. |
-| Linux x86_64 | `nsh-mail-X.Y.Z-linux-x86_64.tar.gz` | Needs GTK 4.14+, and WebKitGTK 6.0 for HTML mail. |
-| Windows x64 | `nsh-mail-X.Y.Z-windows-x64-setup.exe`, `nsh-mail-X.Y.Z-windows-x64.zip` | Unsigned: SmartScreen warns on first run (More info → Run anyway). |
-| Server | `ghcr.io/markbang/nsh-mail` | Docker image of the cloud-mode server with the web client. |
+| Android 8+ | `agentinbox-X.Y.Z-arm64-v8a.apk`, `-armeabi-v7a.apk`, `-x86_64.apk`, `-universal.apk` | Release-signed. |
+| Android (Google Play) | `agentinbox-X.Y.Z.aab` | App bundle with arm64-v8a and armeabi-v7a. |
+| Linux x86_64 | `agentinbox-X.Y.Z-linux-x86_64.tar.gz` | Needs GTK 4.14+, and WebKitGTK 6.0 for HTML mail. |
+| Windows x64 | `agentinbox-X.Y.Z-windows-x64-setup.exe`, `agentinbox-X.Y.Z-windows-x64.zip` | Unsigned: SmartScreen warns on first run (More info → Run anyway). |
+| Server | `ghcr.io/markbang/agentinbox` | Docker image of the cloud-mode server with the web client. |
 
 Which APK? Most phones: arm64-v8a. Old 32-bit phones: armeabi-v7a. Emulators and Chromebooks: x86_64. Not sure: universal (larger). Google Play or enterprise distribution: the AAB.
 

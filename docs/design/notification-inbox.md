@@ -1,6 +1,6 @@
-# nsh-mail → notification inbox
+# AgentInbox: the notification inbox
 
-Product direction: nsh-mail stops being only a mail client and becomes a **notification inbox**: everything that wants to reach you — mail, webhooks, IM bots, Gotify/ntfy scripts — lands in one place, and an agent can read all of it with one API key. This builds on the existing app, server and `mail-core`; nothing is rewritten.
+Product direction: the app, previously nsh-mail, stops being only a mail client and becomes a **notification inbox**: everything that wants to reach you — mail, webhooks, IM bots, Gotify/ntfy scripts — lands in one place, and an agent can read all of it with one API key. This builds on the existing app, server and `mail-core`; nothing is rewritten.
 
 Design documents are English here; the Chinese version is [notification-inbox.zh-CN.md](notification-inbox.zh-CN.md).
 
@@ -47,7 +47,7 @@ Indexes: `(user_id, received_at DESC, id)`, `(user_id, source_id, received_at DE
 
 `id` is `msg_…` for ingested messages and the mail message id for mail; `seq` (the row's rowid) is monotonic per user and is what SSE resumes from.
 
-**Mail is projected, not moved.** Mail keeps its own tables (bodies, flags, thread keys, watermarks). Triggers on `accounts`, `folders` and `messages` write the matching `feed_messages` row in the same transaction, so the mail code path is unchanged; drafts and trash are not projected (they are not notifications) — a projected copy used by the unified feed, so the feed's paging, filters and SSE are one query and mail code stays untouched. A mail message that sits in Archive is projected with `archived_at` set, because archiving is how a notification is handled; that keeps the app's archive and an agent's archive the same thing. The projection is rebuildable (`nsh-mail-server rebuild-feed`), so a bug cannot lose mail. Tradeoff: one extra row per mail message (≈120 bytes plus text), accepted for a uniform feed.
+**Mail is projected, not moved.** Mail keeps its own tables (bodies, flags, thread keys, watermarks). Triggers on `accounts`, `folders` and `messages` write the matching `feed_messages` row in the same transaction, so the mail code path is unchanged; drafts and trash are not projected (they are not notifications) — a projected copy used by the unified feed, so the feed's paging, filters and SSE are one query and mail code stays untouched. A mail message that sits in Archive is projected with `archived_at` set, because archiving is how a notification is handled; that keeps the app's archive and an agent's archive the same thing. The projection is rebuildable (`agentinbox-server rebuild-feed`), so a bug cannot lose mail. Tradeoff: one extra row per mail message (≈120 bytes plus text), accepted for a uniform feed.
 
 ## 2. Ingestion
 
@@ -133,7 +133,7 @@ Archiving is one path for the app and for agents: a mail notification is moved t
 
 ### MCP
 
-A separate crate `crates/mcp` (`nsh-notify-mcp`), tools:
+A separate crate `crates/mcp` (`agentinbox-mcp`), tools:
 
 | Tool | Arguments |
 |---|---|
@@ -143,13 +143,13 @@ A separate crate `crates/mcp` (`nsh-notify-mcp`), tools:
 | `mark_read` | `{ id }` (write scope) |
 | `list_sources` | `{}` |
 
-Two transports: stdio (`nsh-notify-mcp --server https://… --key nb_…`) and HTTP (streamable HTTP at `/mcp` on the server, same Bearer key). README shows the exact config block for Claude Code, Codex and Cursor.
+Two transports: stdio (`agentinbox-mcp --server https://… --key nb_…`) and HTTP (streamable HTTP at `/mcp` on the server, same Bearer key). README shows the exact config block for Claude Code, Codex and Cursor.
 
 The crate is a library as much as a binary: `notify_mcp::router(factory)` returns a mountable `POST /mcp` that does no auth of its own (the mounting server's key check applies), and the `Notify` trait lets the server answer the tools from its own store without an HTTP hop. The standalone binary is the same dispatcher with a REST-backed `Notify`. The server mounts that router at `/mcp` behind its key check and answers from its store with the key's scope applied, so an agent that talks to `/mcp` needs no second address.
 
 ### OpenAPI
 
-Generated from the route definitions (`utoipa`), served at `/openapi.json` and rendered at `/docs` (Swagger UI, its assets vendored, so a server with no internet still documents itself). `nsh-mail-server openapi` prints the document and the same bytes are committed to `docs/openapi.json`, so an agent can read the API without a server; a test fails when the file and the routes drift apart.
+Generated from the route definitions (`utoipa`), served at `/openapi.json` and rendered at `/docs` (Swagger UI, its assets vendored, so a server with no internet still documents itself). `agentinbox-server openapi` prints the document and the same bytes are committed to `docs/openapi.json`, so an agent can read the API without a server; a test fails when the file and the routes drift apart.
 
 ## 4. For people: the app
 
@@ -162,7 +162,7 @@ Generated from the route definitions (`utoipa`), served at `/openapi.json` and r
 ## 5. Migration and production safety
 
 - New tables only; no column of an existing table changes meaning. Mail rows are projected in one transaction per user with counts checked (like #24), and `users/*.sqlite` imports run first.
-- Backup the volume before every deploy that touches this (existing procedure: stop, schedule `nsh-mail data backup (manual)`, dry-run on the copy, deploy).
+- Backup the volume before every deploy that touches this (existing procedure: stop, schedule the `nsh-mail data backup (manual)` Dokploy task, dry-run on the copy, deploy).
 - Existing clients keep working: `/v1/accounts`, `/v1/messages`, `/v1/threads` unchanged. The new endpoints are additive, and `/v1/messages` keeps its meaning (mail in one folder) — the agent feed is `/v1/feed` (§3).
 - The feed migration is versioned (`feed_meta`); version 2 marks mail that is already in Archive as archived in the feed, so a mailbox migrated later does not look like a pile of new notifications.
 - Rate limits and size caps on ingress; `payload` capped; HTML sanitized; tokens and API keys only stored hashed.
@@ -177,7 +177,7 @@ The product stops being just mail. Candidates (checked 2026-11-14: npm registry,
 | PingSink | free | 0 | `pingsink.io` |
 | NotifyInbox | free | 0 | `notifyinbox.dev` |
 
-Recommendation: **AgentInbox** — it says who reads it (agents) and what it is (an inbox), and the `.io` domain and npm name are free. Renaming the repository and the app needs the user's confirmation; until then the code, package id (`top.bangwu.nshmail`), image name and URLs stay as they are. No product name appears in API paths, so nothing breaks at rename time.
+Chosen: **AgentInbox** — it says who reads it (agents) and what it is (an inbox), and the `.io` domain and npm name are free. The rename is done ([README](../../README.md)): the repository moved to `markbang/agentinbox` and the app, images and packages carry the name. What stays for upgrades: the package id (`top.bangwu.nshmail`), the `nshmail://` scheme, the `nshmail.` storage keys, the `NSHMAIL_*` environment variables (aliases of `AGENTINBOX_*`), the data directory and database file names, and the old `ghcr.io/markbang/nsh-mail*` image tags (published for one release cycle). No product name appears in API paths, so nothing broke at rename time.
 
 ## 7. Milestones
 
