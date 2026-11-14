@@ -472,8 +472,10 @@ for mode in ("light", "dark"):
     adb("shell", "cmd", "uimode", "night", "yes" if mode == "dark" else "no")
     time.sleep(3)
 
-    # Signing out shows the onboarding. The confirmation is a system dialog the emulator is slow to
-    # draw, so the whole step is tried again rather than failing the run on its timing.
+    # Signing out shows the onboarding. A fresh launch puts Settings back at its top, where Sign out
+    # is, and the confirmation is a system dialog the emulator is slow to draw: try the step again
+    # rather than failing the run on its timing.
+    launch()
     if tap("Settings"):
         for attempt in range(1, 4):
             # A dialog left open by an attempt that missed covers the page under it.
@@ -488,19 +490,18 @@ for mode in ("light", "dark"):
             time.sleep(1)
             if attempt == 1:
                 shot(f"{mode}-sign-out-dialog")
-            # The dialog's own button: the system alert's positive button, not the page's under it.
+            # The dialog's own button: the one on Cancel's row, not the page's under the dialog.
             nodes_now = nodes()
-            positive = next((n for n in nodes_now if n.get("resource-id") == "android:id/button1"), None)
-            if positive is not None:
-                x, y = centre(positive)
+            cancel = next((n for n in nodes_now if n.get("text", "") == "Cancel"), None)
+            choices = [
+                n
+                for n in nodes_now
+                if n.get("text", "").lower() == "sign out" and n.get("resource-id", "") != "sign-out"
+            ]
+            if choices:
+                pick = min(choices, key=lambda n: abs(centre(n)[1] - centre(cancel)[1])) if cancel is not None else choices[-1]
+                x, y = centre(pick)
                 adb("shell", "input", "tap", str(x), str(y))
-            else:
-                cancel = next((n for n in nodes_now if n.get("text", "") == "Cancel"), None)
-                choices = [n for n in nodes_now if n.get("text", "").lower() == "sign out"]
-                if choices:
-                    pick = min(choices, key=lambda n: abs(centre(n)[1] - centre(cancel)[1])) if cancel is not None else choices[-1]
-                    x, y = centre(pick)
-                    adb("shell", "input", "tap", str(x), str(y))
             if find("id:onboarding", 15):
                 shot(f"{mode}-onboarding")
                 break
