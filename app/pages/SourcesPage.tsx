@@ -9,7 +9,7 @@ import { AppBar, Button, Card, Divider, Icon, IconButton, Menu, Page, SectionLab
 import { PageHeader, PageScroll } from "../components/PageHeader";
 import { SourceMark } from "../components/SourceMark";
 import { NavContext } from "../nav";
-import { deleteSource, rotateSource, setSourceEnabled, sources, testSource } from "../notify";
+import { deleteSource, rotateSource, serverInbox, setSourceEnabled, sources, testSource } from "../notify";
 
 export function SourcesPage() {
   const nav = NavContext();
@@ -54,39 +54,66 @@ export function SourcesPage() {
         label={t("sources.actions", { name: source.name })}
         trigger={<IconButton icon="more" label={t("sources.actions", { name: source.name })} testID={`source-more-${index}`} />}
         actions={[
-          { id: "test", label: t("sources.test"), icon: "bell", onSelect: () => void testSource(source) },
+          ...(serverInbox() ? [{ id: "test", label: t("sources.test"), icon: "bell" as const, onSelect: () => void testSource(source) }] : []),
           {
             id: "toggle",
             label: source.enabled ? t("sources.pause") : t("sources.resume"),
             icon: source.enabled ? "minus" : "check",
             onSelect: () => void setSourceEnabled(source, !source.enabled),
           },
-          ...(source.kind === "mail" ? [] : [{ id: "url", label: t("sources.showUrl"), icon: "key" as const, onSelect: () => void showUrl(source) }]),
-          ...(source.kind === "mail" ? [] : [{ id: "delete", label: t("sources.delete"), icon: "trash" as const, destructive: true, onSelect: () => void remove(source) }]),
+          ...(serverInbox() && source.kind !== "mail" ? [{ id: "url", label: t("sources.showUrl"), icon: "key" as const, onSelect: () => void showUrl(source) }] : []),
+          ...(serverInbox() && source.kind !== "mail"
+            ? [{ id: "delete", label: t("sources.delete"), icon: "trash" as const, destructive: true, onSelect: () => void remove(source) }]
+            : []),
         ]}
       />
     </View>
   );
+  const add = () => nav.stack.push({ name: "addSource" });
+  const addAction = () => (
+    <If when={serverInbox()}>
+      <IconButton icon="plus" label={t("sources.add")} onPress={add} testID="sources-add-top" />
+    </If>
+  );
   return (
     <Page
       title={t("sources.title")}
-      header={<PageHeader title={t("sources.title")} actions={<IconButton icon="plus" label={t("sources.add")} onPress={() => nav.stack.push({ name: "addSource" })} testID="sources-add-top" />} />}
-      appBar={<AppBar title={t("sources.title")} actions={<IconButton icon="plus" label={t("sources.add")} onPress={() => nav.stack.push({ name: "addSource" })} testID="sources-add-top" />} />}
+      header={<PageHeader title={t("sources.title")} actions={addAction()} />}
+      appBar={<AppBar title={t("sources.title")} actions={addAction()} />}
     >
       <PageScroll contentClass="gap-6 p-4" testID="sources">
-        <View class="flex-row items-start gap-3 rounded-large bg-surface-container-low p-4">
-          <Icon name="bell" tone="on-surface-variant" />
-          <Text class="flex-1 text-body-medium tracking-body-medium text-on-surface-variant">{t("sources.intro")}</Text>
-        </View>
+        <If
+          when={serverInbox()}
+          else={
+            <Card class="items-start gap-1 p-4" testID="sources-local">
+              <Text class="text-title-small font-medium tracking-title-small text-on-surface">{t("sources.localTitle")}</Text>
+              <Text class="text-body-medium tracking-body-medium text-on-surface-variant">{t("sources.localBody")}</Text>
+            </Card>
+          }
+        >
+          <View class="flex-row items-start gap-3 rounded-large bg-surface-container-low p-4">
+            <Icon name="bell" tone="on-surface-variant" />
+            <Text class="flex-1 text-body-medium tracking-body-medium text-on-surface-variant" testID="sources-intro">{t("sources.intro")}</Text>
+          </View>
+        </If>
         <View class="gap-1">
           <SectionLabel label={t("sources.list")} class="px-1" />
           <If
             when={sources().length}
             else={
-              <Card class="items-start gap-2 p-4">
-                <Text class="text-body-large tracking-body-large text-on-surface">{t("sources.empty")}</Text>
-                <Text class="text-body-medium tracking-body-medium text-on-surface-variant">{t("sources.emptyHint")}</Text>
-                <Button icon="plus" label={t("sources.add")} onPress={() => nav.stack.push({ name: "addSource" })} class="mt-2" testID="sources-add-empty" />
+              <Card class="items-start gap-2 p-4" testID="sources-local-empty">
+                <Text class="text-body-large tracking-body-large text-on-surface">
+                  {serverInbox() ? t("sources.empty") : t("sources.localEmpty")}
+                </Text>
+                <Text class="text-body-medium tracking-body-medium text-on-surface-variant">
+                  {serverInbox() ? t("sources.emptyHint") : t("sources.localEmptyHint")}
+                </Text>
+                <If
+                  when={serverInbox()}
+                  else={<Button icon="plus" label={t("accounts.add")} onPress={() => nav.stack.push({ name: "addAccount" })} class="mt-2" testID="sources-local-add" />}
+                >
+                  <Button icon="plus" label={t("sources.add")} onPress={add} class="mt-2" testID="sources-add-empty" />
+                </If>
               </Card>
             }
           >
@@ -101,10 +128,14 @@ export function SourcesPage() {
                   </>
                 )}
               </Each>
-              <Divider inset />
-              <View class="p-3">
-                <Button variant="text" icon="plus" label={t("sources.add")} onPress={() => nav.stack.push({ name: "addSource" })} class="self-start" testID="sources-add" />
-              </View>
+              <If when={serverInbox()}>
+                <>
+                  <Divider inset />
+                  <View class="p-3">
+                    <Button variant="text" icon="plus" label={t("sources.add")} onPress={add} class="self-start" testID="sources-add" />
+                  </View>
+                </>
+              </If>
             </Card>
           </If>
         </View>

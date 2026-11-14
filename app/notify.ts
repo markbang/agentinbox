@@ -5,7 +5,7 @@
 import { batch, signal, Storage } from "nsh";
 import { t } from "nsh/i18n";
 import { Mail, type ApiKey, type CreatedApiKey, type CreatedSource, type NewApiKey, type NewSource, type Notification, type Source } from "agentinbox/native";
-import { errorText, notificationsEnabled, onFeedChanged, onSession, showToast, UNDO_MS } from "./store";
+import { errorText, mailStatus, notificationsEnabled, onFeedChanged, onSession, showToast, UNDO_MS } from "./store";
 
 /** A page of the feed. */
 const PAGE = 40;
@@ -43,6 +43,9 @@ const leaving = signal<Record<string, true>>({});
 
 /** Every source, in the order they were added. */
 export const sources = () => sourceList();
+/** Whether this mode has the server's half of the inbox: sources beyond the mail accounts, their
+ * ingest URLs and the API keys agents read the feed with are all kept on an nsh-mail server. */
+export const serverInbox = () => mailStatus().serverFeed;
 export const sourceById = (id: string | null | undefined) => sourceList().find((s) => s.id === id);
 /** The feed's rows: the chosen source, minus the ones archived with Undo still open. */
 export const notifications = () => {
@@ -364,6 +367,11 @@ export async function rotateSource(source: Source): Promise<CreatedSource> {
 }
 
 export async function loadKeys() {
+  // Local mode has no keys: the page says so instead of asking the backend.
+  if (!serverInbox()) {
+    keyState.set("idle");
+    return;
+  }
   keyState.set("loading");
   try {
     keys.set(await Mail.apiKeys());
@@ -422,7 +430,12 @@ export async function feedSessionChanged() {
   if (apiKeys().length === 0) void loadKeys();
 }
 
-// The feed follows the engine: reloads when something arrives or a session starts.
+// The feed follows the engine: reloads when something arrives or a session starts. Events come
+// in bursts (a sync's folders, a stream catching up after a reconnect), so one reload serves them.
+let changeTimer: ReturnType<typeof setTimeout> | undefined;
 onSession(() => void feedSessionChanged());
-onFeedChanged(() => void loadFeed());
+onFeedChanged(() => {
+  clearTimeout(changeTimer);
+  changeTimer = setTimeout(() => void loadFeed(), 150);
+});
 void loadRules();

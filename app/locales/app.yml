@@ -953,6 +953,12 @@ notify.noSources:
 notify.noSourcesHint:
   en: A webhook, Gotify, ntfy or a chat bot writes into this feed. Add a source to start.
   zh-CN: Webhook、Gotify、ntfy 或聊天机器人都会写进这个收件箱。先添加一个来源。
+notify.noAccounts:
+  en: No mail accounts yet
+  zh-CN: 还没有邮箱账号
+notify.noAccountsHint:
+  en: Add a mail account and its mail lands here. Webhooks and bots need an AgentInbox server.
+  zh-CN: 添加邮箱账号后，它的邮件就会出现在这里。Webhook 和机器人需要 AgentInbox 服务器。
 notify.empty:
   en: No notifications
   zh-CN: 没有通知
@@ -1112,6 +1118,18 @@ sources.empty:
 sources.emptyHint:
   en: Add a webhook and paste its URL into the service that should reach you.
   zh-CN: 添加一个 Webhook，把地址填到要给你发消息的服务里。
+sources.localTitle:
+  en: Only your mail on this device
+  zh-CN: 本机只有邮件
+sources.localBody:
+  en: Webhooks, Gotify, ntfy and chat bots live on an AgentInbox server, which gives each one its own ingest URL. Sign in to cloud mode to add them; your mail stays in the feed either way.
+  zh-CN: Webhook、Gotify、ntfy 和聊天机器人由 AgentInbox 服务器接收，每个来源有独立的接收地址。登录云端模式后即可添加；无论哪种模式，邮件都会出现在收件箱里。
+sources.localEmpty:
+  en: No mail accounts yet
+  zh-CN: 还没有邮箱账号
+sources.localEmptyHint:
+  en: Add an account and its mail joins the feed. Other kinds of source need an AgentInbox server.
+  zh-CN: 添加邮箱账号后，它的邮件就会出现在收件箱里。其他类型的来源需要 AgentInbox 服务器。
 sources.chooseKind:
   en: What kind of source?
   zh-CN: 选择来源类型
@@ -1215,6 +1233,12 @@ keys.list:
 keys.intro:
   en: "Agents read the feed with a key: the REST API, the event stream and MCP all take it as a Bearer token."
   zh-CN: 智能体用密钥读取收件箱：REST 接口、事件流和 MCP 都用它作为 Bearer 令牌。
+keys.localTitle:
+  en: API keys need a server
+  zh-CN: API 密钥需要服务器
+keys.localBody:
+  en: A key lets an agent read the feed over REST, the event stream or MCP, and those live on an AgentInbox server. Sign in to cloud mode to create one; this device's mail is read in the app alone.
+  zh-CN: 密钥让智能体通过 REST、事件流或 MCP 读取收件箱，这些都在 AgentInbox 服务器上提供。登录云端模式后即可创建；本机邮件只在应用内查看。
 keys.empty:
   en: No keys yet
   zh-CN: 还没有密钥

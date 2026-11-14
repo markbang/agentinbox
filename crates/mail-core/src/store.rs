@@ -889,6 +889,12 @@ impl Store {
         lock(&self.conn)
     }
 
+    /// The notification feed of this store's user, read and written on the same connection as
+    /// the mail tables so a projected mail row and its message cannot be seen apart.
+    pub(crate) fn feed(&self) -> crate::feed::Feed {
+        crate::feed::Feed::new(self.conn.clone(), self.user)
+    }
+
     pub fn insert_account(&self, account: &Account) -> Result<()> {
         self.conn().execute(
             "INSERT INTO accounts (user_id, id, position, data)

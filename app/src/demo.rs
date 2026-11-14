@@ -972,6 +972,11 @@ impl Backend for DemoBackend {
         })
     }
 
+    fn server_feed(&self) -> bool {
+        // The demo stands in for cloud mode's server: every source and key works.
+        true
+    }
+
     fn sources(&self) -> MailFuture<'_, Vec<Source>> {
         ok(Ok(self.data.borrow().sources.clone()))
     }

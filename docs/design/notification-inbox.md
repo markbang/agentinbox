@@ -158,6 +158,7 @@ Generated from the route definitions (`utoipa`), served at `/openapi.json` and r
 - **API keys** in Settings: create (name, scope, sources, expiry), copy once, see last use, revoke.
 - **Notifications**: per source and priority — notify / silent / off, on top of the existing per-account mail settings.
 - Mail keeps its current screens; the mail inbox stays the default view for people who only have mail.
+- **Modes.** Cloud mode is the whole inbox: the feed, its sources and the keys are the server's (`/v1/feed`, `/v1/sources`, `/v1/keys`), and `/v1/stream` pushes each change into the app, which reloads the feed, so new notifications reach the screen and the system's notifications without a poll. Local mode is the device's own mail: the feed is `mail.sqlite`'s (mail is projected there, §1), and sources are the mail accounts. Opening a mail notification sets the mail's own flag and archiving one moves the message to Archive, both through the engine, so a local mailbox and the feed cannot disagree. Webhooks, ingest URLs, IM sources and agent keys are the server's alone, so in local mode those screens say so instead of offering them, and the backend answers `ERR_UNSUPPORTED` with what to do (sign in to cloud mode; remove the account for a mail source).
 
 ## 5. Migration and production safety
 

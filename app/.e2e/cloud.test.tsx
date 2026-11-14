@@ -198,3 +198,85 @@ test("cloud mode: attachments upload in chunks, arrive whole, forward, and stay 
   await bobs.press("id:thread-older >> text:me");
   await bobs.waitFor("id:reader >> text:截图.png", slow);
 }, 240_000);
+
+/** A real request: the test's process has no network, so `.e2e/hook.tsx` makes it with the app's. */
+async function request(method: string, url: string, headers: Record<string, string> = {}, body?: string) {
+  const app = await open("./hook.tsx", {
+    ...desktop,
+    storage: { "hook.request": JSON.stringify({ method, url, headers, body }) },
+  });
+  await app.waitFor("text:/^status /", slow);
+  const answer = app.texts().find((text) => text.startsWith("status ") || text.startsWith("error ")) ?? "";
+  const [status, ...rest] = answer.split("\n");
+  return { status, body: rest.join("\n") };
+}
+
+test("cloud mode: a webhook lands live in the feed, reads, archives, and an agent's key reads it", async () => {
+  const run = Date.now();
+  const alices = await signUp(`alice${run}n@test.local`);
+
+  // Settings → Sources → Add: a webhook, whose ingest URL the server answers once.
+  await alices.press("id:open-settings");
+  await alices.press("id:settings-sources");
+  await alices.waitFor("id:sources");
+  await alices.press("id:sources-add-top");
+  await alices.press("id:kind-webhook");
+  await alices.type("id:source-name", "Deploys");
+  await alices.press("id:source-create");
+  await alices.waitFor("id:source-url", slow);
+  const hook = alices.texts().find((text) => /^https?:\/\/[^\s]+\/hooks\/\S+$/.test(text));
+  expect(hook).toBeTruthy();
+  await alices.press("id:source-done");
+  await alices.back();
+  await alices.back();
+  await alices.waitFor("id:modal", { state: "gone" });
+
+  // The feed is empty and the rail says so before anything arrives.
+  await alices.press("id:rail-notifications");
+  await alices.waitFor("id:notify-list");
+  expect(alices.shows("id:notify-list >> text:Deploy finished")).toBe(false);
+
+  // A service posts to the URL: the notification reaches the feed live, over the stream.
+  const posted = await request(
+    "POST",
+    hook!,
+    { "content-type": "application/json" },
+    JSON.stringify({ title: "Deploy finished", message: "AgentInbox 0.0.4 is live on every target", priority: 7 }),
+  );
+  expect(posted.status).toBe("status 202");
+  await alices.waitFor("id:notify-list >> text:Deploy finished", slow);
+  // Its source's chip carries it, so the feed knows the source the server made.
+  await alices.waitFor("id:notify-filters >> text:Deploys");
+
+  // Opening it marks it read on the server, as the mail list does.
+  await alices.press("id:notify-list >> text:Deploy finished");
+  await alices.waitFor("id:notify-body", slow);
+  expect(alices.texts().some((text) => text.includes("live on every target"))).toBe(true);
+  await alices.waitUntil(() => alices.requests().some((r) => r.method === "POST" && r.url === `${server}/v1/feed/read`), slow);
+
+  // Archiving takes it out of the feed once Undo has passed, on the server too.
+  await alices.press("id:notify-archive");
+  await alices.waitUntil(() => alices.requests().some((r) => r.method === "POST" && r.url === `${server}/v1/feed/archive`), slow);
+  await alices.waitFor("id:notify-list >> text:Deploy finished", { state: "gone", timeout: 30_000 });
+
+  // An agent's key: created in Settings, then used against the REST API for real.
+  await alices.press("id:open-settings");
+  await alices.press("id:settings-keys");
+  await alices.press("id:keys-add-top");
+  await alices.type("id:key-name", "Deploy bot");
+  await alices.press("id:key-write");
+  await alices.press("id:key-create");
+  await alices.waitFor("id:key-token", slow);
+  const key = alices.texts().find((text) => text.startsWith("nb_"));
+  expect(key).toBeTruthy();
+
+  // A second notification, read back with the key: the feed, its unread count and its source.
+  const again = await request("POST", hook!, { "content-type": "application/json" }, JSON.stringify({ title: "Nightly build passed" }));
+  expect(again.status).toBe("status 202");
+  const read = await request("GET", `${server}/v1/feed?unread=1`, { authorization: `Bearer ${key}` });
+  expect(read.status).toBe("status 200");
+  expect(read.body).toContain("Nightly build passed");
+  expect(read.body).toContain('"unread":1');
+  // The archived one is out of the default view.
+  expect(read.body).not.toContain("Deploy finished");
+}, 240_000);

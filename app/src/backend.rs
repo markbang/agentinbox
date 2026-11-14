@@ -85,6 +85,12 @@ pub trait Backend {
     // The notification inbox (docs/design/notification-inbox.md §3). A backend
     // without it answers `ERR_UNSUPPORTED`; `DemoBackend` serves it in memory.
 
+    /// Whether this backend has the server's half of the inbox: sources beyond the mail
+    /// accounts, their ingest URLs and the agent API keys. A device-only backend has not.
+    fn server_feed(&self) -> bool {
+        false
+    }
+
     /// Every source, in the order they were added.
     fn sources(&self) -> MailFuture<'_, Vec<Source>> {
         unavailable("this build has no notification sources")
