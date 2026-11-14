@@ -69,9 +69,9 @@ jobs:
         run: |
           RUSTFLAGS="--cfg nshmail_demo" nsh package App.tsx --target android --abi x86_64 --out .nsh/ui
           # The frame measurements scroll the large mailbox (10,000 messages, 2,000 conversations).
-          mv .nsh/ui/nsh-mail.apk .nsh/ui/nsh-mail-demo.apk
+          mv .nsh/ui/AgentInbox.apk .nsh/ui/agentinbox-demo.apk
           RUSTFLAGS="--cfg nshmail_demo --cfg nshmail_demo_large" nsh package App.tsx --target android --abi x86_64 --out .nsh/perf
-          mv .nsh/ui/nsh-mail-demo.apk .nsh/ui/nsh-mail.apk
+          mv .nsh/ui/agentinbox-demo.apk .nsh/ui/AgentInbox.apk
       - uses: actions/cache/save@v6
         if: github.ref == 'refs/heads/main' && steps.cache.outputs.cache-hit != 'true'
         with:

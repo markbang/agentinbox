@@ -2,7 +2,7 @@
 // servers, so on the web only a server (cloud mode) is offered.
 import { Notifications, platform, Scroll, signal, Text, UrlScheme, View } from "nsh";
 import { t } from "nsh/i18n";
-import { Mail } from "nsh-mail/native";
+import { Mail } from "agentinbox/native";
 import { Button, Choice, Icon, Row, TextField, type IconName } from "../ui";
 import { errorText, sessionChanged } from "../store";
 

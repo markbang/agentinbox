@@ -1,7 +1,7 @@
-# Self-hosting: put NSHMAIL_MASTER_KEY (openssl rand -base64 32) and other settings in .env, then `docker compose up -d`.
+# Self-hosting: put AGENTINBOX_MASTER_KEY (openssl rand -base64 32) and other settings in .env, then `docker compose up -d`.
 services:
   server:
-    image: ghcr.io/markbang/nsh-mail-server:latest
+    image: ghcr.io/markbang/agentinbox-server:latest
     build:
       context: .
       dockerfile: crates/server/Dockerfile
@@ -12,7 +12,8 @@ services:
       - path: .env
         required: false
     environment:
-      NSHMAIL_MASTER_KEY: ${NSHMAIL_MASTER_KEY:?set NSHMAIL_MASTER_KEY in .env (openssl rand -base64 32)}
+      # The old NSHMAIL_MASTER_KEY in an existing .env still works.
+      AGENTINBOX_MASTER_KEY: ${AGENTINBOX_MASTER_KEY:-${NSHMAIL_MASTER_KEY:?set AGENTINBOX_MASTER_KEY in .env (openssl rand -base64 32)}}
     volumes:
       - data:/data
 

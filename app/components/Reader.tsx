@@ -6,7 +6,7 @@
 // and flag act on the whole conversation; reply and forward on the message.
 import { createMotion, reduceMotion, Scroll, signal, Text, View } from "nsh";
 import { t } from "nsh/i18n";
-import { Mail, type Attachment, type Message, type Summary } from "nsh-mail/native";
+import { Mail, type Attachment, type Message, type Summary } from "agentinbox/native";
 import { AccountMark, Avatar, Button, Divider, FileTile, FloatingToolbar, Icon, IconButton, LoadingIndicator, material, Menu, Row, ToolbarButton, touch } from "../ui";
 import { displayName, fileSize, fullDate, listDate, type ComposeMode } from "../lib/format";
 import {

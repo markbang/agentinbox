@@ -1,6 +1,6 @@
 //! The streamable HTTP transport: a POST is one JSON-RPC exchange, the key
 //! travels as a Bearer header, and the router can be mounted without its own
-//! auth (that is how the nsh-mail server will reuse it).
+//! auth (that is how the AgentInbox server will reuse it).
 
 mod support;
 
@@ -41,7 +41,7 @@ async fn http_transport_answers_the_handshake_and_tool_calls() {
     .json()
     .await
     .unwrap();
-    assert_eq!(init["result"]["serverInfo"]["name"], "nsh-notify");
+    assert_eq!(init["result"]["serverInfo"]["name"], "agentinbox");
 
     let list: Value = post(
         &client,

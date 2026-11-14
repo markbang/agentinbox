@@ -1116,7 +1116,7 @@ impl Notify for StoreNotify {
 #[derive(utoipa::OpenApi)]
 #[openapi(
     info(
-        title = "nsh-mail server",
+        title = "AgentInbox server",
         description = "Mail and notification API. Every `/v1` path takes the session token from \
                        `POST /v1/auth/login` as `Authorization: Bearer`, and the agent paths \
                        (`/v1/feed`, `/v1/stream`, `/mcp`) also take an API key `nb_…` created in \

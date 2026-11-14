@@ -69,7 +69,7 @@ pub async fn build(config: Config) -> Result<Arc<AppState>> {
     let (dir, key, old) = (users_dir.clone(), config.master_key, config.master_key_old);
     tokio::task::spawn_blocking(move || rotate::rotate_secrets(&dir, key, old)).await??;
     let http = reqwest::Client::builder()
-        .user_agent(concat!("nsh-mail-server/", env!("CARGO_PKG_VERSION")))
+        .user_agent(concat!("agentinbox-server/", env!("CARGO_PKG_VERSION")))
         .timeout(std::time::Duration::from_secs(30))
         .build()?;
     let vapid = push::load_vapid(config.vapid_private_key.as_deref(), &config.data_dir)?;

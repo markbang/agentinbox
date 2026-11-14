@@ -2,7 +2,7 @@
 // address, editable) and an app password.
 import { openUrl, signal, Text, View } from "nsh";
 import { t } from "nsh/i18n";
-import { Mail, type Endpoint, type Security, type ServerSettings } from "nsh-mail/native";
+import { Mail, type Endpoint, type Security, type ServerSettings } from "agentinbox/native";
 import { Button, Icon, Page, SectionLabel, SelectField, TextField, touch } from "../ui";
 import { PageHeader, PageScroll } from "../components/PageHeader";
 import { NavContext } from "../nav";

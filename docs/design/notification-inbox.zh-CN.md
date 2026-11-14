@@ -1,8 +1,8 @@
-# nsh-mail → 通知收件箱
+# AgentInbox：通知收件箱
 
 [English](notification-inbox.md) | 简体中文
 
-产品方向：nsh-mail 不再只是邮件客户端，而是**通知收件箱**——邮件、webhook、IM 机器人、Gotify/ntfy 脚本发来的一切都落到同一个地方，agent 用一个 API key 就能全部读走。在现有的 App、服务端和 `mail-core` 上演进，不推倒重来。
+产品方向：最初叫 nsh-mail 的应用不再只是邮件客户端，而是**通知收件箱**——邮件、webhook、IM 机器人、Gotify/ntfy 脚本发来的一切都落到同一个地方，agent 用一个 API key 就能全部读走。在现有的 App、服务端和 `mail-core` 上演进，不推倒重来。
 
 ## 1. 数据模型
 
@@ -47,7 +47,7 @@
 
 `id` 对接收来的消息是 `msg_…`，对邮件就是邮件 id；`seq`（rowid）按用户单调递增，SSE 从它续传。
 
-**邮件是投影，不是搬家。** 邮件保留自己的表（正文、标记、线程、水位）。`accounts`、`folders`、`messages` 上的触发器在同一个事务里写对应的 `feed_messages` 行——所以邮件代码路径不变——草稿箱和垃圾箱不投影（它们不是通知）——统一 feed 用的投影副本，这样 feed 的分页、筛选和 SSE 都是一条查询，邮件代码完全不动。已经躺在 Archive 里的邮件按已归档投影（`archived_at` 就是邮件日期），因为归档就是“处理完了”，这样 App 的归档和 agent 的归档是同一件事。投影可重建（`nsh-mail-server rebuild-feed`），所以出 bug 也不会丢邮件。代价是每封邮件多一行（约 120 字节加文本），换来统一的 feed。
+**邮件是投影，不是搬家。** 邮件保留自己的表（正文、标记、线程、水位）。`accounts`、`folders`、`messages` 上的触发器在同一个事务里写对应的 `feed_messages` 行——所以邮件代码路径不变——草稿箱和垃圾箱不投影（它们不是通知）——统一 feed 用的投影副本，这样 feed 的分页、筛选和 SSE 都是一条查询，邮件代码完全不动。已经躺在 Archive 里的邮件按已归档投影（`archived_at` 就是邮件日期），因为归档就是“处理完了”，这样 App 的归档和 agent 的归档是同一件事。投影可重建（`agentinbox-server rebuild-feed`），所以出 bug 也不会丢邮件。代价是每封邮件多一行（约 120 字节加文本），换来统一的 feed。
 
 ## 2. 入口
 
@@ -135,7 +135,7 @@ cursor 不透明（`receivedAt` + `id` 的 base64，按 `(receivedAt DESC, id DE
 
 ### MCP
 
-独立的 `crates/mcp`（`nsh-notify-mcp`），工具：
+独立的 `crates/mcp`（`agentinbox-mcp`），工具：
 
 | 工具 | 参数 |
 |---|---|
@@ -145,13 +145,13 @@ cursor 不透明（`receivedAt` + `id` 的 base64，按 `(receivedAt DESC, id DE
 | `mark_read` | `{ id }`（write 权限） |
 | `list_sources` | `{}` |
 
-两种传输：stdio（`nsh-notify-mcp --server https://… --key nb_…`）和服务端 HTTP（`/mcp`，同一个 Bearer key）。README 给出 Claude Code、Codex、Cursor 的接入配置。
+两种传输：stdio（`agentinbox-mcp --server https://… --key nb_…`）和服务端 HTTP（`/mcp`，同一个 Bearer key）。README 给出 Claude Code、Codex、Cursor 的接入配置。
 
 这个 crate 既是可执行文件也是库：`notify_mcp::router(factory)` 返回可挂载的 `POST /mcp`，自身不鉴权（由挂载它的服务器校验 key），`Notify` trait 让服务器直接用自己的存储回答工具调用，不必绕一圈 HTTP。服务端就在 `/mcp` 挂载它，前面加 key 检查，回答时应用 key 的范围，所以用 `/mcp` 的 agent 不需要第二个地址。独立可执行文件是同一个分发器，只是 `Notify` 走 REST。
 
 ### OpenAPI
 
-由路由定义自动生成（`utoipa`），`/openapi.json` 提供，`/docs` 渲染（Swagger UI，资源内置，断网部署也能看文档）。`nsh-mail-server openapi` 打印这份文档，同一份字节提交在 `docs/openapi.json`，agent 不连服务端也能读；路由和文件不一致时测试会失败。
+由路由定义自动生成（`utoipa`），`/openapi.json` 提供，`/docs` 渲染（Swagger UI，资源内置，断网部署也能看文档）。`agentinbox-server openapi` 打印这份文档，同一份字节提交在 `docs/openapi.json`，agent 不连服务端也能读；路由和文件不一致时测试会失败。
 
 ## 4. 给人的界面
 
@@ -179,7 +179,7 @@ cursor 不透明（`receivedAt` + `id` 的 base64，按 `(receivedAt DESC, id DE
 | PingSink | 空闲 | 0 | `pingsink.io` |
 | NotifyInbox | 空闲 | 0 | `notifyinbox.dev` |
 
-推荐 **AgentInbox**：既说明谁在读（agent），也说明它是什么（收件箱），`agentinbox.io` 和 npm 名都空着。改仓库名和 App 名称需要用户确认；在此之前代码、包名（`top.bangwu.nshmail`）、镜像名和 URL 都不动。API 路径里不含产品名，改名时不会破坏任何东西。
+最终选定 **AgentInbox**：既说明谁在读（agent），也说明它是什么（收件箱），`agentinbox.io` 和 npm 名都空着。改名已完成（见 [README](../../README.zh-CN.md)）：仓库改为 `markbang/agentinbox`，App、镜像和安装包都改用新名字。为升级保留的东西：包名（`top.bangwu.nshmail`）、`nshmail://` scheme、`nshmail.` 开头的存储键、`NSHMAIL_*` 环境变量（作为 `AGENTINBOX_*` 的别名）、数据目录和数据库文件名，以及旧的 `ghcr.io/markbang/nsh-mail*` 镜像标签（继续发布一个版本周期）。API 路径里不含产品名，所以改名没有破坏任何东西。
 
 ## 7. 里程碑
 

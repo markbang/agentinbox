@@ -148,7 +148,7 @@ function Main() {
           searchRef={(ref) => (search = ref)}
         />
       </View>
-      <Dialog open={isModalOpen()} onClose={closeModal} label="nsh-mail" size="3xl" height={modalFit()} bare testID="modal">
+      <Dialog open={isModalOpen()} onClose={closeModal} label="AgentInbox" size="3xl" height={modalFit()} bare testID="modal">
         <NavContext.Provider value={modalNavigator}>
           <NavStack state={modalStack} class="flex-1">
             {page}

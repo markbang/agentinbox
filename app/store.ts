@@ -5,7 +5,7 @@ import { batch, resource, signal, Storage } from "nsh";
 import { t } from "nsh/i18n";
 import { fileSize } from "./lib/format";
 import { clearDrafts, loadDrafts } from "./drafts";
-import { Mail, type Account, type Address, type Backfill, type ErrorInfo, type Flags, type Folder, type MailEvent, type Signature, type Status, type Summary, type Thread } from "nsh-mail/native";
+import { Mail, type Account, type Address, type Backfill, type ErrorInfo, type Flags, type Folder, type MailEvent, type Signature, type Status, type Summary, type Thread } from "agentinbox/native";
 
 const PAGE = 30;
 /** The most results a search shows. */

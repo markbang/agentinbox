@@ -4,8 +4,8 @@
     "id": 101,
     "status": "failed",
     "name": "main",
-    "url": "https://gitlab.com/bang/nsh-mail/-/pipelines/101"
+    "url": "https://gitlab.com/bang/agentinbox/-/pipelines/101"
   },
-  "project": { "name": "nsh-mail", "web_url": "https://gitlab.com/bang/nsh-mail" },
+  "project": { "name": "agentinbox", "web_url": "https://gitlab.com/bang/agentinbox" },
   "user": { "name": "Bang Wu", "username": "bang" }
 }

@@ -3,7 +3,7 @@
 import { signal, Text, View } from "nsh";
 import { AlertDialog } from "nsh/base";
 import { t } from "nsh/i18n";
-import type { ApiKey } from "nsh-mail/native";
+import type { ApiKey } from "agentinbox/native";
 import { AppBar, Button, Card, Divider, IconButton, ListItem, Menu, Page, SectionLabel } from "../ui";
 import { PageHeader, PageScroll } from "../components/PageHeader";
 import { fullDate } from "../lib/format";

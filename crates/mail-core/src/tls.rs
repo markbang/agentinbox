@@ -127,7 +127,7 @@ pub(crate) fn http_client() -> reqwest::Client {
     reqwest::Client::builder()
         .tls_backend_preconfigured(http_config())
         .timeout(std::time::Duration::from_secs(30))
-        .user_agent(concat!("nsh-mail/", env!("CARGO_PKG_VERSION")))
+        .user_agent(concat!("AgentInbox/", env!("CARGO_PKG_VERSION")))
         .build()
         .expect("HTTP client with a preconfigured rustls config")
 }

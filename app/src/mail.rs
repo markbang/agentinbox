@@ -265,7 +265,7 @@ impl Mail {
         if cfg!(target_arch = "wasm32") {
             return Err(js(Error::new(
                 ErrorCode::Unsupported,
-                "a browser cannot connect to mail servers: use an nsh-mail server",
+                "a browser cannot connect to mail servers: use an AgentInbox server",
             )));
         }
         open(Mode::Local, None, None, local_backend(None)?).await?;
@@ -273,7 +273,7 @@ impl Mail {
         Ok(())
     }
 
-    /// Signs in to (or, with `sign_up`, creates an account on) the nsh-mail
+    /// Signs in to (or, with `sign_up`, creates an account on) the AgentInbox
     /// server at `server`, and syncs through it. On the web an empty
     /// `server` is the page's own.
     pub async fn sign_in(

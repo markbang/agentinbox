@@ -6,7 +6,7 @@
 import { cleanup, keymap, Picker, platform, signal, Text, View } from "nsh";
 import { AlertDialog } from "nsh/base";
 import { t } from "nsh/i18n";
-import { Mail, type Draft as MailDraft, type Outgoing } from "nsh-mail/native";
+import { Mail, type Draft as MailDraft, type Outgoing } from "agentinbox/native";
 import { Button, Dialog, DialogBody, DialogFooter, IconButton, Menu, Page, SelectField, SplitButton, TextField, touch, systemHeader, type MenuAction } from "../ui";
 import { PageHeader } from "../components/PageHeader";
 import { AttachmentChips } from "../components/Attachments";

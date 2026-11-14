@@ -1,11 +1,11 @@
 English | [简体中文](design.zh-CN.md)
 
-# nsh-mail design
+# AgentInbox design
 
 A client that puts several mail accounts into one inbox, written with [Native Shell](https://nsh.dev) (NSH 0.5), targeting Web, Android, Linux and Windows. Two modes:
 
 - **Local mode**: credentials and mail stay on the device; the client connects to IMAP/SMTP directly.
-- **Cloud mode**: the nsh-mail server syncs on the client's behalf and pushes new mail to clients.
+- **Cloud mode**: the AgentInbox server syncs on the client's behalf and pushes new mail to clients.
 
 ## 1. Platform facts (from the NSH docs)
 
@@ -31,18 +31,18 @@ Browsers cannot open TCP connections. An optional "user-run relay" (WebSocket to
 2. An open TCP relay is easily abused as a hop and would need its own authentication;
 3. Once the tab closes there is no sync and no notification, so the experience still depends on an always-on machine.
 
-Since the user has to run an always-on machine anyway, that machine is better off running the **nsh-mail server** directly: the same binary, self-hosted, and the web client connecting to it is the "user-run relay", with sync, search and push on top. So **the web has cloud mode only**; the server address can be the official instance or a self-hosted one, and the sign-in page says so plainly.
+Since the user has to run an always-on machine anyway, that machine is better off running the **AgentInbox server** directly: the same binary, self-hosted, and the web client connecting to it is the "user-run relay", with sync, search and push on top. So **the web has cloud mode only**; the server address can be the official instance or a self-hosted one, and the sign-in page says so plainly.
 
 ## 3. Architecture
 
 ```
 crates/mail-core     Rust library, no NSH dependency: IMAP sync, SMTP sending, MIME parsing, SQLite+FTS5 storage,
                      OAuth (PKCE), provider presets, credential store. Shared by client and server.
-crates/server        nsh-mail-server: axum + tokio. Accounts, sync scheduling, REST/WebSocket API, push (FCM, Web Push),
+crates/server        agentinbox-server: axum + tokio. Accounts, sync scheduling, REST/WebSocket API, push (FCM, Web Push),
                      and it also serves the web client's static files (same origin, no CORS).
-crates/mcp           nsh-notify-mcp: the MCP server for agents (notification-inbox.md §3). A library plus a
+crates/mcp           agentinbox-mcp: the MCP server for agents (notification-inbox.md §3). A library plus a
                      binary; the server can mount its `POST /mcp` router and answer from its own store.
-app/                 NSH mixed app (TSX UI + Rust crate). The crate exports `nsh-mail/native`; TSX only calls that.
+app/                 NSH mixed app (TSX UI + Rust crate). The crate exports `agentinbox/native`; TSX only calls that.
 android/             Gradle host project: NshView + Firebase Messaging (§5).
 ```
 
@@ -53,7 +53,7 @@ Inside the client there is a single `Mail` interface (exported from Rust to TSX)
 
 TSX does not know which mode is active; there is one UI. State ownership: mail, accounts and sync state live in Rust; the current selection, drafts and filters live in TSX.
 
-### TSX ↔ Rust interface (`nsh-mail/native`)
+### TSX ↔ Rust interface (`agentinbox/native`)
 
 ```ts
 Mail.init(): Promise<Status>                       // open the store, restore the session, start syncing
@@ -137,7 +137,7 @@ On desktop, closing the main window leaves the app in the tray, IDLE continues a
 ### Cloud mode (all platforms)
 
 ```
-client ──HTTPS REST──▶ nsh-mail-server ──mail-core──▶ each mailbox's IMAP/SMTP
+client ──HTTPS REST──▶ agentinbox-server ──mail-core──▶ each mailbox's IMAP/SMTP
    ▲  ◀──WebSocket events──┘   │
    │                           ├──FCM HTTP v1──▶ Android
    └─ system notification ◀────┴──Web Push (VAPID)──▶ browser Service Worker
@@ -178,7 +178,7 @@ Send with Undo and Schedule send both put the message in an outbox that mail-cor
 
 - **Undo send**: Settings → Sending → Undo send (off, 5, 10, 20, 30 s; 10 by default, `Storage` key `nshmail.undoSend`). Send queues with `{delay}` and shows "Sending… Undo" for as long; Undo calls `Mail.cancel` and reopens the composer with the same draft (`app/drafts.ts` holds it meanwhile, off the device's storage). Off sends at once with `Mail.send`, as before.
 - **Schedule send**: the Send split button's menu (a clock button on phones): tomorrow 8:00, next Monday 8:00, or a date and time from a calendar and a time field, in the device's time zone; `{sendAt}` is absolute (ms since the epoch), so the server needs no time zone. The Scheduled mailbox lists scheduled and failed messages; opening one takes it out of the outbox into the composer, and closing the composer puts it back at its time; Cancel send takes it out, with Undo.
-- **Local mode**: the delay and the schedule run in the app; the outbox is in `mail.sqlite`, so closing the app during the undo window neither loses nor sends the message early: it goes at the next start. A scheduled time that passes while the app is closed sends at the next start, and the app says so ("Sent … : its time came while nsh-mail was closed"). Desktops keep running in the tray.
+- **Local mode**: the delay and the schedule run in the app; the outbox is in `mail.sqlite`, so closing the app during the undo window neither loses nor sends the message early: it goes at the next start. A scheduled time that passes while the app is closed sends at the next start, and the app says so ("Sent … : its time came while AgentInbox was closed"). Desktops keep running in the tray.
 - **Cloud mode**: the server holds the message; `POST /v1/send` with `delay` or `sendAt` answers 202 with the `Outgoing`, `DELETE /v1/outbox/{id}` cancels before it goes (the files become uploads again, same ids). Closing the tab changes nothing; the server's outbox survives restarts (the engines of users with accounts start at boot).
 - **Failures**: network errors retry 5 times, 1, 2, 4, 8, 16 minutes apart; other errors leave the message `failed` with its error, listed under Scheduled for the user to edit or cancel. A message left `sending` by a process that stopped becomes `failed` ("check Sent"), since it may have gone. A time more than a minute in the past is refused; delays are at most 5 minutes.
 
@@ -232,7 +232,7 @@ Privacy: Web Push content is end-to-end encrypted; FCM payloads pass through Goo
 
 Android host (`android/`, usage in its README):
 
-- **Runtime**: `prepare.sh` fetches `nsh.aar` (the Java runtime) at the CLI's version, verifying its sha256, replaces its `libnsh.so` with the one `nsh package --target android` builds from this crate (`.nsh/rust/android-release/lib`, containing `nsh-mail/native`), and puts the bundle built by `nsh build --release` into assets. `MainActivity` follows nsh's `AppActivity`: `NshView.loadAssetBundle`, notification and URL intents, the back key, immersive system bars.
+- **Runtime**: `prepare.sh` fetches `nsh.aar` (the Java runtime) at the CLI's version, verifying its sha256, replaces its `libnsh.so` with the one `nsh package --target android` builds from this crate (`.nsh/rust/android-release/lib`, containing `agentinbox/native`), and puts the bundle built by `nsh build --release` into assets. `MainActivity` follows nsh's `AppActivity`: `NshView.loadAssetBundle`, notification and URL intents, the back key, immersive system bars.
 - **Token**: the host sends the FCM token to the app as the host event `push.token` `{kind: "fcm", token}`; `app/push.ts` passes it to `Push.setToken`, and once signed in to cloud mode `on_token` picks it up and `POST /v1/devices`. An event rather than `host.call`: events need no grant, while `host.call` needs `capabilities.host` declared, and declaring any capabilities denies every capability not listed (network, notifications, …).
 - **Notifications**: data messages are shown like the app's own notifications (nsh's notification channel, tag `message:<id>`, launch extra); on tap `handleNotificationIntent` hands it to the app's existing `Notifications` listener (`app/resident.ts`), which opens the message, with no new TSX.
 - Without `google-services.json` it builds and runs as usual, just without push; CI writes the file when the secret `GOOGLE_SERVICES_JSON` exists.
@@ -242,12 +242,12 @@ Android host (`android/`, usage in its README):
 - **Rust + axum + tokio**: same language as mail-core, one copy of the sync logic.
 - **Storage**: one `server.sqlite` holds users, sessions, devices and every user's mail (the same tables and FTS5 as the client). Every row of the mail tables carries a `user_id` and the indexes start with it; mail-core offers queries only on a `Store` bound to a user, so a query that forgets the user cannot be written. The client's local store uses the same tables with a single user (`LOCAL_USER` = 0). One file is easy to back up and migrate; the cost is a single machine. One instance is enough for v1. The old per-user `data/users/<id>.sqlite` files are imported at start (row counts and contents checked table by table, inside a transaction) and the originals are kept, renamed `*.migrated`; if import or the check fails the server refuses to start and leaves the originals untouched.
 - **Passwords**: Argon2id; session tokens are 32 random bytes, and the store keeps only their SHA-256.
-- **Mail credentials**: encrypted with AES-256-GCM in each user's `data/users/<id>.secrets.json` (mail-core's `EncryptedFileStore`), with the master key from the environment variable `NSHMAIL_MASTER_KEY`, never written to disk. Rotation: put the new key in `NSHMAIL_MASTER_KEY` and the old one in `NSHMAIL_MASTER_KEY_OLD`; at start every file is read first, and if any entry opens with neither key the server refuses to start and changes no file; otherwise entries encrypted with the old key are rewritten file by file (a `.bak-old-key` copy is kept first, the file is replaced atomically, and the copy is deleted only after re-reading with the new key alone checks out), after which `NSHMAIL_MASTER_KEY_OLD` can be removed. With only one key set, entries it cannot open likewise stop the server from starting.
+- **Mail credentials**: encrypted with AES-256-GCM in each user's `data/users/<id>.secrets.json` (mail-core's `EncryptedFileStore`), with the master key from the environment variable `AGENTINBOX_MASTER_KEY`, never written to disk. Rotation: put the new key in `AGENTINBOX_MASTER_KEY` and the old one in `AGENTINBOX_MASTER_KEY_OLD`; at start every file is read first, and if any entry opens with neither key the server refuses to start and changes no file; otherwise entries encrypted with the old key are rewritten file by file (a `.bak-old-key` copy is kept first, the file is replaced atomically, and the copy is deleted only after re-reading with the new key alone checks out), after which `AGENTINBOX_MASTER_KEY_OLD` can be removed. With only one key set, entries it cannot open likewise stop the server from starting.
 - **Deployment**: CI builds the Docker image and pushes it to ghcr.io; `docker compose` self-hosts in one step. The host and domain for the public service need separate confirmation (paid, public).
 
 ## 7. Security
 
-- **OAuth first**: Gmail and Outlook are steered to OAuth (XOAUTH2) only. Local mode does authorization code + PKCE in the client with a loopback redirect `http://127.0.0.1:<random port>` (supported by Google's "Desktop app" clients and Microsoft's public clients, usable on Android too); cloud mode does the web flow on the server. Google scope `https://mail.google.com/`, Microsoft scopes `IMAP.AccessAsUser.All SMTP.Send offline_access`; both add `openid email` and take the account's address from the ID token. Client IDs are injected at build time (`NSHMAIL_GOOGLE_CLIENT_ID`, `NSHMAIL_MS_CLIENT_ID`).
+- **OAuth first**: Gmail and Outlook are steered to OAuth (XOAUTH2) only. Local mode does authorization code + PKCE in the client with a loopback redirect `http://127.0.0.1:<random port>` (supported by Google's "Desktop app" clients and Microsoft's public clients, usable on Android too); cloud mode does the web flow on the server. Google scope `https://mail.google.com/`, Microsoft scopes `IMAP.AccessAsUser.All SMTP.Send offline_access`; both add `openid email` and take the account's address from the ID token. Client IDs are injected at build time (`AGENTINBOX_GOOGLE_CLIENT_ID`, `AGENTINBOX_MS_CLIENT_ID`).
 - **Plain IMAP**: app passwords only (the UI explains how to create one and links to common providers); preset servers for QQ, 163, iCloud, Fastmail, Yahoo and others.
 - **Credential storage**: Windows Credential Manager, Linux Secret Service (`keyring` crate); Linux sessions without Secret Service fall back to an encrypted 0600 file in the app's private directory, with a notice. Android v1 stores an encrypted file in the app's private directory (isolated by the system sandbox), moving to the Android Keystore once the Gradle host is in place.
 - **Transport**: TLS only (993/465 or STARTTLS), plaintext refused; rustls, trusting the bundled webpki roots plus the OS trust store (`rustls-native-certs`: the system store on Windows, `SSL_CERT_FILE`/`SSL_CERT_DIR` or the distribution bundle on Linux; on Android `MainActivity` exports the user-installed CAs to a file it names in `SSL_CERT_FILE`), so a self-hosted server with a private CA works once its CA is installed on the device. There is no option to accept invalid certificates.

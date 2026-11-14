@@ -2,7 +2,7 @@
 // account; the chat bots arrive with the server's bot connections.
 import { Text, View } from "nsh";
 import { t } from "nsh/i18n";
-import type { SourceKind } from "nsh-mail/native";
+import type { SourceKind } from "agentinbox/native";
 import { AppBar, Card, Icon, ListItem, Page } from "../ui";
 import { PageHeader, PageScroll } from "../components/PageHeader";
 import { kindIcon } from "../components/SourceMark";

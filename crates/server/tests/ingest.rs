@@ -3,7 +3,7 @@
 
 use std::{net::SocketAddr, path::PathBuf, time::Duration};
 
-use nsh_mail_server::{Config, build, ingest::hmac_sha256, router};
+use agentinbox_server::{Config, build, ingest::hmac_sha256, router};
 use reqwest::{Client, StatusCode};
 use serde_json::{Value, json};
 use sha2::Digest;
@@ -23,7 +23,7 @@ fn temp_dir() -> PathBuf {
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
         .as_nanos();
-    let dir = std::env::temp_dir().join(format!("nsh-mail-ingest-{n}"));
+    let dir = std::env::temp_dir().join(format!("agentinbox-ingest-{n}"));
     std::fs::create_dir_all(dir.join("users")).unwrap();
     dir
 }
@@ -176,14 +176,14 @@ async fn presets_map_real_payloads() {
         (
             include_str!("fixtures/github-issue.json"),
             "github",
-            "markbang/nsh-mail: Sync drops messages above 5k",
+            "markbang/agentinbox: Sync drops messages above 5k",
             "bangwu",
             3,
         ),
         (
             include_str!("fixtures/github-actions.json"),
             "github",
-            "markbang/nsh-mail: CI",
+            "markbang/agentinbox: CI",
             "markbang",
             3,
         ),
@@ -197,15 +197,15 @@ async fn presets_map_real_payloads() {
         (
             include_str!("fixtures/sentry-issue-alert.json"),
             "sentry",
-            "nsh-mail-web: TypeError: cannot read property 'id' of undefined",
-            "nsh-mail-web",
+            "agentinbox-web: TypeError: cannot read property 'id' of undefined",
+            "agentinbox-web",
             6,
         ),
         (
             include_str!("fixtures/grafana-alert.json"),
             "grafana",
             "[FIRING:1] HighErrorRate",
-            "nsh-mail",
+            "agentinbox",
             6,
         ),
         (

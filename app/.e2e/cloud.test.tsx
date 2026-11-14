@@ -1,5 +1,5 @@
 // Cloud mode end to end: two copies of the app, Alice's and Bob's, against
-// a running nsh-mail-server on 127.0.0.1:18080 whose mailboxes are
+// a running agentinbox-server on 127.0.0.1:18080 whose mailboxes are
 // GreenMail's (IMAPS 3993, SMTPS 3465, auth disabled). `.e2e/run.sh` starts
 // both and runs this file; `nsh test` does not look in hidden directories.
 // A test file has no network of its own, so everything goes through the apps.

@@ -2,7 +2,7 @@
 import { appInfo, keymap, Notifications, platform, Text, View } from "nsh";
 import { AlertDialog } from "nsh/base";
 import { t } from "nsh/i18n";
-import { Mail, type Account } from "nsh-mail/native";
+import { Mail, type Account } from "agentinbox/native";
 import { AccountMark, AppBar, Button, Card, Choice, Divider, Icon, IconButton, ListItem, Menu, Page, SectionLabel, Switch, systemHeader, touch } from "../ui";
 import { sources } from "../notify";
 import { PageHeader, PageScroll } from "../components/PageHeader";

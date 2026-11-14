@@ -1,17 +1,17 @@
 [package]
-name = "nsh-notify-mcp"
+name = "agentinbox-mcp"
 version = "0.1.0"
 edition = "2024"
 license = "MIT"
 publish = false
-description = "MCP server for the nsh-mail notification inbox"
+description = "MCP server for the AgentInbox notification inbox"
 
 [lib]
 name = "notify_mcp"
 path = "src/lib.rs"
 
 [[bin]]
-name = "nsh-notify-mcp"
+name = "agentinbox-mcp"
 path = "src/main.rs"
 
 [dependencies]

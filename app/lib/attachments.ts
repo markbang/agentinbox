@@ -4,7 +4,7 @@
 // composer, so a staging upload finishes into a closed draft.
 import { cleanup, signal } from "nsh";
 import { t } from "nsh/i18n";
-import { Mail, PageDrop, type DraftAttachment, type Message, type Upload } from "nsh-mail/native";
+import { Mail, PageDrop, type DraftAttachment, type Message, type Upload } from "agentinbox/native";
 import { fileSize } from "./format";
 
 export interface Attached {

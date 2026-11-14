@@ -37,14 +37,14 @@ jobs:
         with:
           shared-key: e2e-server
           save-if: false
-      - run: cargo build --locked -p nsh-mail-server --features insecure-test-tls
+      - run: cargo build --locked -p agentinbox-server --features insecure-test-tls
       - name: Playwright with Chromium and CJK fonts
         working-directory: tools/screenshots
         run: |
           sudo apt-get update && sudo apt-get install -y fonts-noto-cjk
           npm ci --no-audit --no-fund
           npx playwright install --with-deps chromium
-      - run: tools/screenshots/run.sh "$RUNNER_TEMP/web/nsh-mail" "$RUNNER_TEMP/shots"
+      - run: tools/screenshots/run.sh "$RUNNER_TEMP/web/AgentInbox" "$RUNNER_TEMP/shots"
       - if: always()
         uses: actions/upload-artifact@v7
         with:

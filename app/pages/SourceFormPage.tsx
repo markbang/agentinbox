@@ -2,7 +2,7 @@
 // priority it pushes from. Webhooks, Gotify and ntfy then show their URL once.
 import { signal, Text, View } from "nsh";
 import { t } from "nsh/i18n";
-import type { SourceKind } from "nsh-mail/native";
+import type { SourceKind } from "agentinbox/native";
 import { AppBar, Button, Card, Choice, Page, SectionLabel, SelectField, TextField, type IconName } from "../ui";
 import { PageHeader, PageScroll } from "../components/PageHeader";
 import { kindIcon, sourceColours } from "../components/SourceMark";

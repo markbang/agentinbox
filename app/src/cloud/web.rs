@@ -20,7 +20,7 @@ use mail_core::types::{Error, ErrorCode, Result};
 use super::Api;
 
 /// Where the window the sign-in returned to tells the one that opened it.
-const OAUTH_CHANNEL: &str = "nshmail-oauth";
+const OAUTH_CHANNEL: &str = "agentinbox-oauth";
 /// Served next to the page: the server serves `sw.js` from the web client's directory.
 const SERVICE_WORKER: &str = "sw.js";
 

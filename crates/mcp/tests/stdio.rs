@@ -13,7 +13,7 @@ use tokio::process::Command;
 #[tokio::test]
 async fn stdio_session_speaks_mcp() {
     let base = support::serve().await;
-    let mut child = Command::new(env!("CARGO_BIN_EXE_nsh-notify-mcp"))
+    let mut child = Command::new(env!("CARGO_BIN_EXE_agentinbox-mcp"))
         .args(["--server", &base, "--key", support::KEY])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -37,7 +37,7 @@ async fn stdio_session_speaks_mcp() {
     .await;
     let init = next(&mut stdout).await;
     assert_eq!(init["id"], 1);
-    assert_eq!(init["result"]["serverInfo"]["name"], "nsh-notify");
+    assert_eq!(init["result"]["serverInfo"]["name"], "agentinbox");
     assert_eq!(init["result"]["protocolVersion"], "2025-06-18");
     assert!(init["result"]["capabilities"]["tools"].is_object());
 

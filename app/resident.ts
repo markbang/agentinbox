@@ -3,7 +3,7 @@
 import { cleanup, effect, lifecycle, Notifications, platform } from "nsh";
 import { t } from "nsh/i18n";
 import { currentWindow, isAvailable, Tray, type WindowRef } from "nsh/desktop";
-import type { Summary } from "nsh-mail/native";
+import type { Summary } from "agentinbox/native";
 import icon from "./assets/tray.svg";
 // Linux tints an SVG for the app's light or dark scheme, not the panel's (black on GNOME's dark bar): the full-color icon reads on any panel.
 import linuxIcon from "./assets/tray-linux.png";
@@ -29,7 +29,7 @@ export function stayResident(openFromNotification: (id: string) => void, openNot
     effect(() => {
       Tray.set({
         icon: platform.os === "linux" ? linuxIcon : icon,
-        tooltip: "nsh-mail",
+        tooltip: "AgentInbox",
         onClick: () => win.focus(),
         menu: [{ label: t("tray.open"), onSelect: () => win.focus() }, { type: "separator" }, { role: "quit", label: t("tray.quit") }],
       });

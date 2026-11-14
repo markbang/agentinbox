@@ -1,4 +1,4 @@
-// Signs up on a fresh nsh-mail-server, adds the three seeded GreenMail accounts
+// Signs up on a fresh agentinbox-server, adds the three seeded GreenMail accounts
 // through the UI, then captures the fixed screen set in light and dark.
 // Usage: node shoot.mjs <server origin> <out dir>
 import { mkdirSync } from "node:fs";

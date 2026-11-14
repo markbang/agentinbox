@@ -7,7 +7,7 @@ cd "$(dirname "$0")/../../.."
 dir=$(mktemp -d)
 trap 'docker rm -f greenmail-private-ca >/dev/null 2>&1 || true; [ -n "${pid:-}" ] && kill "$pid" 2>/dev/null; rm -rf "$dir"' EXIT
 
-openssl req -x509 -newkey rsa:2048 -nodes -days 2 -subj "/CN=nsh-mail test CA" \
+openssl req -x509 -newkey rsa:2048 -nodes -days 2 -subj "/CN=AgentInbox test CA" \
   -addext "basicConstraints=critical,CA:TRUE" -addext "keyUsage=critical,keyCertSign,cRLSign" \
   -keyout "$dir/ca.key" -out "$dir/ca.pem" 2>/dev/null
 openssl req -newkey rsa:2048 -nodes -subj "/CN=localhost" -keyout "$dir/server.key" -out "$dir/server.csr" 2>/dev/null

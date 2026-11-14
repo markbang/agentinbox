@@ -1,4 +1,4 @@
-//! Serde types shared with clients (`nsh-mail/native`, the server REST API, the web CloudBackend).
+//! Serde types shared with clients (`agentinbox/native`, the server REST API, the web CloudBackend).
 //! Field names serialize in camelCase to match the TSX interface in docs/design.md §3.
 
 use serde::{Deserialize, Serialize};

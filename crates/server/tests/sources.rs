@@ -3,7 +3,7 @@
 
 use std::{net::SocketAddr, path::PathBuf};
 
-use nsh_mail_server::{Config, build, crypto::sha256, router};
+use agentinbox_server::{Config, build, crypto::sha256, router};
 use reqwest::{Client, StatusCode};
 use serde_json::{Value, json};
 
@@ -12,7 +12,7 @@ fn temp_dir() -> PathBuf {
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
         .as_nanos();
-    let dir = std::env::temp_dir().join(format!("nsh-mail-sources-{n}"));
+    let dir = std::env::temp_dir().join(format!("agentinbox-sources-{n}"));
     std::fs::create_dir_all(dir.join("users")).unwrap();
     dir
 }
@@ -248,9 +248,9 @@ async fn migration_projects_mail_written_before_the_feed() {
         "smtp": { "host": "127.0.0.1", "port": 465, "security": "tls" }
     });
     {
-        let db = nsh_mail_server::db::Db::open(&path).unwrap();
+        let db = agentinbox_server::db::Db::open(&path).unwrap();
         let user = db.create_user("owner@test.local", "x").unwrap().unwrap();
-        let some = nsh_mail_server::db::Db::open(&path).unwrap();
+        let some = agentinbox_server::db::Db::open(&path).unwrap();
         some.create_session(&sha256(b"session-token"), user)
             .unwrap();
         let mail = mail_core::MailDb::open(&path).unwrap();

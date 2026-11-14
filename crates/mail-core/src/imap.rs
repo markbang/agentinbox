@@ -188,7 +188,7 @@ pub(crate) async fn connect(ep: &Endpoint, login: Login<'_>) -> Result<Conn> {
         // NetEase (163/126) refuses SELECT from clients that do not identify themselves.
         let _ = session
             .id([
-                ("name", Some("nsh-mail")),
+                ("name", Some("AgentInbox")),
                 ("version", Some(env!("CARGO_PKG_VERSION"))),
             ])
             .await;

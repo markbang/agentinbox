@@ -31,7 +31,7 @@ class PushService : FirebaseMessagingService() {
     }
 
     private companion object {
-        const val TAG = "nsh-mail"
+        const val TAG = "AgentInbox"
         const val NOTIFICATION_PREFIX = "message:"
 
         // nsh 0.5's Notifications (NshView.handleNotificationIntent reads EXTRA): the same channel, tag, id and
@@ -77,12 +77,12 @@ object PushToken {
     fun listen(context: Context, listener: (String) -> Unit) {
         this.listener = listener
         if (FirebaseApp.getApps(context).isEmpty()) {
-            Log.i("nsh-mail", "no Firebase config (android/app/google-services.json): push is off")
+            Log.i("AgentInbox", "no Firebase config (android/app/google-services.json): push is off")
             return
         }
         FirebaseMessaging.getInstance().token
             .addOnSuccessListener { token -> this.listener?.invoke(token) }
-            .addOnFailureListener { e -> Log.w("nsh-mail", "no FCM token", e) }
+            .addOnFailureListener { e -> Log.w("AgentInbox", "no FCM token", e) }
     }
 
     fun stop(listener: (String) -> Unit) {

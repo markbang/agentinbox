@@ -1,11 +1,11 @@
 [English](design.md) | 简体中文
 
-# nsh-mail 设计
+# AgentInbox 设计
 
 把多个邮箱账号放进一个收件箱的客户端，用 [Native Shell](https://nsh.dev)（NSH 0.5）写成，目标平台 Web、Android、Linux、Windows。两种模式：
 
 - **本地模式**：凭据和邮件只在本机，客户端直连 IMAP/SMTP。
-- **云端模式**：nsh-mail 服务端代为同步，向客户端推送新邮件。
+- **云端模式**：AgentInbox 服务端代为同步，向客户端推送新邮件。
 
 ## 1. 平台事实（来自 NSH 文档）
 
@@ -31,18 +31,18 @@
 2. 开放的 TCP 中继容易被滥用为跳板，需要再做一套鉴权；
 3. 标签页关掉就没有同步和通知，体验仍然依赖一台常驻机器。
 
-既然用户总要运行一台常驻机器，那台机器直接跑 **nsh-mail 服务端** 更好：同一个二进制，自托管即可，Web 客户端连它就是"用户自己的中继"，并且得到同步、搜索和推送。所以 **Web 只有云端模式**，服务端地址可填官方或自托管实例；登录页明确说明这一点。
+既然用户总要运行一台常驻机器，那台机器直接跑 **AgentInbox 服务端** 更好：同一个二进制，自托管即可，Web 客户端连它就是"用户自己的中继"，并且得到同步、搜索和推送。所以 **Web 只有云端模式**，服务端地址可填官方或自托管实例；登录页明确说明这一点。
 
 ## 3. 架构
 
 ```
 crates/mail-core     Rust 库，不依赖 NSH：IMAP 同步、SMTP 发送、MIME 解析、SQLite+FTS5 存储、
                      OAuth（PKCE）、服务商预设、凭据库。客户端和服务端共用。
-crates/server        nsh-mail-server：axum + tokio。账号、同步调度、REST/WebSocket API、推送（FCM、Web Push）、
+crates/server        agentinbox-server：axum + tokio。账号、同步调度、REST/WebSocket API、推送（FCM、Web Push）、
                      顺带托管 Web 客户端静态文件（同源，免 CORS）。
-crates/mcp           nsh-notify-mcp：给 agent 用的 MCP 服务器（notification-inbox.zh-CN.md §3）。既是库也是
+crates/mcp           agentinbox-mcp：给 agent 用的 MCP 服务器（notification-inbox.zh-CN.md §3）。既是库也是
                      可执行文件；服务器可以挂载它的 `POST /mcp` 路由，直接用自己的存储回答。
-app/                 NSH 混合应用（TSX 界面 + Rust crate）。crate 导出 `nsh-mail/native`，TSX 只调它。
+app/                 NSH 混合应用（TSX 界面 + Rust crate）。crate 导出 `agentinbox/native`，TSX 只调它。
 android/             Gradle 宿主工程：NshView + Firebase Messaging（§5）。
 ```
 
@@ -53,7 +53,7 @@ android/             Gradle 宿主工程：NshView + Firebase Messaging（§5）
 
 TSX 不知道当前是哪种模式，界面一套。状态归属：邮件、账号、同步状态在 Rust；当前选中、草稿、筛选在 TSX。
 
-### TSX ↔ Rust 接口（`nsh-mail/native`）
+### TSX ↔ Rust 接口（`agentinbox/native`）
 
 ```ts
 Mail.init(): Promise<Status>                       // 打开库、恢复会话、开始同步
@@ -124,7 +124,7 @@ TSX ──Mail.*──▶ Rust LocalBackend ──tokio/rustls──▶ IMAP (99
 ### 云端模式（全部平台）
 
 ```
-客户端 ──HTTPS REST──▶ nsh-mail-server ──mail-core──▶ 各邮箱 IMAP/SMTP
+客户端 ──HTTPS REST──▶ agentinbox-server ──mail-core──▶ 各邮箱 IMAP/SMTP
    ▲  ◀──WebSocket 事件──┘   │
    │                         ├──FCM HTTP v1──▶ Android
    └─ 系统通知 ◀──────────────┴──Web Push (VAPID)──▶ 浏览器 Service Worker
@@ -165,7 +165,7 @@ mail-core 在每封邮件入库时为它归入会话（`store.rs`），本地模
 
 - **撤销发送**："设置 → 发送 → 撤销发送"（关闭、5、10、20、30 秒；默认 10 秒，`Storage` 键 `nshmail.undoSend`）。发送时用 `{delay}` 入队，并在这段时间里显示"正在发送… 撤销"；点"撤销"调用 `Mail.cancel`，用同一份草稿重新打开写信页（期间由 `app/drafts.ts` 暂时保管，不写入设备存储）。关闭时仍像以前一样用 `Mail.send` 立即发送。
 - **定时发送**："发送"分体按钮的菜单（手机上是时钟按钮）：明天 8:00、下周一 8:00，或用日历和时间框自选，按设备时区计算；`{sendAt}` 是绝对时间（毫秒时间戳），服务端不需要知道时区。"定时发送"邮箱列出定时和发送失败的邮件；打开一封会把它从发件箱取出放进写信页，关闭写信页时按原定时间放回；"取消发送"把它取出，可撤销。
-- **本地模式**：延迟和定时在应用里进行；发件箱在 `mail.sqlite` 里，撤销窗口内关掉应用既不会丢失邮件，也不会提前发出：下次启动时发出。应用关闭期间到了定时时间的邮件，在下次启动时发出，并提示（"已发送……：它的发送时间在 nsh-mail 关闭期间已到"）。桌面端在托盘中常驻。
+- **本地模式**：延迟和定时在应用里进行；发件箱在 `mail.sqlite` 里，撤销窗口内关掉应用既不会丢失邮件，也不会提前发出：下次启动时发出。应用关闭期间到了定时时间的邮件，在下次启动时发出，并提示（"已发送……：它的发送时间在 AgentInbox 关闭期间已到"）。桌面端在托盘中常驻。
 - **云端模式**：邮件由服务端保管；`POST /v1/send` 带 `delay` 或 `sendAt` 时返回 202 和 `Outgoing`，`DELETE /v1/outbox/{id}` 在发出前取消（附件按原 id 重新成为 upload）。关掉网页不影响发送；服务端的发件箱在重启后仍在（有账号的用户的引擎在启动时就运行）。
 - **失败**：网络错误重试 5 次，间隔 1、2、4、8、16 分钟；其他错误使邮件进入 `failed` 并记下错误，列在"定时发送"里，由用户编辑或取消。进程停止时停在 `sending` 的邮件改为 `failed`（"请先查看已发送"），因为它可能已经发出。早于当前时间一分钟以上的定时会被拒绝；延迟最长 5 分钟。
 
@@ -219,7 +219,7 @@ GET  /                   Web 客户端静态文件         GET /healthz
 
 Android 宿主（`android/`，用法见其 README）：
 
-- **运行时**：`prepare.sh` 取与 CLI 同版本的 `nsh.aar`（Java 运行时，校验 sha256），其中的 `libnsh.so` 换成 `nsh package --target android` 用本 crate 构建的那份（`.nsh/rust/android-release/lib`，含 `nsh-mail/native`），bundle 用 `nsh build --release` 放进 assets。`MainActivity` 照 nsh 的 `AppActivity` 写：`NshView.loadAssetBundle`、通知与 URL intent、返回键、沉浸式系统栏。
+- **运行时**：`prepare.sh` 取与 CLI 同版本的 `nsh.aar`（Java 运行时，校验 sha256），其中的 `libnsh.so` 换成 `nsh package --target android` 用本 crate 构建的那份（`.nsh/rust/android-release/lib`，含 `agentinbox/native`），bundle 用 `nsh build --release` 放进 assets。`MainActivity` 照 nsh 的 `AppActivity` 写：`NshView.loadAssetBundle`、通知与 URL intent、返回键、沉浸式系统栏。
 - **token**：宿主把 FCM token 作为 host 事件 `push.token` `{kind: "fcm", token}` 发给应用，`app/push.ts` 交给 `Push.setToken`，云端模式登录后经 `on_token` 拿到并 `POST /v1/devices`。用事件而不是 `host.call`：事件不需要授权，而 `host.call` 要声明 `capabilities.host`，声明任何 capabilities 都会让没列出的能力（网络、通知……）全部被拒。
 - **通知**：data 消息按应用自己的通知的样子显示（nsh 的通知渠道、标签 `message:<id>`、启动 extra），点击后 `handleNotificationIntent` 交给应用已有的 `Notifications` 监听（`app/resident.ts`）打开该信，无需新的 TSX。
 - 没有 `google-services.json` 时照常构建运行，只是不推送；CI 有 secret `GOOGLE_SERVICES_JSON` 时写入。
@@ -229,12 +229,12 @@ Android 宿主（`android/`，用法见其 README）：
 - **Rust + axum + tokio**：与 mail-core 同语言，同步逻辑一份代码。
 - **存储**：一个 `server.sqlite` 存用户、会话、设备，以及所有用户的邮件（与客户端同一套表和 FTS5）。邮件表每行带 `user_id`，索引以它开头；mail-core 只在绑定了用户的 `Store` 上提供查询，漏写用户的查询写不出来。客户端本地库是同一套表，只有一个用户（`LOCAL_USER` = 0）。一个文件好备份、好迁移；代价是单机。v1 单实例足够。旧版每用户一份的 `data/users/<id>.sqlite` 在启动时导入（逐表核对行数和内容，事务内完成），原文件改名为 `*.migrated` 保留；导入或核对失败则拒绝启动、原文件不动。
 - **密码**：Argon2id；会话 token 随机 32 字节，库里只存 SHA-256。
-- **邮箱凭据**：AES-256-GCM 加密存储在每个用户的 `data/users/<id>.secrets.json`（mail-core 的 `EncryptedFileStore`），主密钥来自环境变量 `NSHMAIL_MASTER_KEY`，不落盘。轮换：新钥放 `NSHMAIL_MASTER_KEY`、旧钥放 `NSHMAIL_MASTER_KEY_OLD`，启动时先读全部文件，有条目两把钥匙都解不开就拒绝启动、不改任何文件；否则把旧钥加密的条目逐文件重写（先留 `.bak-old-key`，原子替换，只用新钥重读核对后删副本），之后可去掉 `NSHMAIL_MASTER_KEY_OLD`。只设一把钥匙时解不开同样拒绝启动。
+- **邮箱凭据**：AES-256-GCM 加密存储在每个用户的 `data/users/<id>.secrets.json`（mail-core 的 `EncryptedFileStore`），主密钥来自环境变量 `AGENTINBOX_MASTER_KEY`，不落盘。轮换：新钥放 `AGENTINBOX_MASTER_KEY`、旧钥放 `AGENTINBOX_MASTER_KEY_OLD`，启动时先读全部文件，有条目两把钥匙都解不开就拒绝启动、不改任何文件；否则把旧钥加密的条目逐文件重写（先留 `.bak-old-key`，原子替换，只用新钥重读核对后删副本），之后可去掉 `AGENTINBOX_MASTER_KEY_OLD`。只设一把钥匙时解不开同样拒绝启动。
 - **部署**：CI 构建 Docker 镜像推到 ghcr.io；`docker compose` 一键自托管。正式上线的主机和域名需要另行确认（付费、对外）。
 
 ## 7. 安全
 
-- **OAuth 优先**：Gmail 和 Outlook 只引导 OAuth（XOAUTH2）。本地模式在客户端做授权码 + PKCE，回调用回环地址 `http://127.0.0.1:<随机端口>`（Google "桌面应用"客户端、Microsoft 公共客户端都支持，Android 也可用）；云端模式由服务端做 Web 流程。Google 范围 `https://mail.google.com/`，Microsoft 范围 `IMAP.AccessAsUser.All SMTP.Send offline_access`；两家都另加 `openid email`，从 ID token 取账号邮箱。客户端 ID 在构建时注入（`NSHMAIL_GOOGLE_CLIENT_ID`、`NSHMAIL_MS_CLIENT_ID`）。
+- **OAuth 优先**：Gmail 和 Outlook 只引导 OAuth（XOAUTH2）。本地模式在客户端做授权码 + PKCE，回调用回环地址 `http://127.0.0.1:<随机端口>`（Google "桌面应用"客户端、Microsoft 公共客户端都支持，Android 也可用）；云端模式由服务端做 Web 流程。Google 范围 `https://mail.google.com/`，Microsoft 范围 `IMAP.AccessAsUser.All SMTP.Send offline_access`；两家都另加 `openid email`，从 ID token 取账号邮箱。客户端 ID 在构建时注入（`AGENTINBOX_GOOGLE_CLIENT_ID`、`AGENTINBOX_MS_CLIENT_ID`）。
 - **普通 IMAP**：只接受应用专用密码（界面说明怎样生成，并给常见服务商的链接）；QQ、163、iCloud、Fastmail、Yahoo 等预设服务器。
 - **凭据存储**：Windows 凭据管理器、Linux Secret Service（`keyring` crate）；没有 Secret Service 的 Linux 会话退回应用私有目录下 0600 的加密文件并提示。Android v1 存应用私有目录（系统沙箱隔离）的加密文件，Gradle 宿主就位后改用 Android Keystore。
 - **传输**：只允许 TLS（993/465 或 STARTTLS），拒绝明文；rustls，信任内置的 webpki 根证书，外加系统信任库（`rustls-native-certs`：Windows 用系统证书库，Linux 用 `SSL_CERT_FILE`/`SSL_CERT_DIR` 或发行版的证书包；Android 由 `MainActivity` 把用户安装的 CA 导出到文件，并通过 `SSL_CERT_FILE` 指向它），所以自建服务器用私有 CA 时，只要在设备上装好这个 CA 就能连。没有"接受无效证书"的选项。

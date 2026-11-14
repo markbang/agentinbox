@@ -43,8 +43,8 @@ fn app(state: &AppState, p: OAuthProvider) -> Option<&OAuthApp> {
 
 fn env_vars(p: OAuthProvider) -> &'static str {
     match p {
-        OAuthProvider::Google => "NSHMAIL_GOOGLE_CLIENT_ID / NSHMAIL_GOOGLE_CLIENT_SECRET",
-        OAuthProvider::Microsoft => "NSHMAIL_MS_CLIENT_ID / NSHMAIL_MS_CLIENT_SECRET",
+        OAuthProvider::Google => "AGENTINBOX_GOOGLE_CLIENT_ID / AGENTINBOX_GOOGLE_CLIENT_SECRET",
+        OAuthProvider::Microsoft => "AGENTINBOX_MS_CLIENT_ID / AGENTINBOX_MS_CLIENT_SECRET",
     }
 }
 

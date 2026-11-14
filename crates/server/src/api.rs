@@ -132,7 +132,7 @@ pub struct Credentials {
 /// Verifying against a fixed hash for unknown emails keeps login timing uniform.
 static DUMMY_HASH: LazyLock<String> = LazyLock::new(|| {
     Argon2::default()
-        .hash_password(b"nsh-mail-dummy")
+        .hash_password(b"agentinbox-dummy")
         .expect("argon2")
         .to_string()
 });

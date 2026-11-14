@@ -3,7 +3,7 @@
 // composer puts it back); Cancel send takes it out, with Undo.
 import { Scroll, Text, View } from "nsh";
 import { t } from "nsh/i18n";
-import { Mail, type Outgoing } from "nsh-mail/native";
+import { Mail, type Outgoing } from "agentinbox/native";
 import { AccountMark, Empty, Icon, IconButton, LoadingIndicator, Row, touch } from "../ui";
 import { displayName, sendDate } from "../lib/format";
 import { wide } from "../layout";

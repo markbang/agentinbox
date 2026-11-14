@@ -61,7 +61,7 @@ async fn open() -> Result<(Engine, secrets::Backend)> {
     let dir = data_dir().ok_or_else(|| {
         Error::new(
             ErrorCode::Unsupported,
-            "this device keeps no files for the app: use an nsh-mail server",
+            "this device keeps no files for the app: use an AgentInbox server",
         )
     })?;
     blocking(move || {

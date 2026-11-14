@@ -18,26 +18,26 @@ onboarding.title:
   en: All your mail in one inbox
   zh-CN: 所有邮箱，一个收件箱
 onboarding.subtitle:
-  en: Choose where nsh-mail keeps your mail. You can change it later in Settings.
-  zh-CN: 选择 nsh-mail 在哪里保存你的邮件，之后可以在设置里更改。
+  en: Choose where AgentInbox keeps your mail. You can change it later in Settings.
+  zh-CN: 选择 AgentInbox 在哪里保存你的邮件，之后可以在设置里更改。
 onboarding.subtitleWeb:
-  en: Sign in to your nsh-mail server to read all your accounts in one place.
-  zh-CN: 登录你的 nsh-mail 服务器，在一个地方阅读所有邮箱。
+  en: Sign in to your AgentInbox server to read all your accounts in one place.
+  zh-CN: 登录你的 AgentInbox 服务器，在一个地方阅读所有邮箱。
 onboarding.local:
   en: On this device
   zh-CN: 仅本机
 onboarding.localDetail:
-  en: Passwords and mail stay here. nsh-mail connects to your mail servers directly.
-  zh-CN: 密码和邮件只保存在本机，nsh-mail 直接连接你的邮件服务器。
+  en: Passwords and mail stay here. AgentInbox connects to your mail servers directly.
+  zh-CN: 密码和邮件只保存在本机，AgentInbox 直接连接你的邮件服务器。
 onboarding.cloud:
-  en: Through an nsh-mail server
-  zh-CN: 通过 nsh-mail 服务器
+  en: Through an AgentInbox server
+  zh-CN: 通过 AgentInbox 服务器
 onboarding.cloudDetail:
   en: The server syncs your accounts and pushes new mail to every device, also when the app is closed.
   zh-CN: 服务器代为同步账号，并把新邮件推送到每台设备，应用关闭时也能收到。
 onboarding.webOnlyCloud:
-  en: Browsers can't connect to mail servers, so the web app works through an nsh-mail server, the official one or your own.
-  zh-CN: 浏览器无法直接连接邮件服务器，所以网页版需要通过 nsh-mail 服务器使用，可以是官方的，也可以是你自己部署的。
+  en: Browsers can't connect to mail servers, so the web app works through an AgentInbox server, the official one or your own.
+  zh-CN: 浏览器无法直接连接邮件服务器，所以网页版需要通过 AgentInbox 服务器使用，可以是官方的，也可以是你自己部署的。
 onboarding.signIn:
   en: Sign in
   zh-CN: 登录
@@ -51,8 +51,8 @@ onboarding.server:
   en: Server
   zh-CN: 服务器地址
 onboarding.serverHint:
-  en: The address of your nsh-mail server, starting with https://
-  zh-CN: 你的 nsh-mail 服务器地址，以 https:// 开头
+  en: The address of your AgentInbox server, starting with https://
+  zh-CN: 你的 AgentInbox 服务器地址，以 https:// 开头
 onboarding.email:
   en: Email
   zh-CN: 邮箱
@@ -527,8 +527,8 @@ outbox.tooLate:
   en: Too late to undo, the message is on its way.
   zh-CN: 来不及撤销，邮件已经发出。
 outbox.sentLate:
-  en: "Sent “%{subject}”: its time came while nsh-mail was closed."
-  zh-CN: 已发送“%{subject}”：它的发送时间在 nsh-mail 关闭期间已到。
+  en: "Sent “%{subject}”: its time came while AgentInbox was closed."
+  zh-CN: 已发送“%{subject}”：它的发送时间在 AgentInbox 关闭期间已到。
 outbox.failed:
   en: "Couldn't send “%{subject}”. %{detail} It's waiting in Scheduled."
   zh-CN: 未能发送“%{subject}”。%{detail} 它在“定时发送”里等你处理。
@@ -539,8 +539,8 @@ outbox.emptyHint:
   en: Use the arrow next to Send to send a message later.
   zh-CN: 点“发送”旁的箭头，可以稍后再发送邮件。
 outbox.localHint:
-  en: Scheduled mail goes out while nsh-mail runs (on desktops it keeps running in the tray). Anything due while it's closed goes out when it starts again.
-  zh-CN: 定时邮件在 nsh-mail 运行时发出（桌面端关闭窗口后会在托盘中继续运行）。关闭期间到时的邮件，会在下次启动时发出。
+  en: Scheduled mail goes out while AgentInbox runs (on desktops it keeps running in the tray). Anything due while it's closed goes out when it starts again.
+  zh-CN: 定时邮件在 AgentInbox 运行时发出（桌面端关闭窗口后会在托盘中继续运行）。关闭期间到时的邮件，会在下次启动时发出。
 
 search.label:
   en: Search
@@ -616,14 +616,14 @@ settings.localDetail:
   en: Passwords and mail stay on this device.
   zh-CN: 密码和邮件只保存在本机。
 settings.androidLocal:
-  en: On Android, this mode checks for mail only while the app is open. Use an nsh-mail server to get new mail pushed.
-  zh-CN: 在 Android 上，此模式只在应用打开时收取邮件。如需推送新邮件，请使用 nsh-mail 服务器。
+  en: On Android, this mode checks for mail only while the app is open. Use an AgentInbox server to get new mail pushed.
+  zh-CN: 在 Android 上，此模式只在应用打开时收取邮件。如需推送新邮件，请使用 AgentInbox 服务器。
 settings.signOut:
   en: Sign out
   zh-CN: 退出登录
 settings.signOutTitle:
-  en: Sign out of nsh-mail?
-  zh-CN: 退出 nsh-mail？
+  en: Sign out of AgentInbox?
+  zh-CN: 退出 AgentInbox？
 settings.signOutLocal:
   en: Your accounts and the mail kept on this device are removed from this app.
   zh-CN: 本机保存的账号和邮件将从此应用中移除。
@@ -646,17 +646,17 @@ settings.newMailNotifications:
   en: New mail
   zh-CN: 新邮件通知
 settings.notificationsDetail:
-  en: Shown when nsh-mail isn't in front.
-  zh-CN: nsh-mail 不在前台时显示。
+  en: Shown when AgentInbox isn't in front.
+  zh-CN: AgentInbox 不在前台时显示。
 settings.notificationsDenied:
-  en: Notifications are turned off for nsh-mail in your system settings.
-  zh-CN: 系统设置中已关闭 nsh-mail 的通知。
+  en: Notifications are turned off for AgentInbox in your system settings.
+  zh-CN: 系统设置中已关闭 AgentInbox 的通知。
 settings.help:
   en: Help
   zh-CN: 帮助
 settings.about:
-  en: nsh-mail %{version}
-  zh-CN: nsh-mail %{version}
+  en: AgentInbox %{version}
+  zh-CN: AgentInbox %{version}
 
 accounts.add:
   en: Add account
@@ -692,8 +692,8 @@ accounts.removeTitle:
   en: Remove %{email}?
   zh-CN: 移除 %{email}？
 accounts.removeBody:
-  en: Its mail is removed from nsh-mail. Nothing is deleted on the mail server.
-  zh-CN: 它的邮件将从 nsh-mail 中移除，邮件服务器上的内容不会被删除。
+  en: Its mail is removed from AgentInbox. Nothing is deleted on the mail server.
+  zh-CN: 它的邮件将从 AgentInbox 中移除，邮件服务器上的内容不会被删除。
 accounts.removed:
   en: Removed %{email}
   zh-CN: 已移除 %{email}
@@ -803,8 +803,8 @@ imap.password:
   en: App password
   zh-CN: 应用专用密码
 imap.appPasswordHint:
-  en: Use an app password (or authorization code) made for nsh-mail in your provider's security settings, not your regular password.
-  zh-CN: 请在邮箱的安全设置中为 nsh-mail 生成应用专用密码（或授权码），不要使用登录密码。
+  en: Use an app password (or authorization code) made for AgentInbox in your provider's security settings, not your regular password.
+  zh-CN: 请在邮箱的安全设置中为 AgentInbox 生成应用专用密码（或授权码），不要使用登录密码。
 imap.appPasswordLink:
   en: How to get one from %{provider}
   zh-CN: 如何在 %{provider} 获取
@@ -828,8 +828,8 @@ imap.connecting:
   zh-CN: 正在连接
 
 errors.unsupported:
-  en: This isn't available here. The web app works through an nsh-mail server.
-  zh-CN: 此处不支持该操作。网页版需要通过 nsh-mail 服务器使用。
+  en: This isn't available here. The web app works through an AgentInbox server.
+  zh-CN: 此处不支持该操作。网页版需要通过 AgentInbox 服务器使用。
 errors.auth:
   en: The server didn't accept the sign-in. Check the email and password.
   zh-CN: 服务器拒绝了登录，请检查邮箱和密码。
@@ -854,8 +854,8 @@ layout.resize:
   zh-CN: 调整窗格大小
 
 tray.open:
-  en: Open nsh-mail
-  zh-CN: 打开 nsh-mail
+  en: Open AgentInbox
+  zh-CN: 打开 AgentInbox
 tray.quit:
   en: Quit
   zh-CN: 退出
@@ -1294,8 +1294,8 @@ keys.copied:
   en: Key copied
   zh-CN: 密钥已复制
 keys.usage:
-  en: "REST: curl -H \"Authorization: Bearer …\" <server>/v1/messages · MCP: nsh-notify-mcp --key …"
-  zh-CN: "REST：curl -H \"Authorization: Bearer …\" <server>/v1/messages · MCP：nsh-notify-mcp --key …"
+  en: "REST: curl -H \"Authorization: Bearer …\" <server>/v1/messages · MCP: agentinbox-mcp --key …"
+  zh-CN: "REST：curl -H \"Authorization: Bearer …\" <server>/v1/messages · MCP：agentinbox-mcp --key …"
 keys.revoke:
   en: Revoke
   zh-CN: 撤销

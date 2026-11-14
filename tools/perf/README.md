@@ -11,7 +11,7 @@ only with `--cfg nshmail_demo`:
 ```sh
 cd app
 RUSTFLAGS="--cfg nshmail_demo" nsh package App.tsx --target web -o /tmp/web
-node tools/perf/scroll.mjs /tmp/web/nsh-mail --large --label before --out /tmp/before.json
+node tools/perf/scroll.mjs /tmp/web/AgentInbox --large --label before --out /tmp/before.json
 ```
 
 `puppeteer-core` is the only dependency (`npm i puppeteer-core`, or point `PUPPETEER_CORE` at its

@@ -4,7 +4,7 @@ use serde_json::{Value, json};
 
 use crate::api::{ListQuery, MAX_LIMIT, Message, Notify, Page, Source};
 
-pub const SERVER_NAME: &str = "nsh-notify";
+pub const SERVER_NAME: &str = "agentinbox";
 /// Newest first; the server answers with whatever it and we share.
 const PROTOCOL_VERSIONS: [&str; 3] = ["2025-06-18", "2025-03-26", "2024-11-05"];
 const LIST_BODY_CHARS: usize = 280;

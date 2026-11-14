@@ -1,4 +1,4 @@
-//! nsh-mail core: types shared with every client, plus (feature `engine`) the mail engine used by the
+//! AgentInbox core: types shared with every client, plus (feature `engine`) the mail engine used by the
 //! native app in local mode and by the cloud server.
 
 pub mod types;

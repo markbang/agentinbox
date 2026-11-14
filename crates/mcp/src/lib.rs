@@ -1,14 +1,14 @@
-//! `nsh-notify-mcp` — the MCP server for the nsh-mail notification inbox.
+//! `agentinbox-mcp` — the MCP server for the AgentInbox notification inbox.
 //!
 //! Tools: `list_unread`, `search`, `get`, `mark_read`, `list_sources`, exactly
 //! as [docs/design/notification-inbox.md] §3 defines them. Two transports share
 //! one dispatcher:
 //!
 //! - stdio ([`stdio::serve`]), what Claude Code, Codex and Cursor launch;
-//! - streamable HTTP ([`router`]), which the nsh-mail server can mount as-is at
+//! - streamable HTTP ([`router`]), which the AgentInbox server can mount as-is at
 //!   `/mcp`, because the tools only need a [`Notify`] backend.
 //!
-//! [docs/design/notification-inbox.md]: https://github.com/markbang/nsh-mail/blob/main/docs/design/notification-inbox.md
+//! [docs/design/notification-inbox.md]: https://github.com/markbang/agentinbox/blob/main/docs/design/notification-inbox.md
 
 pub mod api;
 pub mod http;

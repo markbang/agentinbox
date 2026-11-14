@@ -2,7 +2,7 @@
 // (REST, SSE or MCP), warning that it cannot be read again.
 import { Clipboard, Text, View } from "nsh";
 import { t } from "nsh/i18n";
-import type { ApiKey } from "nsh-mail/native";
+import type { ApiKey } from "agentinbox/native";
 import { AppBar, Button, Card, Icon, Page, SectionLabel } from "../ui";
 import { PageHeader, PageScroll } from "../components/PageHeader";
 import { keyExpiry, keyScopes } from "./ApiKeysPage";

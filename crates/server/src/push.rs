@@ -33,7 +33,7 @@ pub fn load_vapid(env_key: Option<&str>, data_dir: &Path) -> Result<ES256KeyPair
         ES256KeyPair::from_bytes(&raw).map_err(|e| anyhow!("invalid VAPID private key: {e}"))
     };
     if let Some(k) = env_key {
-        return decode(k).context("NSHMAIL_VAPID_PRIVATE_KEY");
+        return decode(k).context("AGENTINBOX_VAPID_PRIVATE_KEY");
     }
     let path = data_dir.join("vapid_private_key");
     if path.exists() {

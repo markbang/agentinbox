@@ -1,6 +1,6 @@
 [English](linux.md) | 简体中文
 
-# 在 Linux 上使用 nsh-mail
+# 在 Linux 上使用 AgentInbox
 
 ## 需要什么
 
@@ -18,16 +18,16 @@ GNOME 和 KDE 桌面一般都已装好。Ubuntu 22.04（GTK 4.6）太旧，不�
 
 ```sh
 mkdir -p ~/.local/opt ~/.local/bin ~/.local/share/applications
-tar -xzf nsh-mail-<版本>-linux-x86_64.tar.gz -C ~/.local/opt
-ln -sf ~/.local/opt/nsh-mail/nshmail ~/.local/bin/nshmail
+tar -xzf agentinbox-<版本>-linux-x86_64.tar.gz -C ~/.local/opt
+ln -sf ~/.local/opt/AgentInbox/AgentInbox ~/.local/bin/agentinbox
 
 cat > ~/.local/share/applications/top.bangwu.nshmail.desktop <<EOF
 [Desktop Entry]
 Type=Application
-Name=nsh-mail
+Name=AgentInbox
 Comment=All your mail in one inbox
-Exec=$HOME/.local/opt/nsh-mail/nshmail %u
-Icon=$HOME/.local/opt/nsh-mail/top.bangwu.nshmail.png
+Exec=$HOME/.local/opt/AgentInbox/AgentInbox %u
+Icon=$HOME/.local/opt/AgentInbox/top.bangwu.nshmail.png
 StartupWMClass=top.bangwu.nshmail
 Terminal=false
 Categories=Network;Email;
@@ -37,11 +37,11 @@ chmod 444 ~/.local/share/applications/top.bangwu.nshmail.desktop
 xdg-mime default top.bangwu.nshmail.desktop x-scheme-handler/nshmail
 ```
 
-`chmod 444` 不能省：应用每次启动都会把可写的 `top.bangwu.nshmail.desktop` 换成一个隐藏、没有图标的条目（NSH 运行时的行为），nsh-mail 会从启动器里消失，通知也没有图标。设成只读后你的条目会保留，应用只记一条警告。`xdg-mime` 那一行让 `nshmail://` 链接（Google、Microsoft 登录的最后一步）由本应用打开。升级时把新压缩包解压覆盖旧目录即可。
+`chmod 444` 不能省：应用每次启动都会把可写的 `top.bangwu.nshmail.desktop` 换成一个隐藏、没有图标的条目（NSH 运行时的行为），AgentInbox 会从启动器里消失，通知也没有图标。设成只读后你的条目会保留，应用只记一条警告。`xdg-mime` 那一行让 `nshmail://` 链接（Google、Microsoft 登录的最后一步）由本应用打开。升级时把新压缩包解压覆盖旧目录即可。从 nsh-mail 升级：先删掉 `~/.local/opt/nsh-mail`、旧的 `~/.local/bin/nshmail` 链接和旧的 `top.bangwu.nshmail.desktop` 条目，再按上面的步骤安装；应用的数据、设置和账号都会保留，因为应用 id 没有变。
 
 ## 桌面集成
 
-- **托盘**：图标是 StatusNotifierItem，KDE Plasma、Waybar 和大多数面板都能显示；GNOME 需要 AppIndicator 扩展（Ubuntu 默认开启）。关闭窗口后 nsh-mail 仍在运行，用于新邮件通知；没有托盘时再次启动 nsh-mail 即可找回窗口，Ctrl+Q 退出。
+- **托盘**：图标是 StatusNotifierItem，KDE Plasma、Waybar 和大多数面板都能显示；GNOME 需要 AppIndicator 扩展（Ubuntu 默认开启）。关闭窗口后 AgentInbox 仍在运行，用于新邮件通知；没有托盘时再次启动 AgentInbox 即可找回窗口，Ctrl+Q 退出。
 - **通知**：窗口隐藏或不在前台时，新邮件通知交给桌面的通知服务。
 - **密码**（本地模式）存进 Secret Service（GNOME Keyring、KWallet）；没有时加密保存在应用目录，应用会提示一次。
 - **深色模式和字号**跟随桌面：配色经 XDG 设置门户实时跟随，字号取自字体缩放设置（`Xft.dpi`）。

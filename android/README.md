@@ -31,7 +31,7 @@ Bump `build` by one for every release: any package of a release then outranks ev
 
 CI's `Package` step passes the code to `nsh package --build`; `app/build.gradle.kts` applies the same scheme to this host's split APKs. Plain local `nsh package` uses `build` itself.
 
-`prepare.sh` downloads `nsh.aar` from the NSH release matching `nsh --version` (checksum verified), replaces its `libnsh.so` with the one `nsh package` builds for this app (it holds the `nsh-mail/native` module), and writes the bundle with `nsh build --release`. Both outputs are git-ignored.
+`prepare.sh` downloads `nsh.aar` from the NSH release matching `nsh --version` (checksum verified), replaces its `libnsh.so` with the one `nsh package` builds for this app (it holds the `agentinbox/native` module), and writes the bundle with `nsh build --release`. Both outputs are git-ignored.
 
 ## Signing
 
@@ -45,7 +45,7 @@ Without `app/google-services.json` the APK builds and runs, with push off. To tu
 
 1. Create a Firebase project and add an Android app with package `top.bangwu.nshmail`.
 2. Download its `google-services.json` to `android/app/` (never commit it). For CI, save the file's content as the repository secret `GOOGLE_SERVICES_JSON`.
-3. Create a service account key (Project settings → Service accounts) and point the server's `NSHMAIL_FCM_SERVICE_ACCOUNT` at it.
+3. Create a service account key (Project settings → Service accounts) and point the server's `AGENTINBOX_FCM_SERVICE_ACCOUNT` at it (`NSHMAIL_FCM_SERVICE_ACCOUNT` still works).
 
 ## How it talks to the app
 

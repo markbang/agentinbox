@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Drives nsh-mail on a running emulator with adb and screenshots each screen,
+"""Drives AgentInbox on a running emulator with adb and screenshots each screen,
 in light and dark mode: inbox, swipe to archive and Undo, selection, pull to
 refresh, reader, a conversation, compose, Schedule send, search, mailboxes, Scheduled, settings, a signature, a tab switch that must
 keep the inbox's scroll position; then larger text and a tablet-sized screen.

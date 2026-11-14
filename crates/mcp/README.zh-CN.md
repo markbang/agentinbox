@@ -1,8 +1,8 @@
 [English](README.md) | 简体中文
 
-# nsh-notify-mcp
+# agentinbox-mcp
 
-nsh-mail **通知收件箱**的 [Model Context Protocol](https://modelcontextprotocol.io) 服务器：邮件、Webhook（GitHub、GitLab、Sentry、Grafana、Uptime Kuma）、Gotify、ntfy 和聊天机器人全都汇聚到一个信息流里，agent 用一个以 `nb_` 开头的 API key 就能读取。
+AgentInbox **通知收件箱**的 [Model Context Protocol](https://modelcontextprotocol.io) 服务器：邮件、Webhook（GitHub、GitLab、Sentry、Grafana、Uptime Kuma）、Gotify、ntfy 和聊天机器人全都汇聚到一个信息流里，agent 用一个以 `nb_` 开头的 API key 就能读取。
 
 它只是一个薄而诚实的客户端：五个工具、两种传输（stdio 和 streamable HTTP），服务端返回的错误原样透出。
 
@@ -21,7 +21,7 @@ nsh-mail **通知收件箱**的 [Model Context Protocol](https://modelcontextpro
 ## 构建
 
 ```sh
-cargo build -p nsh-notify-mcp --release     # target/release/nsh-notify-mcp
+cargo build -p agentinbox-mcp --release     # target/release/agentinbox-mcp
 # 或
 cargo install --path crates/mcp
 ```
@@ -29,13 +29,13 @@ cargo install --path crates/mcp
 ## 运行：stdio（MCP 客户端启动的就是这个）
 
 ```sh
-nsh-notify-mcp --server https://mail-api.bangwu.me --key nb_xxxxxxxx
+agentinbox-mcp --server https://mail-api.bangwu.me --key nb_xxxxxxxx
 ```
 
 | 选项 | 环境变量 | 含义 |
 |---|---|---|
-| `--server URL` | `NSH_NOTIFY_SERVER` | 你的 nsh-mail 服务器地址 |
-| `--key KEY` | `NSH_NOTIFY_KEY` | API key（`nb_…`），在 App 的 设置 → API keys 里创建 |
+| `--server URL` | `AGENTINBOX_SERVER` | 你的 AgentInbox 服务器地址 |
+| `--key KEY` | `AGENTINBOX_KEY` | API key（`nb_…`），在 App 的 设置 → API keys 里创建 |
 | `--timeout SECS` | | 单次 REST 请求的超时秒数（1–300，默认 15） |
 
 stdout 只承载协议内容，日志一律走 stderr。退出码 2 表示参数有误，1 表示传输层失败。
@@ -43,7 +43,7 @@ stdout 只承载协议内容，日志一律走 stderr。退出码 2 表示参数
 ## 运行：HTTP
 
 ```sh
-nsh-notify-mcp --http 127.0.0.1:8099 --server https://mail-api.bangwu.me --key nb_xxxxxxxx
+agentinbox-mcp --http 127.0.0.1:8099 --server https://mail-api.bangwu.me --key nb_xxxxxxxx
 ```
 
 `POST /mcp` 接收一条 JSON-RPC 消息（或一批），返回 `application/json`。它是无状态的——没有会话 id，也没有服务端主动推送的流——所以 `GET /mcp` 返回 405。指定了 `--key` 时，请求必须带上同一个 key（`Authorization: Bearer …` 或 `X-API-Key`）；不指定时，每个请求自备 key。
@@ -62,9 +62,9 @@ curl -s http://127.0.0.1:8099/mcp \
 ### Claude Code
 
 ```sh
-claude mcp add nsh-notify -- nsh-notify-mcp --server https://mail-api.bangwu.me --key nb_xxxxxxxx
+claude mcp add agentinbox -- agentinbox-mcp --server https://mail-api.bangwu.me --key nb_xxxxxxxx
 # 或者不把 key 写在命令行里：
-claude mcp add nsh-notify -e NSH_NOTIFY_KEY=nb_xxxxxxxx -- nsh-notify-mcp --server https://mail-api.bangwu.me
+claude mcp add agentinbox -e AGENTINBOX_KEY=nb_xxxxxxxx -- agentinbox-mcp --server https://mail-api.bangwu.me
 ```
 
 `.mcp.json`，放在项目目录（团队共享）或家目录顶层：
@@ -72,10 +72,10 @@ claude mcp add nsh-notify -e NSH_NOTIFY_KEY=nb_xxxxxxxx -- nsh-notify-mcp --serv
 ```json
 {
   "mcpServers": {
-    "nsh-notify": {
-      "command": "nsh-notify-mcp",
+    "agentinbox": {
+      "command": "agentinbox-mcp",
       "args": ["--server", "https://mail-api.bangwu.me"],
-      "env": { "NSH_NOTIFY_KEY": "nb_xxxxxxxx" }
+      "env": { "AGENTINBOX_KEY": "nb_xxxxxxxx" }
     }
   }
 }
@@ -86,8 +86,8 @@ claude mcp add nsh-notify -e NSH_NOTIFY_KEY=nb_xxxxxxxx -- nsh-notify-mcp --serv
 `~/.codex/config.toml`：
 
 ```toml
-[mcp_servers.nsh-notify]
-command = "nsh-notify-mcp"
+[mcp_servers.agentinbox]
+command = "agentinbox-mcp"
 args = ["--server", "https://mail-api.bangwu.me", "--key", "nb_xxxxxxxx"]
 ```
 
@@ -98,10 +98,10 @@ args = ["--server", "https://mail-api.bangwu.me", "--key", "nb_xxxxxxxx"]
 ```json
 {
   "mcpServers": {
-    "nsh-notify": {
-      "command": "nsh-notify-mcp",
+    "agentinbox": {
+      "command": "agentinbox-mcp",
       "args": ["--server", "https://mail-api.bangwu.me"],
-      "env": { "NSH_NOTIFY_KEY": "nb_xxxxxxxx" }
+      "env": { "AGENTINBOX_KEY": "nb_xxxxxxxx" }
     }
   }
 }
@@ -112,7 +112,7 @@ args = ["--server", "https://mail-api.bangwu.me", "--key", "nb_xxxxxxxx"]
 ```json
 {
   "mcpServers": {
-    "nsh-notify": {
+    "agentinbox": {
       "url": "https://mail-api.bangwu.me/mcp",
       "headers": { "Authorization": "Bearer nb_xxxxxxxx" }
     }
@@ -126,7 +126,7 @@ args = ["--server", "https://mail-api.bangwu.me", "--key", "nb_xxxxxxxx"]
 
 ## 在服务器里复用
 
-这个 crate 首先是库（`notify_mcp`）。nsh-mail 服务器可以在自己的进程里提供 MCP，与 REST API 同址，并共用同一套 API key 校验：
+这个 crate 首先是库（`notify_mcp`）。AgentInbox 服务器可以在自己的进程里提供 MCP，与 REST API 同址，并共用同一套 API key 校验：
 
 ```rust
 let make: notify_mcp::BackendFactory =
@@ -142,7 +142,7 @@ let app = app.merge(notify_mcp::router(make));
 ## 测试
 
 ```sh
-cargo test -p nsh-notify-mcp
+cargo test -p agentinbox-mcp
 ```
 
 测试会在随机端口上启动桩服务器：逐个工具、游标分页、401 与 403（权限）错误、超时、用编译出的可执行文件跑一次真实的 stdio 会话，以及 HTTP 传输（包括挂载模式、自身不鉴权的 router）。不需要真实的服务器、key 或网络。

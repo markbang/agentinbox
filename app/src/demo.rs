@@ -156,7 +156,7 @@ impl Data {
             &account,
             FolderKind::Inbox,
             unix_ms(),
-            ("nsh-mail", "hello@nsh-mail.app"),
+            ("AgentInbox", "hello@agentinbox.app"),
             "Your account is connected",
             &text,
         );
@@ -1316,7 +1316,7 @@ fn message(
         .take(140)
         .collect();
     Message {
-        message_id: Some(format!("<{id}@demo.nsh-mail>")),
+        message_id: Some(format!("<{id}@demo.agentinbox>")),
         summary: Summary {
             id: id.clone(),
             account_id: account.id.clone(),
@@ -1497,7 +1497,7 @@ const DESIGN_REVIEW_HTML: &str = r#"<h2>Design review: unified inbox</h2>
 <li>Remote images are <i>blocked by default</i>; the reader offers to load them.</li>
 </ul>
 <p><img src="https://images.example.com/mockup-inbox.png" alt="Inbox mockup"></p>
-<p>The full notes are in the <a href="https://github.com/markbang/nsh-mail/blob/main/docs/design.md">design doc</a>.</p>
+<p>The full notes are in the <a href="https://github.com/markbang/agentinbox/blob/main/docs/design.md">design doc</a>.</p>
 <p>— Maya</p>"#;
 
 const NEWSLETTER_HTML: &str = r#"<h1>This Week in Rust 571</h1>
@@ -2074,7 +2074,7 @@ const NOTICE_SEEDS: &[(&str, f64, &str, &str, &str, u8, &[&str], bool, Option<&s
         5.0 * HOUR,
         "northwind/atlas",
         "Deploy failed: production",
-        "Deploy nsh-mail-server to mail-api.bangwu.me failed at the health check.\n\nThe container restarted 3 times in 90s.",
+        "Deploy agentinbox-server to mail-api.bangwu.me failed at the health check.\n\nThe container restarted 3 times in 90s.",
         9,
         &["deploy", "production"],
         false,

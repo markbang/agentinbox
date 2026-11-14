@@ -1,6 +1,6 @@
 English | [简体中文](linux.zh-CN.md)
 
-# nsh-mail on Linux
+# AgentInbox on Linux
 
 ## What it needs
 
@@ -18,16 +18,16 @@ GNOME and KDE installs usually have all of them. Ubuntu 22.04 (GTK 4.6) is too o
 
 ```sh
 mkdir -p ~/.local/opt ~/.local/bin ~/.local/share/applications
-tar -xzf nsh-mail-<version>-linux-x86_64.tar.gz -C ~/.local/opt
-ln -sf ~/.local/opt/nsh-mail/nshmail ~/.local/bin/nshmail
+tar -xzf agentinbox-<version>-linux-x86_64.tar.gz -C ~/.local/opt
+ln -sf ~/.local/opt/AgentInbox/AgentInbox ~/.local/bin/agentinbox
 
 cat > ~/.local/share/applications/top.bangwu.nshmail.desktop <<EOF
 [Desktop Entry]
 Type=Application
-Name=nsh-mail
+Name=AgentInbox
 Comment=All your mail in one inbox
-Exec=$HOME/.local/opt/nsh-mail/nshmail %u
-Icon=$HOME/.local/opt/nsh-mail/top.bangwu.nshmail.png
+Exec=$HOME/.local/opt/AgentInbox/AgentInbox %u
+Icon=$HOME/.local/opt/AgentInbox/top.bangwu.nshmail.png
 StartupWMClass=top.bangwu.nshmail
 Terminal=false
 Categories=Network;Email;
@@ -37,11 +37,11 @@ chmod 444 ~/.local/share/applications/top.bangwu.nshmail.desktop
 xdg-mime default top.bangwu.nshmail.desktop x-scheme-handler/nshmail
 ```
 
-The `chmod 444` matters: at every start the app replaces a writable `top.bangwu.nshmail.desktop` with a hidden entry that has no icon (an NSH runtime behavior), which takes nsh-mail out of the launcher and leaves notifications without its icon. Read-only, yours stays; the app only logs a warning. The `xdg-mime` line makes `nshmail://` links (the end of a Google or Microsoft sign-in) open the app. To update, extract the new archive over the old one.
+The `chmod 444` matters: at every start the app replaces a writable `top.bangwu.nshmail.desktop` with a hidden entry that has no icon (an NSH runtime behavior), which takes AgentInbox out of the launcher and leaves notifications without its icon. Read-only, yours stays; the app only logs a warning. The `xdg-mime` line makes `nshmail://` links (the end of a Google or Microsoft sign-in) open the app. To update, extract the new archive over the old one. Upgrading from nsh-mail: remove `~/.local/opt/nsh-mail`, the old `~/.local/bin/nshmail` link and the old `top.bangwu.nshmail.desktop` entry, then install as above; the app keeps its data, settings and accounts, because the application id did not change.
 
 ## On the desktop
 
-- **Tray**: the icon is a StatusNotifierItem, which KDE Plasma, Waybar and most panels show. GNOME shows it with the AppIndicator extension (Ubuntu has it on). Closing the window keeps nsh-mail running for new-mail notifications; without a tray, start nsh-mail again to bring the window back, and quit with Ctrl+Q.
+- **Tray**: the icon is a StatusNotifierItem, which KDE Plasma, Waybar and most panels show. GNOME shows it with the AppIndicator extension (Ubuntu has it on). Closing the window keeps AgentInbox running for new-mail notifications; without a tray, start AgentInbox again to bring the window back, and quit with Ctrl+Q.
 - **Notifications** go to the desktop's notification service while the window is hidden or not focused.
 - **Passwords** (local mode) go to the Secret Service (GNOME Keyring, KWallet). Without one they are kept encrypted in the app's folder, and the app says so once.
 - **Dark mode and text size** follow the desktop: the color scheme through the XDG settings portal, live; the text size from the font scaling setting (`Xft.dpi`).
