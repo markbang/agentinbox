@@ -111,7 +111,7 @@ dependencies = [
  "futures-util",
  "lettre",
  "mail-core 0.1.0",
- "mail-core 0.1.0 (git+https://github.com/markbang/nsh-mail?rev=ec172435302f79013110f70235acaaaea5c9a89a)",
+ "mail-core 0.1.0 (git+https://github.com/markbang/agentinbox?rev=ec172435302f79013110f70235acaaaea5c9a89a)",
  "reqwest",
  "rusqlite",
  "serde",
@@ -2003,7 +2003,7 @@ dependencies = [
 [[package]]
 name = "mail-core"
 version = "0.1.0"
-source = "git+https://github.com/markbang/nsh-mail?rev=ec172435302f79013110f70235acaaaea5c9a89a#ec172435302f79013110f70235acaaaea5c9a89a"
+source = "git+https://github.com/markbang/agentinbox?rev=ec172435302f79013110f70235acaaaea5c9a89a#ec172435302f79013110f70235acaaaea5c9a89a"
 dependencies = [
  "aes-gcm 0.11.1",
  "ammonia",
