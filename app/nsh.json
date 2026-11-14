@@ -1,8 +1,8 @@
 {
   "name": "AgentInbox",
   "id": "top.bangwu.nshmail",
-  "version": "0.0.2",
-  "build": 5,
+  "version": "0.0.4",
+  "build": 6,
   "rust": ".",
   "theme": "theme.json",
   "icon": "icon.png",
