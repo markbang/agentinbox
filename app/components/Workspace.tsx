@@ -39,7 +39,7 @@ export function Workspace(props: WorkspaceProps) {
         <MailboxRail expanded={expanded()} fab={fab()} onSettings={props.onSettings} />
       </View>
       <If when={notificationsSection()} else={mailPanes()}>
-        <NotificationsView onAddSource={props.onAddSource} onOpenSources={props.onSources} />
+        <NotificationsView onAddSource={props.onAddSource} onAddAccount={props.onAddAccount} onOpenSources={props.onSources} />
       </If>
     </View>
   );

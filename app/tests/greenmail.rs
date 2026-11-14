@@ -124,6 +124,46 @@ fn received(host: &str, to: &str, subject: &str) -> (Message, Vec<(String, Vec<u
     })
 }
 
+/// The folder `subject` sits in, in `mailbox`'s own account on the server, and whether it is seen
+/// there: what another IMAP client logged in as that user would find.
+fn folder_of(host: &str, mailbox: &str, subject: &str) -> (FolderKind, bool) {
+    tokio::runtime::Runtime::new().unwrap().block_on(async {
+        let engine = Engine::open(
+            scratch("probe").join("mail.sqlite"),
+            Arc::new(MemoryStore::new()),
+        )
+        .unwrap();
+        let account = engine
+            .add_imap_account(ImapInput {
+                email: mailbox.into(),
+                name: None,
+                username: None,
+                password: "secret".into(),
+                imap: endpoint(host, 3993),
+                smtp: endpoint(host, 3465),
+                provider: None,
+            })
+            .await
+            .unwrap();
+        engine.sync(&account.id).await.unwrap();
+        for folder in [FolderKind::Inbox, FolderKind::Archive] {
+            let list = engine
+                .list(ListQuery {
+                    folder,
+                    account: None,
+                    before: None,
+                    limit: 50,
+                })
+                .await
+                .unwrap();
+            if let Some(m) = list.iter().find(|m| m.subject == subject) {
+                return (m.folder, m.seen);
+            }
+        }
+        panic!("no {subject:?} in {mailbox}'s inbox or archive");
+    })
+}
+
 fn step(app: &mut Headless, what: impl FnOnce(&mut Headless) -> Result<(), String>) {
     if let Err(e) = what(app) {
         panic!("{e}\non screen:\n{}", app.screen().texts().join("\n"));
@@ -322,4 +362,49 @@ fn local_mode_reads_replies_and_searches_real_mail() {
     step(&mut app, |a| {
         a.wait_for_within("id:results >> text:Re: Lunch on Friday?", WAIT)
     });
+
+    // The notification inbox reads the same database: new mail lands in the feed while it is open.
+    deliver(&host, &bob, "Deploys are red");
+    step(&mut app, |a| a.press("id:rail-notifications"));
+    step(&mut app, |a| {
+        a.wait_for_within("id:notify-list >> text:Deploys are red", WAIT)
+    });
+    assert_eq!(
+        folder_of(&host, &bob, "Deploys are red"),
+        (FolderKind::Inbox, false)
+    );
+
+    // Opening it in the feed reads the mail itself: another IMAP client finds it seen.
+    step(&mut app, |a| {
+        a.press("id:notify-list >> text:Deploys are red")
+    });
+    step(&mut app, |a| a.wait_for_within("id:notify-body", WAIT));
+    assert_eq!(
+        folder_of(&host, &bob, "Deploys are red"),
+        (FolderKind::Inbox, true)
+    );
+
+    // Archiving the notification moves the message, through the engine path the mail list uses;
+    // Undo holds the move for its 8 seconds.
+    step(&mut app, |a| a.press("id:notify-archive"));
+    assert!(!app.shows("id:notify-list >> text:Deploys are red"));
+    std::thread::sleep(Duration::from_secs(10));
+    assert_eq!(
+        folder_of(&host, &bob, "Deploys are red").0,
+        FolderKind::Archive
+    );
+
+    // Sources in local mode are the mail accounts, and the page says so instead of offering
+    // what only a server can do.
+    step(&mut app, |a| a.press("id:open-settings"));
+    step(&mut app, |a| a.press("id:settings-sources"));
+    step(&mut app, |a| a.wait_for_within("id:sources-local", WAIT));
+    step(&mut app, |a| {
+        a.wait_for_within(&format!("id:sources >> text:{bob}"), WAIT)
+    });
+    step(&mut app, |a| {
+        a.wait_for_within("id:sources >> text:Mail", WAIT)
+    });
+    assert!(!app.shows("id:sources-add"));
+    assert!(!app.shows("id:sources-add-top"));
 }

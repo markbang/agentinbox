@@ -24,6 +24,10 @@ use serde_json::{Value, json};
 use mail_core::types::*;
 
 use crate::backend::{Backend, Events, File, MailFuture, Progress};
+use crate::notify::{
+    ApiKey, CreatedApiKey, CreatedSource, FeedPage, FeedQuery, NewApiKey, NewSource, Notification,
+    Source,
+};
 
 #[cfg(target_arch = "wasm32")]
 pub use web::{finish_oauth, page_origin};
@@ -32,9 +36,179 @@ pub use web::{finish_oauth, page_origin};
 const MAX_BACKOFF: Duration = Duration::from_secs(60);
 /// How long a provider's sign-in page may stay open.
 const OAUTH_TIMEOUT: Duration = Duration::from_secs(10 * 60);
+/// The most ids one batch of `/feed/read` or `/feed/archive` may carry.
+const BATCH: usize = 200;
+
 /// A staged file goes to the server in chunks of this size: each a small
 /// request, and progress between them.
 const CHUNK: usize = 1024 * 1024;
+
+// The server's answers that do not map onto the app's own types.
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SourceList {
+    sources: Vec<Source>,
+}
+
+/// A notification as `/v1/feed` sends it: `readAt`/`archivedAt` are the mail model's.
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ServerMessage {
+    id: String,
+    source_id: String,
+    #[serde(default)]
+    sender: Option<String>,
+    title: String,
+    #[serde(default)]
+    body_text: Option<String>,
+    #[serde(default)]
+    link: Option<String>,
+    received_at: i64,
+    #[serde(default)]
+    priority: i64,
+    #[serde(default)]
+    tags: Vec<String>,
+    #[serde(default)]
+    read_at: Option<i64>,
+    #[serde(default)]
+    archived_at: Option<i64>,
+    #[serde(default)]
+    thread_id: Option<String>,
+}
+
+impl ServerMessage {
+    fn notification(self) -> Notification {
+        Notification {
+            id: self.id,
+            source_id: self.source_id,
+            // A notification without a sender shows its title alone.
+            sender: self.sender.unwrap_or_default(),
+            title: self.title,
+            body: self.body_text.unwrap_or_default(),
+            link: self.link,
+            received_at: self.received_at,
+            priority: self.priority.clamp(0, 10) as u8,
+            tags: self.tags,
+            read: self.read_at.is_some(),
+            archived: self.archived_at.is_some(),
+            thread_id: self.thread_id,
+        }
+    }
+}
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FeedList {
+    messages: Vec<ServerMessage>,
+    #[serde(default)]
+    more: bool,
+    #[serde(default)]
+    unread: i64,
+    #[serde(default)]
+    counts: HashMap<String, i64>,
+}
+
+/// A key as `/v1/keys` sends it: one `scopes` list holds read and write.
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ServerKey {
+    id: String,
+    name: String,
+    prefix: String,
+    #[serde(default)]
+    scopes: Vec<String>,
+    #[serde(default)]
+    source_ids: Vec<String>,
+    created_at: i64,
+    #[serde(default)]
+    last_used_at: Option<i64>,
+    #[serde(default)]
+    expires_at: Option<i64>,
+}
+
+impl ServerKey {
+    fn key(self) -> ApiKey {
+        ApiKey {
+            id: self.id,
+            name: self.name,
+            prefix: self.prefix,
+            read: true,
+            write: self.scopes.iter().any(|scope| scope == "write"),
+            source_ids: self.source_ids,
+            created_at: self.created_at,
+            last_used_at: self.last_used_at,
+            expires_at: self.expires_at,
+        }
+    }
+}
+
+#[derive(serde::Deserialize)]
+struct KeyList {
+    keys: Vec<ServerKey>,
+}
+
+/// A key as created: its token is shown only here.
+#[derive(serde::Deserialize)]
+struct CreatedKey {
+    key: ServerKey,
+    token: String,
+}
+
+/// What `/v1/stream` sends: the feed's changes as JSON with a `type` (the SSE events' names).
+#[derive(serde::Deserialize)]
+#[serde(
+    tag = "type",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+enum LiveEvent {
+    Message { message: LiveSeq },
+    Read {},
+    Archived {},
+}
+
+impl LiveEvent {
+    fn seq(&self) -> Option<i64> {
+        match self {
+            Self::Message { message } => Some(message.seq),
+            Self::Read {} | Self::Archived {} => None,
+        }
+    }
+}
+
+#[derive(serde::Deserialize)]
+struct LiveSeq {
+    seq: i64,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::LiveEvent;
+
+    /// The three shapes `crates/server/src` sends over the stream: only a new notification moves
+    /// the seq a reconnect resumes from.
+    #[test]
+    fn stream_events_parse_as_the_server_sends_them() {
+        for (event, seq) in [
+            (
+                serde_json::json!({"type": "message", "message": {"id": "msg_1", "seq": 7, "title": "t"}}),
+                Some(7),
+            ),
+            (
+                serde_json::json!({"type": "read", "id": "msg_1", "sourceId": "src_1", "seq": 7, "readAt": 1}),
+                None,
+            ),
+            (
+                serde_json::json!({"type": "archived", "id": "msg_1", "sourceId": "src_1", "seq": 8, "archivedAt": 2}),
+                None,
+            ),
+        ] {
+            let parsed: LiveEvent = serde_json::from_value(event).expect("a stream event");
+            assert_eq!(parsed.seq(), seq);
+        }
+    }
+}
 
 /// A session on one server.
 struct Api {
@@ -79,6 +253,16 @@ impl Api {
             url.push_str(&format!("&device={}", enc(device)));
         }
         url
+    }
+
+    /// The notification feed's stream (the WebSocket variant of `/v1/stream`), which carries
+    /// every source's notifications, mail included; `since` is appended before each connection.
+    fn feed_url(&self) -> String {
+        let base = self
+            .server
+            .replacen("https://", "wss://", 1)
+            .replacen("http://", "ws://", 1);
+        format!("{base}/v1/stream?format=ws&token={}", enc(&self.token))
     }
 }
 
@@ -235,6 +419,9 @@ struct Inner {
     sys: System,
     emit: RefCell<Option<Events>>,
     listening: RefCell<Option<Spawned<()>>>,
+    /// The feed's own stream, and the seq it resumes from when it reconnects.
+    feed_listening: RefCell<Option<Spawned<()>>>,
+    feed_since: Rc<Cell<i64>>,
     /// This browser's push subscription on the server, once it has one.
     device: RefCell<Option<String>>,
     /// The server's cap on attachments, from `/me`.
@@ -251,6 +438,20 @@ impl Inner {
         let sys = self.sys.clone();
         let task = Owner::detached().run(|| spawn(listen(url, sys, emit)));
         if let Some(old) = self.listening.replace(Some(task)) {
+            old.cancel();
+        }
+    }
+
+    /// (Re)starts listening for notifications: the feed follows this stream, mail's own lists
+    /// follow `listen`.
+    fn listen_feed(&self) {
+        let Some(emit) = self.emit.borrow().clone() else {
+            return;
+        };
+        let url = self.api.feed_url();
+        let (sys, since) = (self.sys.clone(), self.feed_since.clone());
+        let task = Owner::detached().run(|| spawn(follow_feed(url, since, sys, emit)));
+        if let Some(old) = self.feed_listening.replace(Some(task)) {
             old.cancel();
         }
     }
@@ -286,6 +487,9 @@ fn register_fcm(inner: Weak<Inner>) -> crate::push::TokenSink {
 impl Drop for Inner {
     fn drop(&mut self) {
         if let Some(task) = self.listening.take() {
+            task.cancel();
+        }
+        if let Some(task) = self.feed_listening.take() {
             task.cancel();
         }
     }
@@ -345,6 +549,62 @@ async fn listen(url: String, sys: System, emit: Events) {
     }
 }
 
+/** What the feed follows: a notification arrived, was read, or was archived. */
+fn feed_changed() -> MailEvent {
+    MailEvent::Changed {
+        account_id: String::new(),
+        folder: FolderKind::Inbox,
+    }
+}
+
+/// Follows `/v1/stream`, reconnecting with backoff and resuming after the last seq it saw, so a
+/// short disconnect loses nothing. Every change reloads the feed, which is where notifications
+/// then reach the screen and the system's notifications.
+async fn follow_feed(base: String, since: Rc<Cell<i64>>, sys: System, emit: Events) {
+    let mut delay = Duration::from_secs(1);
+    let mut failing = false;
+    loop {
+        let mut opened = false;
+        let url = format!("{base}&since={}", since.get());
+        let mut stream = socket::connect(&url, &sys);
+        while let Some(incoming) = stream.next().await {
+            match incoming {
+                socket::Incoming::Open => {
+                    opened = true;
+                    delay = Duration::from_secs(1);
+                    if failing {
+                        failing = false;
+                        emit(server_state(None));
+                    }
+                    // Notifications may have come while no stream was open.
+                    emit(feed_changed());
+                }
+                socket::Incoming::Text(text) => match serde_json::from_str::<LiveEvent>(&text) {
+                    Ok(event) => {
+                        if let Some(seq) = event.seq() {
+                            since.set(seq);
+                        }
+                        emit(feed_changed());
+                    }
+                    Err(e) => log::warn!("a feed event this app does not read: {e}"),
+                },
+            }
+        }
+        drop(stream);
+        if !opened {
+            if !failing {
+                failing = true;
+                emit(server_state(Some(Error::new(
+                    ErrorCode::Network,
+                    "cannot reach the server for notifications; retrying",
+                ))));
+            }
+            delay = (delay * 2).min(MAX_BACKOFF);
+        }
+        timer(delay).await;
+    }
+}
+
 /// Mail through an AgentInbox server (see the module's docs).
 pub struct CloudBackend(Rc<Inner>);
 
@@ -355,6 +615,8 @@ impl CloudBackend {
             sys,
             emit: RefCell::default(),
             listening: RefCell::default(),
+            feed_listening: RefCell::default(),
+            feed_since: Rc::new(Cell::new(0)),
             device: RefCell::default(),
             attachment_limit: Cell::new(MAX_ATTACHMENTS),
         }))
@@ -445,6 +707,7 @@ impl Backend for CloudBackend {
     fn start(&self, events: Events) -> MailFuture<'_, ()> {
         *self.0.emit.borrow_mut() = Some(events);
         self.0.listen();
+        self.0.listen_feed();
         let inner = Rc::downgrade(&self.0);
         Owner::detached().run(|| {
             spawn(async move {
@@ -480,6 +743,9 @@ impl Backend for CloudBackend {
     fn sign_out(&self) -> MailFuture<'_, ()> {
         Box::pin(async move {
             if let Some(task) = self.0.listening.take() {
+                task.cancel();
+            }
+            if let Some(task) = self.0.feed_listening.take() {
                 task.cancel();
             }
             crate::push::on_token(None);
@@ -705,4 +971,160 @@ impl Backend for CloudBackend {
     fn refresh(&self) -> MailFuture<'_, ()> {
         Box::pin(self.api().call("POST", "/sync", None))
     }
+
+    // The notification inbox (docs/design/notification-inbox.md §3): the server's sources, its
+    // feed and the keys agents read it with.
+
+    fn server_feed(&self) -> bool {
+        true
+    }
+
+    fn sources(&self) -> MailFuture<'_, Vec<Source>> {
+        Box::pin(async move {
+            let list: SourceList = self.api().call("GET", "/sources", None).await?;
+            Ok(list.sources)
+        })
+    }
+
+    fn feed(&self, query: FeedQuery) -> MailFuture<'_, FeedPage> {
+        Box::pin(async move {
+            let list: FeedList = self.api().call("GET", &feed_path(&query), None).await?;
+            Ok(FeedPage {
+                items: list
+                    .messages
+                    .into_iter()
+                    .map(ServerMessage::notification)
+                    .collect(),
+                counts: list
+                    .counts
+                    .into_iter()
+                    .map(|(id, n)| (id, n.max(0) as u32))
+                    .collect(),
+                unread: list.unread.max(0) as u32,
+                more: list.more,
+            })
+        })
+    }
+
+    fn mark_read(&self, ids: Vec<String>, read: bool) -> MailFuture<'_, ()> {
+        Box::pin(async move {
+            for batch in ids.chunks(BATCH) {
+                let body = json!({ "ids": batch, "read": read });
+                self.api()
+                    .call::<()>("POST", "/feed/read", Some(body))
+                    .await?;
+            }
+            Ok(())
+        })
+    }
+
+    fn archive(&self, ids: Vec<String>) -> MailFuture<'_, ()> {
+        Box::pin(async move {
+            for batch in ids.chunks(BATCH) {
+                let body = json!({ "ids": batch });
+                self.api()
+                    .call::<()>("POST", "/feed/archive", Some(body))
+                    .await?;
+            }
+            Ok(())
+        })
+    }
+
+    fn create_source(&self, input: NewSource) -> MailFuture<'_, CreatedSource> {
+        Box::pin(async move {
+            let body = json!({
+                "kind": input.kind,
+                "name": input.name.trim(),
+                "icon": input.icon,
+                "color": input.color,
+                "minPriority": input.min_priority.min(10),
+            });
+            self.api().call("POST", "/sources", Some(body)).await
+        })
+    }
+
+    fn update_source(&self, source: Source) -> MailFuture<'_, Source> {
+        Box::pin(async move {
+            let path = format!("/sources/{}", enc(&source.id));
+            let body = json!({
+                "name": source.name.trim(),
+                "icon": source.icon,
+                "color": source.color,
+                "minPriority": source.min_priority.min(10),
+                "enabled": source.enabled,
+            });
+            self.api().call("PATCH", &path, Some(body)).await
+        })
+    }
+
+    fn delete_source(&self, id: String) -> MailFuture<'_, ()> {
+        Box::pin(async move {
+            let path = format!("/sources/{}", enc(&id));
+            self.api().call("DELETE", &path, None).await
+        })
+    }
+
+    fn rotate_source_token(&self, id: String) -> MailFuture<'_, CreatedSource> {
+        Box::pin(async move {
+            let path = format!("/sources/{}/token", enc(&id));
+            self.api().call("POST", &path, None).await
+        })
+    }
+
+    fn test_source(&self, id: String) -> MailFuture<'_, ()> {
+        Box::pin(async move {
+            let path = format!("/sources/{}/test", enc(&id));
+            self.api().call::<Value>("POST", &path, None).await?;
+            Ok(())
+        })
+    }
+
+    fn api_keys(&self) -> MailFuture<'_, Vec<ApiKey>> {
+        Box::pin(async move {
+            let list: KeyList = self.api().call("GET", "/keys", None).await?;
+            Ok(list.keys.into_iter().map(ServerKey::key).collect())
+        })
+    }
+
+    fn create_api_key(&self, input: NewApiKey) -> MailFuture<'_, CreatedApiKey> {
+        Box::pin(async move {
+            let body = json!({
+                "name": input.name.trim(),
+                "write": input.write,
+                "sourceIds": input.source_ids,
+                "expiresDays": input.expires_days,
+            });
+            let created: CreatedKey = self.api().call("POST", "/keys", Some(body)).await?;
+            Ok(CreatedApiKey {
+                key: created.key.key(),
+                token: created.token,
+            })
+        })
+    }
+
+    fn revoke_api_key(&self, id: String) -> MailFuture<'_, ()> {
+        Box::pin(async move {
+            let path = format!("/keys/{}", enc(&id));
+            self.api().call("DELETE", &path, None).await
+        })
+    }
+}
+
+/// `GET /feed`'s query, as the filter chips and the search field have it.
+fn feed_path(query: &FeedQuery) -> String {
+    let mut path = format!("/feed?limit={}", query.limit.clamp(1, 200));
+    if let Some(source) = &query.source {
+        path.push_str(&format!("&source={}", enc(source)));
+    }
+    let text = query.text.trim();
+    if !text.is_empty() {
+        path.push_str(&format!("&q={}", enc(text)));
+    }
+    if query.unread {
+        path.push_str("&unread=1");
+    }
+    if let Some(before) = &query.before {
+        path.push_str(&format!("&before={}", enc(before)));
+    }
+    path
 }

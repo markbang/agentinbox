@@ -12,20 +12,28 @@ use std::{
 };
 
 use mail_core::{
-    Engine, StagedFile,
+    Archived, Engine, Feed, ListFilter, StagedFile,
     secrets::{self, platform_store},
     types::*,
 };
 use nsh_core::prelude::*;
 use tokio::sync::broadcast::error::RecvError;
 
-use crate::backend::{Backend, Events, File, MailFuture, Progress, Staged, rename_upload};
+use crate::backend::{
+    Backend, Events, File, MailFuture, Progress, Staged, rename_upload, unavailable,
+};
+use crate::notify::{
+    ApiKey, CreatedApiKey, CreatedSource, FeedPage, FeedQuery, NewApiKey, NewSource, Notification,
+    Source, SourceKind,
+};
 
 type Slot = RefCell<Option<Engine>>;
 
 #[derive(Default)]
 pub struct LocalBackend {
     engine: Rc<Slot>,
+    /// The engine's notification feed, beside mail: the store projects mail into it.
+    feed: RefCell<Option<Feed>>,
     staged: Staged,
 }
 
@@ -54,6 +62,27 @@ impl LocalBackend {
     {
         let work = self.engine().map(f);
         Box::pin(async move { run(work?).await })
+    }
+
+    fn feed(&self) -> Result<Feed> {
+        self.feed
+            .borrow()
+            .clone()
+            .ok_or_else(|| Error::new(ErrorCode::Internal, "the mail engine is not running"))
+    }
+
+    /// `f` with the feed, on the tasks' runtime: the reads are SQLite's and fast, and the engine
+    /// thread stays free for the screen.
+    fn db<T, F>(&self, f: F) -> MailFuture<'_, T>
+    where
+        T: Send + 'static,
+        F: FnOnce(Feed) -> Result<T> + Send + 'static,
+    {
+        let feed = self.feed();
+        Box::pin(async move {
+            let feed = feed?;
+            run(async move { f(feed) }).await
+        })
     }
 }
 
@@ -126,11 +155,61 @@ impl LocalBackend {
     }
 }
 
+const CLOUD_ONLY_SOURCES: &str = "webhooks, Gotify and ntfy sources are set up on an AgentInbox \
+     server: sign in to cloud mode to add one";
+const CLOUD_ONLY_TOKENS: &str =
+    "an ingest URL and its test message come from an AgentInbox server: sign in to cloud mode";
+const CLOUD_ONLY_KEYS: &str = "API keys for agents are kept on an AgentInbox server: sign in to \
+     cloud mode to create one";
+const CLOUD_ONLY_DELETE: &str = "a mail account's notifications belong to the account: remove the \
+     account in Settings instead";
+
+/// Whether `id` is mail, which moves through the engine rather than the feed's own rows.
+fn is_mail(feed: &Feed, id: &str) -> Result<bool> {
+    let message = feed.message(id)?;
+    Ok(feed.source(&message.source_id)?.is_mail())
+}
+
+/// A stored source as the app's type. A kind this build does not know (a newer server's)
+/// shows as a webhook: the feed still lists its notifications, and nothing here sends to it.
+fn source_of(source: &mail_core::Source) -> Source {
+    Source {
+        id: source.id.clone(),
+        kind: serde_json::from_value(serde_json::Value::String(source.kind.clone()))
+            .unwrap_or(SourceKind::Webhook),
+        name: source.name.clone(),
+        icon: source.icon.clone(),
+        color: source.color.clone(),
+        enabled: source.enabled,
+        config: Some(source.config.clone()),
+        min_priority: source.min_priority.clamp(0, 10) as u8,
+        created_at: source.created_at,
+    }
+}
+
+fn notification_of(message: &mail_core::FeedMessage) -> Notification {
+    Notification {
+        id: message.id.clone(),
+        source_id: message.source_id.clone(),
+        sender: message.sender.clone().unwrap_or_default(),
+        title: message.title.clone(),
+        body: message.body_text.clone().unwrap_or_default(),
+        link: message.link.clone(),
+        received_at: message.received_at,
+        priority: message.priority.clamp(0, 10) as u8,
+        tags: message.tags.clone(),
+        read: message.read_at.is_some(),
+        archived: message.archived_at.is_some(),
+        thread_id: message.thread_id.clone(),
+    }
+}
+
 impl Backend for LocalBackend {
     fn start(&self, events: Events) -> MailFuture<'_, ()> {
         Box::pin(async move {
             let (engine, secrets) = open().await?;
             forward(&engine, Rc::downgrade(&self.engine), events.clone());
+            *self.feed.borrow_mut() = Some(engine.feed());
             let background_engine = engine.clone();
             run(async move { background_engine.run().await }).await?;
             *self.engine.borrow_mut() = Some(engine);
@@ -159,6 +238,7 @@ impl Backend for LocalBackend {
             })
             .await?;
             self.engine.borrow_mut().take();
+            self.feed.borrow_mut().take();
             Ok(())
         })
     }
@@ -319,6 +399,136 @@ impl Backend for LocalBackend {
 
     fn refresh(&self) -> MailFuture<'_, ()> {
         self.call(|e| async move { e.sync_all().await })
+    }
+
+    // The notification inbox, as far as one device can serve it: the feed is the mail database's
+    // (mail is projected into it), while sources beyond the mail accounts, their ingest URLs and
+    // the agent API keys are the server's.
+
+    fn sources(&self) -> MailFuture<'_, Vec<Source>> {
+        self.db(|feed| Ok(feed.sources()?.iter().map(source_of).collect()))
+    }
+
+    fn feed(&self, query: FeedQuery) -> MailFuture<'_, FeedPage> {
+        self.db(move |feed| {
+            let before = match &query.before {
+                Some(id) => Some(feed.cursor_of(id)?),
+                None => None,
+            };
+            let text = query.text.trim();
+            let page = feed.list(&ListFilter {
+                source: query.source.clone(),
+                unread: query.unread,
+                archived: Archived::Hide,
+                text: (!text.is_empty()).then(|| text.to_owned()),
+                before,
+                limit: query.limit.max(1),
+                ..ListFilter::default()
+            })?;
+            let (unread, per_source) = feed.unread()?;
+            Ok(FeedPage {
+                items: page.messages.iter().map(notification_of).collect(),
+                counts: per_source
+                    .into_iter()
+                    .map(|(id, n)| (id, n.max(0) as u32))
+                    .collect(),
+                unread: unread.max(0) as u32,
+                more: page.more,
+            })
+        })
+    }
+
+    fn mark_read(&self, ids: Vec<String>, read: bool) -> MailFuture<'_, ()> {
+        Box::pin(async move {
+            let engine = self.engine()?;
+            let feed = self.feed()?;
+            let mail: Vec<bool> = ids
+                .iter()
+                .map(|id| is_mail(&feed, id))
+                .collect::<Result<_>>()?;
+            run(async move {
+                for (id, mail) in ids.into_iter().zip(mail) {
+                    if mail {
+                        // Mail's own flag is the truth, and the server hears it from the engine.
+                        let flags = Flags {
+                            seen: Some(read),
+                            flagged: None,
+                        };
+                        engine.set_flags(&id, flags).await?;
+                    } else {
+                        feed.set_read(&id, read)?;
+                    }
+                }
+                Ok(())
+            })
+            .await
+        })
+    }
+
+    fn archive(&self, ids: Vec<String>) -> MailFuture<'_, ()> {
+        Box::pin(async move {
+            let engine = self.engine()?;
+            let feed = self.feed()?;
+            let mail: Vec<bool> = ids
+                .iter()
+                .map(|id| is_mail(&feed, id))
+                .collect::<Result<_>>()?;
+            run(async move {
+                for (id, mail) in ids.into_iter().zip(mail) {
+                    if mail {
+                        // The same move the mail list makes, so the app and an agent agree.
+                        engine.move_to(&id, FolderKind::Archive).await?;
+                    } else {
+                        feed.set_archived(&id, true)?;
+                    }
+                }
+                Ok(())
+            })
+            .await
+        })
+    }
+
+    /// A source's own settings are in the local database too: pause, rename, recolour.
+    fn update_source(&self, source: Source) -> MailFuture<'_, Source> {
+        self.db(move |feed| {
+            let patch = mail_core::SourcePatch {
+                name: Some(source.name.clone()),
+                icon: Some(source.icon.clone()),
+                color: Some(source.color.clone()),
+                config: source.config.clone(),
+                min_priority: Some(i64::from(source.min_priority)),
+                enabled: Some(source.enabled),
+            };
+            Ok(source_of(&feed.update_source(&source.id, &patch)?))
+        })
+    }
+
+    fn create_source(&self, _input: NewSource) -> MailFuture<'_, CreatedSource> {
+        unavailable(CLOUD_ONLY_SOURCES)
+    }
+
+    fn delete_source(&self, _id: String) -> MailFuture<'_, ()> {
+        unavailable(CLOUD_ONLY_DELETE)
+    }
+
+    fn rotate_source_token(&self, _id: String) -> MailFuture<'_, CreatedSource> {
+        unavailable(CLOUD_ONLY_TOKENS)
+    }
+
+    fn test_source(&self, _id: String) -> MailFuture<'_, ()> {
+        unavailable(CLOUD_ONLY_TOKENS)
+    }
+
+    fn api_keys(&self) -> MailFuture<'_, Vec<ApiKey>> {
+        unavailable(CLOUD_ONLY_KEYS)
+    }
+
+    fn create_api_key(&self, _input: NewApiKey) -> MailFuture<'_, CreatedApiKey> {
+        unavailable(CLOUD_ONLY_KEYS)
+    }
+
+    fn revoke_api_key(&self, _id: String) -> MailFuture<'_, ()> {
+        unavailable(CLOUD_ONLY_KEYS)
     }
 }
 

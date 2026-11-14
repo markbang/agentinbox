@@ -110,6 +110,7 @@ const DECLARATIONS: &[(&str, &str)] = &[
         "/** The state of the mail engine. */\n\
          export interface Status {\n  mode: Mode;\n  /** The server's URL in cloud mode. */\n  server?: string | null;\n  \
          /** The server account signed in, in cloud mode. */\n  user?: string | null;\n  \
+         /** Sources beyond the mail accounts, their ingest URLs and the agent API keys are served by an nsh-mail server. */\n  serverFeed: boolean;\n  \
          /** A sync is running. */\n  syncing: boolean;\n  /** How far the running sync has come. */\n  progress?: SyncProgress | null;\n  \
          /** The last sync error, until a sync succeeds. */\n  error?: ErrorInfo | null;\n}",
     ),

@@ -36,7 +36,8 @@ mod tls;
 pub use engine::{Engine, EngineOptions, StagedFile};
 #[cfg(feature = "engine")]
 pub use feed::{
-    Feed, FeedCounts, FeedMessage, Inserted, NewFeedMessage, NewSource, Source, SourcePatch,
+    Archived, Cursor, Feed, FeedCounts, FeedMessage, Inserted, ListFilter, NewFeedMessage,
+    NewSource, Source, SourcePatch,
 };
 #[cfg(feature = "engine")]
 pub use oauth::{OAuthApp, OAuthApps, OAuthGrant, OAuthTokens};

@@ -169,6 +169,12 @@ impl Engine {
         &self.inner.store
     }
 
+    /// This user's notification feed: mail projected there by the store's triggers, beside
+    /// anything else the same database holds (docs/design/notification-inbox.md §1).
+    pub fn feed(&self) -> crate::feed::Feed {
+        self.store().feed()
+    }
+
     /// How far the running syncs have come, merged over accounts; `None` when none runs.
     pub fn progress(&self) -> Option<SyncProgress> {
         let progress = lock(&self.inner.progress);

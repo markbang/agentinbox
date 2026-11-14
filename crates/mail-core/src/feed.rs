@@ -359,6 +359,12 @@ const SOURCE_COLUMNS: &str = "id, user_id, kind, name, icon, color, config, min_
 const MESSAGE_COLUMNS: &str = "id, pk, source_id, external_id, sender, title, body_text, \
      body_html, body_markdown, link, received_at, read_at, archived_at, priority, tags, thread_id";
 
+impl Feed {
+    pub(crate) fn new(conn: Arc<Mutex<Connection>>, user: i64) -> Self {
+        Self { conn, user }
+    }
+}
+
 impl MailDb {
     /// Runs the feed migration (create the tables, triggers and sources, project every mail row
     /// that has none) and hands back this user's feed.

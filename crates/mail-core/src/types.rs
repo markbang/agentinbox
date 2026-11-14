@@ -489,10 +489,15 @@ pub enum Mode {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct Status {
     pub mode: Mode,
     #[serde(default)]
     pub server: Option<String>,
+    /// The backend serves the notification inbox's server half too: sources beyond the mail
+    /// accounts, their ingest URLs and the API keys agents read the feed with.
+    #[serde(default)]
+    pub server_feed: bool,
     /// The server account signed in, in cloud mode.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub user: Option<String>,

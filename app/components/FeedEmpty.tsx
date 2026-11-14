@@ -3,9 +3,9 @@
 import { View } from "nsh";
 import { t } from "nsh/i18n";
 import { Button, Empty, LoadingIndicator } from "../ui";
-import { feedError, feedFilter, feedQuery, feedStatus, clearFeedQuery, reloadFeed, sources } from "../notify";
+import { feedError, feedFilter, feedQuery, feedStatus, clearFeedQuery, reloadFeed, serverInbox, sources } from "../notify";
 
-export function FeedEmpty(props: { onAddSource: () => void; onClearFilters: () => void }) {
+export function FeedEmpty(props: { onAddSource: () => void; onAddAccount: () => void; onClearFilters: () => void }) {
   const filtered = () => !!feedQuery().trim() || !!feedFilter();
   const clear = () => {
     clearFeedQuery();
@@ -28,9 +28,16 @@ export function FeedEmpty(props: { onAddSource: () => void; onClearFilters: () =
             else={
               <Empty
                 icon="bell"
-                title={t("notify.noSources")}
-                description={t("notify.noSourcesHint")}
-                action={<Button icon="plus" label={t("sources.add")} onPress={props.onAddSource} testID="empty-add-source" />}
+                title={serverInbox() ? t("notify.noSources") : t("notify.noAccounts")}
+                description={serverInbox() ? t("notify.noSourcesHint") : t("notify.noAccountsHint")}
+                action={
+                  <Button
+                    icon="plus"
+                    label={serverInbox() ? t("sources.add") : t("accounts.add")}
+                    onPress={serverInbox() ? props.onAddSource : props.onAddAccount}
+                    testID="empty-add-source"
+                  />
+                }
               />
             }
           >

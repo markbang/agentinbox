@@ -22,7 +22,7 @@ import {
 } from "../notify";
 import { openMailbox, openMessage } from "../store";
 
-export function NotificationsView(props: { onAddSource: () => void; onOpenSources: () => void }) {
+export function NotificationsView(props: { onAddSource: () => void; onAddAccount: () => void; onOpenSources: () => void }) {
   const open = () => openNotification();
   const openInMail = (id: string) => {
     showMail();
@@ -54,7 +54,7 @@ export function NotificationsView(props: { onAddSource: () => void; onOpenSource
             refreshing={feedStatus() === "refreshing"}
             onRefresh={() => void reloadFeed("refreshing")}
             onLoadMore={() => void loadMoreFeed()}
-            empty={<FeedEmpty onAddSource={props.onAddSource} onClearFilters={() => setFeedFilter(null)} />}
+            empty={<FeedEmpty onAddSource={props.onAddSource} onAddAccount={props.onAddAccount} onClearFilters={() => setFeedFilter(null)} />}
             testID="notify-list"
           />
         </View>

@@ -305,6 +305,9 @@ function heard(e: MailEvent) {
     status.set(Mail.status());
     if (status().mode === "none") return;
     feedChanged();
+    // A change with no account (the server's streams opening, a notification) is the feed's
+    // alone: mail's lists have their own events.
+    if (e.type === "changed" && !e.accountId) return;
     void loadAccounts();
     syncArrived();
     void loadUnread();
