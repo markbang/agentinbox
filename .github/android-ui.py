@@ -258,11 +258,26 @@ def back(timeout=4):
 TABS = {"Mail": 0, "Notifications": 1, "Search": 2, "Mailboxes": 3, "Settings": 4}
 
 
-def tab(name, wait_for=None, timeout=20):
-    """Taps a tab by its place in the bar: uiautomator does not always give the items their labels."""
-    x = w * (2 * TABS[name] + 1) // 10
-    adb("shell", "input", "tap", str(x), str(h - 40))
-    return wait(wait_for, timeout) if wait_for else True
+def tab_bar():
+    """The bar's box, from its own label: the items' labels are not always their own nodes."""
+    for n in nodes():
+        if (n.get("content-desc") or n.get("text")) == "Tabs" and box(n):
+            return box(n)
+    return None
+
+
+def tab(name):
+    """Taps a tab by its place in the bar, clear of the system's gesture area."""
+    bar = tab_bar()
+    if bar:
+        x1, y1, x2, _ = bar
+        x, y = x1 + (2 * TABS[name] + 1) * (x2 - x1) // 10, (y1 + bar[3]) // 2
+    else:
+        x, y = w * (2 * TABS[name] + 1) // 10, h - 100
+    adb("shell", "input", "tap", str(x), str(y))
+    quiet(1)
+    return True
+
 
 
 def long_press(x, y, tries=2):
@@ -499,8 +514,7 @@ for mode in ("light", "dark"):
     adb("shell", "input", "swipe", str(w // 2), str(h * 7 // 10), str(w // 2), str(h * 3 // 10), "300")
     shot(f"{mode}-inbox-scrolled")
 
-    if tab("Search"):
-        wait("id:search")
+    if tab("Search") and wait("id:search"):
         shot(f"{mode}-search")
         tap("id:search")  # the field, before anything is typed
         adb("shell", "input", "text", "roadmap")
