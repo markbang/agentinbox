@@ -234,25 +234,6 @@ for (const theme of ["light", "dark"]) {
   await id("reader").waitFor();
   await id("attachments").waitFor();
   await shot("narrow-reader", theme);
-  // The settings tab, and its end: the last row must clear the tab bar.
-  try {
-    // The reader covers the bar: back to the list first, then the bar's fifth slot of five.
-    await page.keyboard.press("Escape");
-    await id("messages").waitFor({ timeout: 30_000 });
-    await page.mouse.click(412 * 0.9, 915 - 25);
-    await id("settings").waitFor({ timeout: 30_000 });
-    await shot("narrow-settings", theme);
-    await page.mouse.move(206, 400);
-    for (let i = 0; i < 10; i++) {
-      await page.mouse.wheel(0, 600);
-      await page.waitForTimeout(150);
-    }
-    await shot("narrow-settings-bottom", theme);
-    await page.mouse.click(412 * 0.1, 915 - 25);
-    await id("messages").waitFor({ timeout: 30_000 });
-  } catch (e) {
-    log("narrow settings:", String(e).slice(0, 200));
-  }
   // The 600px booking mail fits the phone's width: no sideways scroll.
   let overflow = null;
   for (const f of page.frames()) {
