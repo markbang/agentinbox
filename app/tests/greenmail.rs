@@ -180,7 +180,7 @@ fn local_mode_reads_replies_and_searches_real_mail() {
     let bob = format!("bob{}@test.local", std::process::id());
     deliver(&host, &bob, "Lunch on Friday?");
 
-    let ui_sets: Vec<Registry> = vec![nsh_base::registry(), nsh_app_agentinbox::registry()];
+    let ui_sets: Vec<Registry> = vec![nsh_base::registry(), nsh_cupertino::registry(), nsh_app_agentinbox::registry()];
     let entry = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("App.tsx");
     let bundle = nsh_testing::compile_tsx(entry, &ui_sets).expect("App.tsx builds");
     let mut config = EngineConfig {

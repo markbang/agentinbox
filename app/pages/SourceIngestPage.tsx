@@ -14,7 +14,6 @@ export function SourceIngestPage(props: { source: Source; url: string; created: 
   const nav = NavContext();
   const back = () => {
     const routes = nav.stack.routes();
-    console.log("ROUTES", routes.map((r) => r.name).join(","));
     const at = routes.map((route) => route.name).lastIndexOf("sources");
     if (at >= 0) nav.stack.pop(routes.length - 1 - at);
     else nav.close();

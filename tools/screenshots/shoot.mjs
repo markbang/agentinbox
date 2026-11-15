@@ -72,7 +72,7 @@ async function home() {
 
 await page.goto(origin + "/");
 await id("onboarding").waitFor({ timeout: 60_000 });
-if (await id("mode-cloud").isVisible()) await press("mode-cloud");
+await page.getByText("Through an AgentInbox server").first().click();
 await page.getByText("Create account").click();
 if (await id("server").isVisible()) await fill("server", origin);
 await fill("cloud-email", "lin@mail.example");
@@ -83,7 +83,7 @@ log("signed up");
 
 for (const [email, name] of accounts) {
   await press("open-settings");
-  await press("add-account");
+  await page.getByText("Add account").first().click();
   await press("add-imap");
   await fill("imap-email", email);
   await fill("imap-name", name);
@@ -107,7 +107,7 @@ await page.getByText("Signature…").click();
 await fill("signature-text", "**Lin Chen**\nNorthwind · [northwind.dev](https://northwind.dev)");
 await press("signature-save");
 await page.getByText("Signature saved").waitFor();
-await press("header-back");
+await page.getByLabel("Done").first().click();
 log("signature set");
 
 for (const theme of ["light", "dark"]) {
@@ -135,7 +135,6 @@ for (const theme of ["light", "dark"]) {
   await shot("compose", theme);
 
   await home();
-  if (await id("open-search").isVisible()) await press("open-search");
   await field("search").fill("Tokyo");
   await field("search").press("Enter");
   await id("results").waitFor({ timeout: 30_000 }).catch(() => {});
@@ -147,18 +146,18 @@ for (const theme of ["light", "dark"]) {
   await shot("settings", theme);
 
   // The shortcuts list: Settings → Help, and ? from the mailbox.
-  await press("open-shortcuts");
+  await page.getByText("Keyboard shortcuts").first().click();
   await id("shortcuts").waitFor();
   await shot("shortcuts", theme);
-  await press("dialog-close");
+  await press("modal-done");
 
   await press("account-more-0");
   await page.getByText("Signature…").click();
   await id("signature-preview").waitFor();
   await shot("signature", theme);
-  await page.locator('[data-testid="header-back"]:visible').click();
+  await page.getByLabel("Done").first().click();
 
-  await press("add-account");
+  await page.getByText("Add account").first().click();
   await id("add-imap").waitFor();
   await shot("add-account", theme);
 
@@ -194,7 +193,7 @@ for (const theme of ["light", "dark"]) {
   await press("toast-action");
   await field("compose-subject").waitFor();
   await press("compose-discard");
-  await press("confirm-discard");
+  await page.getByText("Discard").last().click();
 
   await press("mailbox-scheduled");
   await id("scheduled").waitFor({ timeout: 30_000 });

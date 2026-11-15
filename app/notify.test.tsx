@@ -40,10 +40,8 @@ test("the feed holds every source; a chip filters it; opening reads, archiving t
   await app.press("id:notify-archive");
   await app.waitFor("id:notify-list >> text:CI failed on main", { state: "gone" });
   await app.waitFor("text:Notification archived");
-  console.log("TOAST", JSON.stringify(app.texts().slice(-3)));
   await app.press("id:toast-action");
   await app.wait(500);
-  console.log("AFTER", JSON.stringify(app.texts().filter((t) => t.includes("CI failed") || t.includes("Undo"))));
   await app.waitFor("id:notify-list >> text:CI failed on main", { timeout: 10000 });
 });
 
