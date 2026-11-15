@@ -268,6 +268,24 @@ def back(timeout=4):
 TABS = {"Mail": 0, "Notifications": 1, "Search": 2, "Mailboxes": 3, "Settings": 4}
 
 
+def back_to_mail():
+    """The Mail tab's inbox, closing whatever a flow left open first: a sheet keeps the taps."""
+    if find("id:modal", 2):
+        back()
+        quiet(1)
+    tab("Mail")
+    if find("id:messages", 5):
+        return True
+    # The tab kept a page or a search: end the page, clear the search.
+    back()
+    if find("id:search-clear", 2):
+        tap("id:search-clear")
+    if find("id:messages", 5):
+        return True
+    tab("Mail")
+    return find("id:messages", 10) is not None
+
+
 def tab_id(name):
     return "id:tab-" + name.lower()
 
@@ -525,7 +543,7 @@ for mode in ("light", "dark"):
                 shot(f"{mode}-schedule-menu")
                 scheduled = tap("Tomorrow morning")
                 if scheduled:
-                    wait("id:toast-action", 5)  # seconds long: the shot follows either way
+                    find("id:toast-action", 2)  # seconds long: the shot below is the proof  # seconds long: the shot follows either way
                     screenshot(f"{mode}-scheduled-snackbar")
                     print("shot", f"{mode}-scheduled-snackbar", flush=True)
         # Whatever the schedule step left open (a sheet, the composer itself), the inbox comes back
@@ -571,7 +589,7 @@ for mode in ("light", "dark"):
         wait("id:mailbox-all")
         shot(f"{mode}-mailboxes")
         if tap("id:mailbox-scheduled"):
-            wait("id:scheduled", 10)  # the page's own id is a container; the shot is the proof
+            wait("id:scheduled-row", 10)  # the page's own id is a container; the shot is the proof
             shot(f"{mode}-scheduled")
             if tab("Mailboxes"):
                 tap("id:mailbox-all")
@@ -595,7 +613,7 @@ for mode in ("light", "dark"):
             wait("id:sources", 10)  # its menu, before it is screenshotted
             shot(f"{mode}-notifications-menu")
             if tap("Sources"):
-                wait("id:sources", 15)
+                wait("id:sources-add-top", 15)
                 shot(f"{mode}-sources")
                 if tap("id:sources-add-top"):
                     wait("id:add-source", 10)
@@ -609,7 +627,7 @@ for mode in ("light", "dark"):
         if row:
             x, y = centre(row)
             adb("shell", "input", "tap", str(x), str(y))
-            if wait("id:notify-reader", 15):
+            if wait("id:notify-read", 15):
                 shot(f"{mode}-notification")
                 back()
         wait("id:notify-list", 15)
@@ -647,11 +665,7 @@ for mode in ("light", "dark"):
                 shot(f"{mode}-notify-rules")
                 back_to("id:settings")
 
-    if tab("Mail"):
-        # The Mail tab keeps the search it was left on: clearing it brings the mailbox back.
-        if find("id:search-clear", 2):
-            tap("id:search-clear")
-        wait("id:messages", 15)
+    if back_to_mail():
         shot(f"{mode}-tab-back-to-mail")
         if try_tap("id:compose"):
             wait("id:compose-to")
