@@ -236,6 +236,18 @@ export function Reader(props: ReaderProps) {
               <Button title={t("reader.loadImages")} variant="plain" size="small" onPress={() => imagesShown.update((s) => ({ ...s, [m().id]: true }))} />
             </View>
           </If>
+          <If when={m().attachments.length}>
+            <View class="gap-1.5 px-4">
+              <Text class="text-footnote font-semibold text-secondary-label">{t("reader.attachments")}</Text>
+              <ScrollView horizontal class="shrink-0" style={{ height: 64 }} testID="attachments">
+                <View class="flex-row items-start gap-2 px-0.5">
+                  <Each of={m().attachments} key={(a) => `${m().id}:${a.index}`}>
+                    {(attachment) => <AttachmentTile messageId={m().id} attachment={attachment()} />}
+                  </Each>
+                </View>
+              </ScrollView>
+            </View>
+          </If>
           <If
             when={html()}
             else={
@@ -252,18 +264,6 @@ export function Reader(props: ReaderProps) {
                 <MailView html={source()} remote={showImages()} onUnavailable={() => webViewAvailable.set(false)} class="flex-1" />
               </View>
             )}
-          </If>
-          <If when={m().attachments.length}>
-            <View class="gap-1.5 px-4">
-              <Text class="text-footnote font-semibold text-secondary-label">{t("reader.attachments")}</Text>
-              <ScrollView horizontal class="shrink-0" style={{ height: 64 }} testID="attachments">
-                <View class="flex-row items-start gap-2 px-0.5">
-                  <Each of={m().attachments} key={(a) => `${m().id}:${a.index}`}>
-                    {(attachment) => <AttachmentTile messageId={m().id} attachment={attachment()} />}
-                  </Each>
-                </View>
-              </ScrollView>
-            </View>
           </If>
           <If when={newer().length > 0}>
             <CollapsedList messages={newer()} threadId={m().threadId} testID="thread-newer" />

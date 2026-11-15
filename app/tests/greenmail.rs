@@ -206,7 +206,11 @@ fn local_mode_reads_replies_and_searches_real_mail() {
     let carol = format!("carol{}@test.local", std::process::id());
     for (name, email) in [("Bob", &bob), ("Carol", &carol)] {
         step(&mut app, |a| a.press("id:open-settings"));
-        step(&mut app, |a| a.press("text:Add account >> nth=1"));
+        step(&mut app, |a| {
+            // The empty mailbox behind the sheet shows an Add account button too, until an account exists.
+            a.press("text:Add account >> nth=1")
+                .or_else(|_| a.press("text:Add account"))
+        });
         step(&mut app, |a| a.press("id:add-imap"));
         step(&mut app, |a| a.type_text("id:imap-email", email));
         step(&mut app, |a| a.type_text("id:imap-name", name));
