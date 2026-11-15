@@ -26,7 +26,7 @@ export function TextRow(props: TextRowProps) {
   const keyboard = { email: "email-address", url: "url", number: "number-pad", text: "default" } as const;
   return (
     <View class={`flex-row items-start gap-2 border-b border-separator px-4 ${props.multiline ? "py-2" : "min-h-11 py-2"} ${props.class ?? ""}`}>
-      <Text class="w-14 pt-0.5 text-body text-secondary-label">{props.label}</Text>
+      <Text class="w-[4.5rem] shrink-0 pt-0.5 text-body text-secondary-label">{props.label}</Text>
       <Input
         value={props.value}
         onChange={({ value }) => props.onChange(value)}
