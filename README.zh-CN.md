@@ -28,3 +28,7 @@
 每个版本的 `SHA256SUMS.txt` 列出校验和。
 
 设计：[docs/design.zh-CN.md](docs/design.zh-CN.md)
+
+## 许可
+
+MIT 或 Apache-2.0 双协议，任选其一（见 `LICENSE-MIT`、`LICENSE-APACHE`）。

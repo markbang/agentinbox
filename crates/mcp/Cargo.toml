@@ -2,7 +2,7 @@
 name = "agentinbox-mcp"
 version = "0.1.0"
 edition = "2024"
-license = "MIT"
+license = "MIT OR Apache-2.0"
 publish = false
 description = "MCP server for the AgentInbox notification inbox"
 

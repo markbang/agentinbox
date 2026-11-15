@@ -28,3 +28,7 @@ Download from [Releases](https://github.com/markbang/agentinbox/releases/latest)
 `SHA256SUMS.txt` in each release lists the checksums.
 
 Design: [docs/design.md](docs/design.md)
+
+## License
+
+MIT OR Apache-2.0, at your option (see `LICENSE-MIT`, `LICENSE-APACHE`).
