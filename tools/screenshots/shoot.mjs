@@ -160,9 +160,10 @@ for (const theme of ["light", "dark"]) {
   await press("account-more-0");
   await page.getByText("Signature…").click();
   await id("signature-preview").waitFor();
-  await shot("signature", theme);
-  await id("signature-text").waitFor({ state: "detached", timeout: 10_000 }).catch(() => {});
-  await press("modal-done").catch(() => page.getByLabel("Back").first().click());
+  await press("signature-save");
+  await page.getByText("Signature saved").waitFor({ timeout: 30_000 });
+  await id("signature-text").waitFor({ state: "detached", timeout: 20_000 }).catch(() => {});
+  await press("modal-done");
 
   await page.getByText("Add account").last().click();
   await id("add-imap").waitFor();
