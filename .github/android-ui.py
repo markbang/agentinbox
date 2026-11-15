@@ -317,7 +317,13 @@ for mode in ("light", "dark"):
     wait("id:messages")
 
     # A conversation: its latest message expanded, the earlier ones collapsed above; a tap expands one.
-    if tap("Offsite in March: Lisbon or Porto?"):
+    # The inbox may be scrolled past it: look above, and skip the screen rather than fail on it.
+    subject = "Offsite in March: Lisbon or Porto?"
+    if not find(subject, 3):
+        scroll_up_to(subject)
+    at = find(subject, 3)
+    if at:
+        adb("shell", "input", "tap", str(at[0]), str(at[1]))
         wait("id:thread-older")
         shot(f"{mode}-thread")
         if tap("id:thread-older"):
@@ -325,6 +331,8 @@ for mode in ("light", "dark"):
             shot(f"{mode}-thread-older")
         back()
         wait("id:messages")
+    else:
+        print("the conversation row is not on screen", flush=True)
 
     # The FAB menu: New message, Add account.
     if tap("id:fab-menu"):
