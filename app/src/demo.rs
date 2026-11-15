@@ -105,7 +105,8 @@ impl Data {
 
     /// A notification that arrives on its own, as a webhook or a bot's would.
     fn deliver_notification(&mut self) -> Option<Notification> {
-        let (source, sender, title, body, priority, tags) = NOTICES[self.arrivals % NOTICES.len()];
+        // Each arrival once: a demo refreshed all afternoon should not pile up the same message.
+        let (source, sender, title, body, priority, tags) = *NOTICES.get(self.arrivals)?;
         self.arrivals += 1;
         if self.sources.iter().all(|s| s.id != source) {
             return None;
@@ -2099,6 +2100,30 @@ const NOTICES: &[(&str, &str, &str, &str, u8, &[&str])] = &[
         "snapshot-2026-11-14 at 03:00, 41 GB so far.",
         2,
         &["backup"],
+    ),
+    (
+        "src-kuma",
+        "Uptime Kuma",
+        "Heartbeat: 5 monitors up",
+        "status.northwind.dev, api, web and two cron checks answered in under 300 ms.",
+        1,
+        &["uptime"],
+    ),
+    (
+        "src-sonarr",
+        "Sonarr",
+        "Downloaded: The Bear S03E04",
+        "1080p WEB-DL · 1.4 GB · ready in Plex.",
+        2,
+        &["download"],
+    ),
+    (
+        "src-github",
+        "northwind/atlas",
+        "Deploy passed: staging",
+        "staging.northwind.dev runs 0.0.4; health check green.",
+        4,
+        &["deploy"],
     ),
 ];
 
