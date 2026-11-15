@@ -1,10 +1,11 @@
 // An account's signature: plain text with a little formatting, shown as it
 // will look, and whether new messages and replies get it.
 import { signal, Text, untracked, View } from "nsh";
+import { Input } from "nsh/base";
 import { TextView } from "nsh/base";
 import { t } from "nsh/i18n";
-import { Button, Page, SectionLabel, Switch, TextField, touch } from "../ui";
-import { PageHeader, PageScroll } from "../components/PageHeader";
+import { Button, List, ListTile, Section, Switch } from "cupertino";
+import { Page } from "../components/Page";
 import { NavContext } from "../nav";
 import { renderSignature } from "../lib/signature";
 import { accountById, errorText, setSignature, showToast } from "../store";
@@ -34,40 +35,51 @@ export function SignaturePage(props: { accountId: string }) {
   };
 
   return (
-    <Page title={t("signature.title")} header={<PageHeader title={t("signature.title")} />}>
-      <PageScroll contentClass={touch ? "gap-4 p-4" : "gap-4 p-6"} testID="signature">
-        <Text class="text-body-medium tracking-body-medium text-on-surface-variant">{account()?.email ?? ""}</Text>
-        <TextField
-          value={text()}
-          onChange={(v) => text.set(v)}
-          multiline
-          label={t("signature.text")}
-          placeholder={t("signature.placeholder")}
-          supporting={t("signature.hint")}
-          autoFocus={!touch}
-          class="min-h-32"
-          testID="signature-text"
-        />
-        <If when={text().trim()}>
-          <View class="gap-1">
-            <SectionLabel label={t("signature.preview")} class="px-0 pb-0" />
-            <View class="gap-1 rounded-large bg-surface-container px-4 py-3">
-              <Text class="text-body-large tracking-body-large text-on-surface-variant">--</Text>
-              <TextView html={renderSignature(text()).html} links="open" class="text-body-large text-on-surface" testID="signature-preview" />
-            </View>
+    <Page title={t("signature.title")} back={t("common.back")} onBack={nav.close} testID="signature">
+      <List>
+        <Section header={account()?.email ?? undefined} footer={t("signature.hint")}>
+          <View class="px-4 py-3">
+            <Input
+              value={text()}
+              onChange={({ value }) => text.set(value)}
+              multiline
+              autoFocus
+              placeholder={t("signature.placeholder")}
+              accessibilityLabel={t("signature.text")}
+              testID="signature-text"
+              class="min-h-32 flex-1 bg-transparent text-body leading-relaxed text-label caret-system-blue selection:bg-system-blue/30 placeholder:text-tertiary-label"
+            />
           </View>
+        </Section>
+        <If when={text().trim()}>
+          <Section header={t("signature.preview")}>
+            <View class="gap-1 px-4 py-3">
+              <Text class="text-body text-secondary-label">--</Text>
+              <TextView html={renderSignature(text()).html} links="open" class="text-body text-label" testID="signature-preview" />
+            </View>
+          </Section>
         </If>
-        <View class="gap-3 py-1">
-          <Switch checked={newMessages()} onChange={(on) => newMessages.set(on)} label={t("signature.newMessages")} testID="signature-new" />
-          <Switch checked={replies()} onChange={(on) => replies.set(on)} label={t("signature.replies")} description={t("signature.repliesDetail")} testID="signature-replies" />
-        </View>
+        <Section>
+          <ListTile title={t("signature.newMessages")} accessory="none" separator onPress={() => newMessages.set(!newMessages())} testID="signature-new">
+            <Switch checked={newMessages()} label={t("signature.newMessages")} onChange={({ value: on }: { value: boolean }) => newMessages.set(on)} />
+          </ListTile>
+          <ListTile title={t("signature.replies")} subtitle={t("signature.repliesDetail")} accessory="none" separator={false} onPress={() => replies.set(!replies())} testID="signature-replies">
+            <Switch checked={replies()} label={t("signature.replies")} onChange={({ value: on }: { value: boolean }) => replies.set(on)} />
+          </ListTile>
+        </Section>
         <If when={error()}>
-          <Text class="text-body-medium tracking-body-medium text-error" testID="signature-error">
-            {error()}
-          </Text>
+          {(text) => (
+            <Text role="alert" class="px-4 text-subheadline text-system-red" testID="signature-error">
+              {text()}
+            </Text>
+          )}
         </If>
-        <Button label={t("signature.save")} loading={saving()} onPress={() => void save()} class="self-start" testID="signature-save" />
-      </PageScroll>
+        <Section>
+          <View class="px-4 py-3">
+            <Button title={t("signature.save")} disabled={saving()} onPress={() => void save()} class="w-full" testID="signature-save" />
+          </View>
+        </Section>
+      </List>
     </Page>
   );
 }

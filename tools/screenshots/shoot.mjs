@@ -72,7 +72,7 @@ async function home() {
 
 await page.goto(origin + "/");
 await id("onboarding").waitFor({ timeout: 60_000 });
-if (await id("mode-cloud").isVisible()) await press("mode-cloud");
+await page.getByText("Through an AgentInbox server").first().click();
 await page.getByText("Create account").click();
 if (await id("server").isVisible()) await fill("server", origin);
 await fill("cloud-email", "lin@mail.example");
@@ -83,7 +83,7 @@ log("signed up");
 
 for (const [email, name] of accounts) {
   await press("open-settings");
-  await press("add-account");
+  await page.getByText("Add account").last().click();
   await press("add-imap");
   await fill("imap-email", email);
   await fill("imap-name", name);
@@ -107,7 +107,7 @@ await page.getByText("Signature…").click();
 await fill("signature-text", "**Lin Chen**\nNorthwind · [northwind.dev](https://northwind.dev)");
 await press("signature-save");
 await page.getByText("Signature saved").waitFor();
-await press("header-back");
+await id("signature-text").waitFor({ state: "detached", timeout: 20_000 }).catch(() => {});
 log("signature set");
 
 for (const theme of ["light", "dark"]) {
@@ -117,7 +117,7 @@ for (const theme of ["light", "dark"]) {
 
   await page.getByText("Booking confirmed: Shanghai").first().click();
   await id("reader").waitFor();
-  await page.getByText("E-ticket-K7Q2XM.pdf").first().waitFor();
+  await id("attachments").waitFor();
   await shot("reader", theme);
 
   // A conversation: the latest reply expanded, the message it answers collapsed above.
@@ -135,7 +135,6 @@ for (const theme of ["light", "dark"]) {
   await shot("compose", theme);
 
   await home();
-  if (await id("open-search").isVisible()) await press("open-search");
   await field("search").fill("Tokyo");
   await field("search").press("Enter");
   await id("results").waitFor({ timeout: 30_000 }).catch(() => {});
@@ -147,20 +146,39 @@ for (const theme of ["light", "dark"]) {
   await shot("settings", theme);
 
   // The shortcuts list: Settings → Help, and ? from the mailbox.
-  await press("open-shortcuts");
+  await page.getByText("Keyboard shortcuts").first().click();
   await id("shortcuts").waitFor();
   await shot("shortcuts", theme);
-  await press("dialog-close");
+  // Escape closes a sheet: the shortcut list's, and the settings one it sat on.
+  await page.keyboard.press("Escape");
+  await id("shortcuts").waitFor({ state: "detached", timeout: 10_000 }).catch(() => {});
+  await home();
+  await press("open-settings");
+  await id("signed-in-as").waitFor();
 
   await press("account-more-0");
   await page.getByText("Signature…").click();
   await id("signature-preview").waitFor();
-  await shot("signature", theme);
-  await page.locator('[data-testid="header-back"]:visible').click();
-
-  await press("add-account");
+  await press("signature-save");
+  await page.getByText("Signature saved").waitFor({ timeout: 30_000 });
+  // Saving returns to Settings, which is where the next shot comes from.
+  await id("signature-text").waitFor({ state: "detached", timeout: 20_000 }).catch(() => {});
+  await id("signed-in-as").waitFor();
+  await page.getByText("Add account").last().click();
   await id("add-imap").waitFor();
   await shot("add-account", theme);
+
+  // The notification inbox: the feed (empty until a source posts), and where sources come from.
+  await home();
+  await press("rail-notifications");
+  await id("notify-list").waitFor({ timeout: 30_000 }).catch(() => {});
+  await shot("notifications", theme);
+  await home();
+  await press("open-settings");
+  await id("signed-in-as").waitFor();
+  await page.getByText("Sources").first().click();
+  await id("sources").waitFor({ timeout: 30_000 }).catch(() => {});
+  await shot("sources", theme);
 
   await home();
   await page.keyboard.press("Shift+/");
@@ -194,7 +212,7 @@ for (const theme of ["light", "dark"]) {
   await press("toast-action");
   await field("compose-subject").waitFor();
   await press("compose-discard");
-  await press("confirm-discard");
+  await page.getByText("Discard").last().click();
 
   await press("mailbox-scheduled");
   await id("scheduled").waitFor({ timeout: 30_000 });
@@ -214,7 +232,7 @@ for (const theme of ["light", "dark"]) {
   await shot("narrow-inbox", theme);
   await page.getByText("Booking confirmed: Shanghai").first().click();
   await id("reader").waitFor();
-  await page.getByText("E-ticket-K7Q2XM.pdf").first().waitFor();
+  await id("attachments").waitFor();
   await shot("narrow-reader", theme);
   // The 600px booking mail fits the phone's width: no sideways scroll.
   let overflow = null;

@@ -255,6 +255,19 @@ GitHub Actions，每个 PR 跑：
 | web | ubuntu-24.04 + wasm32 | 静态站点 `.zip` |
 | release | ubuntu-24.04（`v*` 标签；手动运行带 `upload_to` 时补传已有版本的 Android 包） | GitHub Release：Android 按 ABI 的 `.apk` + universal + `.aab`、Linux `.tar.gz`、Windows `.zip` + 安装器、`SHA256SUMS.txt`；说明取自 `docs/releases/<版本>.md` 和 `.zh-CN.md` |
 
-## 9. 第一版范围
+## 9. 客户端界面
+
+所有平台一种设计语言：Cupertino，来自共享的
+[`nsh-cupertino`](https://github.com/markbang/nsh-cupertino) 库，作为
+`vendor/nsh-cupertino` 子模块固定到某个 tag（`nsh.json` 的 `"rust"` 列出它，
+`app/Cargo.toml` 以路径依赖引入）。`app/theme.json` 是库的主题加上 issue #3 记录的三个浅色覆盖，
+由 `scripts/theme-check.py` 与 `scripts/contrast.py` 把关。
+
+外壳随窗口变化：1080 pt 以上是分栏（侧边栏、列表、阅读器，像 iPad 上的邮件），840–1080 pt 只有列表与阅读器，
+邮箱从面板打开；再窄就是标签栏加压栈页面。写信与设置流程在宽窗口用带独立栈的面板打开，手机上则压栈。
+Android 保留系统返回手势与返回键。组件、列表行、阅读器与写信页见
+[`app/DESIGN.md`](../app/DESIGN.md)。
+
+## 10. 第一版范围
 
 添加账号（IMAP + OAuth）、统一收件箱、读信、写信和回复、搜索、本地模式完整可用；云端模式能同步并推送；CI 出四个平台的产物。暂不做：多选批量操作、文件夹管理、规则、PGP。

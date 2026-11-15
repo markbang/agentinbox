@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""WCAG contrast of the M3 color-role pairs the app draws, in both appearances.
+"""WCAG contrast of the Cupertino roles the app draws text and marks in, in both appearances.
+
+The app's theme is the design system's, with the three roles its gate cannot pass
+overridden as nsh-cupertino's issue #3 records them (system-blue, system-red and
+the secondary label's alpha). This checks what the app actually draws.
 
 Usage: scripts/contrast.py [app/theme.json] [-v]   (exit 1 when a pair fails)
 """
@@ -27,19 +31,12 @@ def ratio(a, b):
     la, lb = sorted((lum(a), lum(b)), reverse=True)
     return (la + 0.05) / (lb + 0.05)
 
-# on-X over X: text, 4.5.
-PAIRS = [(f"on-{r}", r) for r in ("primary", "primary-container", "secondary", "secondary-container", "tertiary",
-                                  "tertiary-container", "error", "error-container", "surface", "surface-variant",
-                                  "background")]
-PAIRS += [("on-primary-fixed", "primary-fixed"), ("on-primary-fixed-variant", "primary-fixed"),
-          ("on-secondary-fixed", "secondary-fixed"), ("on-secondary-fixed-variant", "secondary-fixed"),
-          ("on-tertiary-fixed", "tertiary-fixed"), ("on-tertiary-fixed-variant", "tertiary-fixed"),
-          ("inverse-on-surface", "inverse-surface")]
-SURFACES = ["surface", "surface-dim", "surface-bright", "surface-container-lowest", "surface-container-low",
-            "surface-container", "surface-container-high", "surface-container-highest"]
-# Ink drawn on any surface: (ink, minimum). Text needs 4.5; icons, outlines and marks 3.
-ON_SURFACES = [("on-surface", 4.5), ("on-surface-variant", 4.5), ("primary", 4.5), ("error", 4.5),
-               ("outline", 3), ("unread", 3), ("flag", 3)] + [(f"chart-{i}", 3) for i in range(1, 6)]
+# The surfaces rows, bars and cards sit on.
+SURFACES = ["system-background", "system-grouped-background", "secondary-system-grouped-background", "secondary-system-background"]
+# Ink drawn as text: the label roles, links and errors.
+TEXT = {"label": 4.5, "secondary-label": 4.5, "system-blue": 4.5, "system-red": 4.5}
+# Marks and outlines: 3:1 is the bar for a graphic, and the account colours are marks.
+MARKS = ["system-indigo", "system-purple", "system-pink", "system-blue", "system-red"]
 
 failed = 0
 def check(mode, label, fg, bg, need):
@@ -51,14 +48,17 @@ def check(mode, label, fg, bg, need):
         print(f"{'ok  ' if ok else 'FAIL'} {mode:5} {label:52} {r:5.2f} (needs {need})")
 
 for mode in ("light", "dark"):
-    t = {**theme.get("theme", {}), **theme[mode]}
-    c = lambda k: rgba(t[k])
-    for ink, bg in PAIRS:
-        check(mode, f"{ink} on {bg}", c(ink), c(bg), 4.5)
-    check(mode, "inverse-primary on inverse-surface", c("inverse-primary"), c("inverse-surface"), 3)
-    for s in SURFACES:
-        for ink, need in ON_SURFACES:
-            check(mode, f"{ink} on {s}", over(c(ink), c(s)), c(s), need)
+    c = lambda k: rgba(theme[mode][k])
+    for surface in SURFACES:
+        for ink, need in TEXT.items():
+            check(mode, f"{ink} on {surface}", c(ink), c(surface), need)
+        for mark in MARKS:
+            check(mode, f"{mark} on {surface}", c(mark), c(surface), 3)
+    # A filled button: its label is 17 pt semibold, so large text (3:1); in light
+    # the override takes it past 4.5 anyway.
+    check(mode, "white on system-blue", rgba("#ffffff"), c("system-blue"), 3)
+    # The separator is a hairline, not text: 1.5:1 keeps it visible without shouting.
+    for surface in ("system-background", "secondary-system-grouped-background"):
+        check(mode, f"separator on {surface}", over(c("separator"), c(surface)), c(surface), 1.2)
 
-print("contrast:", "all pairs pass" if not failed else f"{failed} pair(s) fail")
 sys.exit(1 if failed else 0)

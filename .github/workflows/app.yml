@@ -49,6 +49,8 @@ jobs:
       GREENMAIL_HOST: 127.0.0.1
     steps:
       - uses: actions/checkout@v7
+        with:
+          submodules: recursive
       # The test runner and `describe` link the crate with the Linux backend (GTK 4, GStreamer); QuickJS' bindgen needs libclang.
       - run: sudo apt-get update && sudo apt-get install -y clang libclang-dev libgtk-4-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
         working-directory: .
@@ -74,6 +76,8 @@ jobs:
           echo "$HOME/.nsh/bin" >> "$GITHUB_PATH"
       - run: nsh check
       - run: python3 ../scripts/contrast.py
+      # The app's theme is the design system's plus issue #3's three overrides.
+      - run: python3 ../scripts/theme-check.py
       # Both languages for every string, and no key the code stopped asking for.
       - run: python3 ../scripts/locales.py
       - name: Wait for GreenMail
@@ -97,6 +101,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
+        with:
+          submodules: recursive
       # The release runner also links WebKitGTK for web views.
       - run: sudo apt-get update && sudo apt-get install -y clang libclang-dev libgtk-4-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libwebkitgtk-6.0-dev
         working-directory: .
@@ -124,6 +130,8 @@ jobs:
       WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          submodules: recursive
       - uses: dtolnay/rust-toolchain@stable
       - *restore-cache
       - name: Install nsh
@@ -187,6 +195,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.upload_to }}
+          submodules: recursive
       - run: sudo apt-get update && sudo apt-get install -y clang libclang-dev
         working-directory: .
       - uses: dtolnay/rust-toolchain@stable
@@ -305,6 +314,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
+        with:
+          submodules: recursive
       # The web runtime's C code compiles with clang and llvm-ar.
       - run: sudo apt-get update && sudo apt-get install -y clang llvm libclang-dev
         working-directory: .
@@ -343,6 +354,8 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v7
+        with:
+          submodules: recursive
       - uses: actions/download-artifact@v8
         with:
           name: web
@@ -393,6 +406,8 @@ jobs:
         working-directory: .
     steps:
       - uses: actions/checkout@v7
+        with:
+          submodules: recursive
       # By name: a pattern matching only one artifact would unpack it into path itself, not path/<name>.
       - uses: actions/download-artifact@v8
         with:

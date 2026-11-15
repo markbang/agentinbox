@@ -1,12 +1,12 @@
-// Settings: the accounts, where mail comes from, reading, sending, notifications, signing out.
-import { appInfo, keymap, Notifications, platform, Text, View } from "nsh";
-import { AlertDialog } from "nsh/base";
+// Settings, as iOS writes it: grouped lists of rows, switches, and the
+// accounts' own pages. Signing out and removing an account ask first.
+import { appInfo, Notifications, platform, signal, Text, View } from "nsh";
 import { t } from "nsh/i18n";
 import { Mail, type Account } from "agentinbox/native";
-import { AccountMark, AppBar, Button, Card, Choice, Divider, Icon, IconButton, ListItem, Menu, Page, SectionLabel, Switch, systemHeader, touch } from "../ui";
-import { sources } from "../notify";
-import { PageHeader, PageScroll } from "../components/PageHeader";
+import { ActionSheet, Icon, List, ListTile, Section, Switch } from "cupertino";
+import { Page } from "../components/Page";
 import { NavContext } from "../nav";
+import { sources } from "../notify";
 import { providerName as named } from "../lib/format";
 import { shortcutsOpen } from "../lib/shortcuts";
 import { setUndoDelay, UNDO_DELAYS, undoDelay } from "../outbox";
@@ -27,17 +27,11 @@ const providerName = (a: Account) => named(a.provider, t("provider.imap"));
 
 export function SettingsPage() {
   const nav = NavContext();
+  const menuFor = signal<string | null>(null);
+  const confirm = signal<{ kind: "remove" | "signOut"; account?: Account } | null>(null);
+  const undoFor = signal(false);
 
   const remove = async (a: Account) => {
-    const { action } = await AlertDialog.show({
-      title: t("accounts.removeTitle", { email: a.email }),
-      description: t("accounts.removeBody"),
-      actions: [
-        { id: "cancel", label: t("common.cancel"), role: "cancel" },
-        { id: "remove", label: t("accounts.remove"), role: "destructive" },
-      ],
-    });
-    if (action !== "remove") return;
     try {
       await Mail.removeAccount(a.id);
       showToast(t("accounts.removed", { email: a.email }));
@@ -47,17 +41,8 @@ export function SettingsPage() {
   };
 
   const signOut = async () => {
-    const { action } = await AlertDialog.show({
-      title: t("settings.signOutTitle"),
-      description: mailStatus().mode === "local" ? t("settings.signOutLocal") : t("settings.signOutCloud"),
-      actions: [
-        { id: "cancel", label: t("common.cancel"), role: "cancel" },
-        { id: "out", label: t("settings.signOut"), role: "destructive" },
-      ],
-    });
-    if (action !== "out") return;
     // The screen changes whatever the backend ends up saying: it has ended the session on this
-    // device already, and a teardown that fails must not leave Settings up with no way back.
+    // device already, and a teardown that fails must not leave the sheet up with no way back.
     let failure: unknown;
     try {
       await Mail.signOut();
@@ -77,168 +62,183 @@ export function SettingsPage() {
     await setNotificationsEnabled(on);
   };
 
+  const account = () => accounts().find((a) => a.id === menuFor());
   return (
-    <Page title={t("settings.title")} header={<PageHeader title={t("settings.title")} />} root={systemHeader} appBar={<AppBar title={t("settings.title")} />}>
-      <PageScroll contentClass={touch ? "gap-6 p-4" : "gap-6 p-5"} testID="settings">
-        <View class="gap-1">
-          <SectionLabel label={t("settings.accounts")} class="px-1" />
-          <Card>
-            <Each of={accounts()} key={(a) => a.id}>
-              {(a, index) => (
-                <>
-                  <If when={index() > 0}>
-                    <Divider inset />
-                  </If>
-                  <View class="min-h-[72px] flex-row items-center gap-4 py-2 pe-2 ps-4">
-                    <AccountMark index={index()} size="md" />
-                    <View class="min-w-0 flex-1">
-                      <Text class="line-clamp-1 text-body-large tracking-body-large text-on-surface">{a().email}</Text>
-                      <Text class="line-clamp-1 text-body-medium tracking-body-medium text-on-surface-variant">
-                        {a().name ? `${a().name} · ${providerName(a())}` : providerName(a())}
-                      </Text>
-                    </View>
-                    <Menu
-                      label={t("accounts.actions", { email: a().email })}
-                      trigger={<IconButton icon="more" label={t("accounts.actions", { email: a().email })} testID={`account-more-${index()}`} />}
-                      actions={[
-                        { id: "signature", label: t("signature.menu"), icon: "compose", onSelect: () => nav.stack.push({ name: "signature", account: a().id }) },
-                        { id: "remove", label: t("accounts.removeMenu"), icon: "trash", destructive: true, onSelect: () => void remove(a()) },
-                      ]}
-                    />
-                  </View>
-                </>
-              )}
-            </Each>
-            <If when={accounts().length}>
-              <Divider inset />
-            </If>
-            <View class="p-3">
-              <Button variant="text" icon="plus" label={t("accounts.add")} onPress={() => nav.stack.push({ name: "addAccount" })} class="self-start" testID="add-account" />
-            </View>
-          </Card>
-        </View>
+    <Page title={t("settings.title")} testID="settings">
+      <List>
+        <Section header={t("settings.accounts")}>
+          <Each of={accounts()} key={(a) => a.id}>
+            {(a, index) => (
+              <ListTile
+                title={a().email}
+                subtitle={a().name ? `${a().name} · ${providerName(a())}` : providerName(a())}
+                leading="person.crop.circle"
+                accessory="none"
+                separator
+                testID={`account-${index()}`}
+              >
+                <View
+                  role="button"
+                  accessibilityLabel={t("accounts.actions", { email: a().email })}
+                  onPress={() => menuFor.set(a().id)}
+                  class="size-9 items-center justify-center rounded-full active:bg-fill"
+                  testID={`account-more-${index()}`}
+                >
+                  <Icon name="ellipsis" size={18} tint="system-blue" />
+                </View>
+              </ListTile>
+            )}
+          </Each>
+          <ListTile title={t("accounts.add")} leading="plus" accessory="none" separator={false} onPress={() => nav.stack.push({ name: "addAccount" })} testID="add-account" />
+        </Section>
 
-        <View class="gap-1">
-          <SectionLabel label={t("settings.sync")} class="px-1" />
-          <Card class="gap-4 p-4">
-            <View class="flex-row items-center gap-3">
-              <Icon name={mailStatus().mode === "cloud" ? "cloud" : "device"} tone="on-surface-variant" />
-              <View class="flex-1 gap-0.5">
-                <Text class="text-body-large tracking-body-large text-on-surface">{t(`mode.${mailStatus().mode}`)}</Text>
-                <If when={mailStatus().mode === "cloud" && mailStatus().user}>
-                  {(user) => (
-                    <Text class="text-body-medium tracking-body-medium text-on-surface" testID="signed-in-as">
-                      {t("settings.signedInAs", { email: user() })}
-                    </Text>
-                  )}
-                </If>
-                <Text class="text-body-medium tracking-body-medium text-on-surface-variant">
-                  {mailStatus().mode === "cloud" ? (mailStatus().server ?? "") : t("settings.localDetail")}
-                </Text>
-              </View>
-            </View>
-            <If when={mailStatus().mode === "local" && platform.os === "android"}>
-              <Text class="text-body-medium tracking-body-medium text-on-surface-variant">{t("settings.androidLocal")}</Text>
-            </If>
-            <Button variant="outlined" tone="error" icon="logOut" label={t("settings.signOut")} onPress={() => void signOut()} class="self-start" testID="sign-out" />
-          </Card>
-        </View>
+        <Section header={t("settings.sync")} footer={mailStatus().mode === "local" ? t("settings.localDetail") : (mailStatus().server ?? "")}>
+          <ListTile
+            title={t(`mode.${mailStatus().mode}`)}
+            subtitle={mailStatus().mode === "cloud" && mailStatus().user ? t("settings.signedInAs", { email: mailStatus().user ?? "" }) : undefined}
+            leading={mailStatus().mode === "cloud" ? "cloud" : "circle.lefthalf.filled"}
+            accessory="none"
+            separator
+            testID="signed-in-as"
+          />
+          <ListTile
+            title={t("settings.signOut")}
+            leading="arrow.up.right"
+            leadingColor="system-red"
+            destructive
+            accessory="none"
+            separator={false}
+            onPress={() => confirm.set({ kind: "signOut" })}
+            testID="sign-out"
+          />
+        </Section>
 
-        <View class="gap-1">
-          <SectionLabel label={t("settings.inbox")} class="px-1" />
-          <Card>
-            <ListItem
-              icon="bell"
-              headline={t("sources.title")}
-              supporting={t("settings.sourcesDetail", { count: sources().length })}
-              onPress={() => nav.stack.push({ name: "sources" })}
-              trailing={<Icon name="chevronRight" tone="on-surface-variant" />}
-              testID="settings-sources"
-            />
-            <Divider inset />
-            <ListItem
-              icon="key"
-              headline={t("keys.title")}
-              supporting={t("settings.keysDetail")}
-              onPress={() => nav.stack.push({ name: "apiKeys" })}
-              trailing={<Icon name="chevronRight" tone="on-surface-variant" />}
-              testID="settings-keys"
-            />
-          </Card>
-        </View>
+        <Section header={t("settings.notifications")}>
+          <ListTile
+            title={t("settings.newMailNotifications")}
+            subtitle={t("settings.notificationsDetail")}
+            accessory="none"
+            separator
+            onPress={() => void toggleNotifications(!notificationsEnabled())}
+            testID="notifications"
+          >
+            <Switch checked={notificationsEnabled()} label={t("settings.newMailNotifications")} onChange={({ value: on }: { value: boolean }) => void toggleNotifications(on)} />
+          </ListTile>
+          <ListTile
+            title={t("sources.title")}
+            subtitle={t("settings.sourcesDetail", { count: sources().length })}
+            leading="bell"
+            onPress={() => nav.stack.push({ name: "sources" })}
+            testID="settings-sources"
+          />
+          <ListTile title={t("rules.title")} subtitle={t("rules.summary")} leading="line.3.horizontal.decrease" onPress={() => nav.stack.push({ name: "notifyRules" })} testID="settings-rules" />
+          <ListTile
+            title={t("keys.title")}
+            subtitle={t("settings.keysDetail")}
+            leading="key"
+            accessory="chevron"
+            separator={false}
+            onPress={() => nav.stack.push({ name: "apiKeys" })}
+            testID="settings-keys"
+          />
+        </Section>
 
-        <View class="gap-1">
-          <SectionLabel label={t("settings.reading")} class="px-1" />
-          <Card class="px-4 py-3">
-            <Switch
-              checked={conversationsEnabled()}
-              onChange={(on) => void setConversationsEnabled(on)}
-              label={t("settings.conversations")}
-              description={t("settings.conversationsDetail")}
-              testID="conversations"
-            />
-          </Card>
-        </View>
+        <Section header={t("settings.reading")}>
+          <ListTile
+            title={t("settings.conversations")}
+            subtitle={t("settings.conversationsDetail")}
+            accessory="none"
+            separator={false}
+            onPress={() => void setConversationsEnabled(!conversationsEnabled())}
+            testID="conversations"
+          >
+            <Switch checked={conversationsEnabled()} label={t("settings.conversations")} onChange={({ value: on }: { value: boolean }) => void setConversationsEnabled(on)} />
+          </ListTile>
+        </Section>
 
-        <View class="gap-1">
-          <SectionLabel label={t("settings.sending")} class="px-1" />
-          <Card class="gap-3 p-4">
-            <View class="gap-0.5">
-              <Text class="text-body-large tracking-body-large text-on-surface">{t("settings.undoSend")}</Text>
-              <Text class="text-body-medium tracking-body-medium text-on-surface-variant">{t("settings.undoSendDetail")}</Text>
-            </View>
-            <Choice
-              label={t("settings.undoSend")}
-              value={String(undoDelay())}
-              options={UNDO_DELAYS.map((s) => ({ value: String(s), label: s ? t("settings.seconds", { n: s }) : t("settings.undoOff"), testID: `undo-${s}` }))}
-              onChange={(v) => void setUndoDelay(Number(v))}
-              fullWidth={touch}
-            />
-          </Card>
-        </View>
+        <Section header={t("settings.sending")} footer={t("settings.undoSendDetail")}>
+          <ListTile
+            title={t("settings.undoSend")}
+            subtitle={undoDelay() ? t("settings.seconds", { n: undoDelay() }) : t("settings.undoOff")}
+            accessory="none"
+            separator={false}
+            onPress={() => undoFor.set(true)}
+            testID="undo-send"
+          />
+        </Section>
 
-        <View class="gap-1">
-          <SectionLabel label={t("settings.notifications")} class="px-1" />
-          <Card>
-            <View class="px-4 py-3">
-              <Switch
-                checked={notificationsEnabled()}
-                onChange={(on) => void toggleNotifications(on)}
-                label={t("settings.newMailNotifications")}
-                description={t("settings.notificationsDetail")}
-                testID="notifications"
-              />
-            </View>
-            <Divider inset />
-            <ListItem
-              icon="filter"
-              headline={t("rules.title")}
-              supporting={t("rules.summary")}
-              onPress={() => nav.stack.push({ name: "notifyRules" })}
-              trailing={<Icon name="chevronRight" tone="on-surface-variant" />}
-              testID="settings-rules"
-            />
-          </Card>
-        </View>
+        <Section
+          header={t("settings.help")}
+          footer={`${t("settings.about", { version: appInfo().version ?? "" })}${mailStatus().mode === "local" && platform.os === "android" ? ` · ${t("settings.androidLocal")}` : ""}`}
+        >
+          <ListTile
+            title={t("shortcuts.title")}
+            subtitle={t("shortcuts.summary")}
+            leading="list.bullet"
+            accessory="none"
+            separator={false}
+            onPress={() => (nav.done(), shortcutsOpen.set(true))}
+            testID="open-shortcuts"
+          />
+        </Section>
+      </List>
 
-        <View class="gap-1">
-          <SectionLabel label={t("settings.help")} class="px-1" />
-          <Card>
-            <ListItem
-              icon="keyboard"
-              headline={t("shortcuts.title")}
-              supporting={t("shortcuts.summary")}
-              onPress={() => shortcutsOpen.set(true)}
-              trailing={<Text class="text-label-large text-on-surface-variant">{keymap.label("shift+/")}</Text>}
-              testID="open-shortcuts"
-            />
-          </Card>
-        </View>
-
-        <Text class="text-center text-body-small tracking-body-small text-on-surface-variant">
-          {t("settings.about", { version: appInfo().version ?? "" })}
-        </Text>
-      </PageScroll>
+      <ActionSheet
+        open={!!menuFor()}
+        title={account()?.email}
+        actions={[
+          { id: "signature", title: t("signature.menu") },
+          { id: "remove", title: t("accounts.removeMenu"), destructive: true },
+        ]}
+        cancel={t("common.cancel")}
+        onOpenChange={({ open }: { open: boolean }) => {
+          if (!open) menuFor.set(null);
+        }}
+        onAction={({ id }: { id: string }) => {
+          const a = account();
+          menuFor.set(null);
+          if (!a) return;
+          if (id === "signature") nav.stack.push({ name: "signature", account: a.id });
+          if (id === "remove") confirm.set({ kind: "remove", account: a });
+        }}
+      />
+      <ActionSheet
+        open={undoFor()}
+        title={t("settings.undoSend")}
+        actions={UNDO_DELAYS.map((s) => ({ id: String(s), title: s ? t("settings.seconds", { n: s }) : t("settings.undoOff") }))}
+        cancel={t("common.cancel")}
+        onOpenChange={({ open }: { open: boolean }) => {
+          if (!open) undoFor.set(false);
+        }}
+        onAction={({ id }: { id: string }) => {
+          undoFor.set(false);
+          void setUndoDelay(Number(id));
+        }}
+      />
+      <ActionSheet
+        open={!!confirm()}
+        title={confirm()?.kind === "remove" ? t("accounts.removeTitle", { email: confirm()?.account?.email ?? "" }) : t("settings.signOutTitle")}
+        message={
+          confirm()?.kind === "remove"
+            ? t("accounts.removeBody")
+            : mailStatus().mode === "local"
+              ? t("settings.signOutLocal")
+              : t("settings.signOutCloud")
+        }
+        actions={[{ id: "go", title: confirm()?.kind === "remove" ? t("accounts.remove") : t("settings.signOut"), destructive: true }]}
+        cancel={t("common.cancel")}
+        onOpenChange={({ open }: { open: boolean }) => {
+          if (!open) confirm.set(null);
+        }}
+        onAction={({ id }: { id: string }) => {
+          const c = confirm();
+          confirm.set(null);
+          if (id !== "go" || !c) return;
+          if (c.kind === "remove" && c.account) void remove(c.account);
+          else void signOut();
+        }}
+        testID="confirm-dialog"
+      />
     </Page>
   );
 }

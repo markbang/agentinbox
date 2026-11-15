@@ -1,40 +1,27 @@
-// One message, or a conversation: its older messages collapsed above the
-// one expanded (the latest when it opens) and its newer ones below; a tap on
-// a collapsed message expands it. For the expanded message: who and when,
-// the body (its HTML in a web view, or its text) and its attachments. Remote
-// images stay blocked until the reader asks for them. Archive, delete, read
-// and flag act on the whole conversation; reply and forward on the message.
-import { createMotion, reduceMotion, Scroll, signal, Text, View } from "nsh";
+// One message, or a conversation: its older messages above the expanded one
+// (the latest when it opens) and its newer ones below; a tap on a collapsed
+// message expands it. For the expanded message: who and when, the body (its
+// HTML in a web view, or its text) and its attachments. Remote images stay
+// blocked until the reader asks for them. Archive, delete, read and flag act
+// on the whole conversation; reply and forward on the message.
+import { createMotion, Image, reduceMotion, signal, Text, View } from "nsh";
 import { t } from "nsh/i18n";
+import { ActionSheet, Button, Icon, ScrollView } from "cupertino";
 import { Mail, type Attachment, type Message, type Summary } from "agentinbox/native";
-import { AccountMark, Avatar, Button, Divider, FileTile, FloatingToolbar, Icon, IconButton, LoadingIndicator, material, Menu, Row, ToolbarButton, touch } from "../ui";
-import { displayName, fileSize, fullDate, listDate, type ComposeMode } from "../lib/format";
-import {
-  accountById,
-  accountIndex,
-  accounts,
-  conversationsEnabled,
-  errorText,
-  isLeaving,
-  moveMessages,
-  openMessage,
-  ownAddresses,
-  selectedId,
-  setFlags,
-  setThreadFlags,
-  showToast,
-} from "../store";
+import { AccountMark, Monogram } from "./Marks";
 import { MailView, webViewAvailable } from "./MailView";
-import { wide } from "../layout";
+import { Toolbar, type ToolbarAction } from "./Toolbar";
+import { displayName, fileSize, fullDate, listDate, type ComposeMode } from "../lib/format";
+import { accountById, accountIndex, accounts, conversationsEnabled, errorText, isLeaving, moveMessages, openMessage, ownAddresses, selectedId, setFlags, setThreadFlags, showToast } from "../store";
 
 export interface ReaderProps {
   message: Message;
   /** Its conversation, oldest first, while conversations are on. */
   conversation?: Summary[];
   onCompose: (mode: ComposeMode) => void;
-  /** The actions float in a toolbar at the reader's bottom (wide windows, narrow browsers). */
+  /** The actions sit in a bar at the reader's foot. */
   toolbar?: boolean;
-  /** Phones: the actions are in the system header and at the bottom (Android's floating toolbar). */
+  /** Phones: the bar's actions are the reader's whole set. */
   phone?: boolean;
   /** Leaves the page (a phone, after archiving or deleting). */
   onLeave?: () => void;
@@ -76,177 +63,112 @@ function mark(x: Target, flags: { seen?: boolean; flagged?: boolean }) {
   else void setFlags(x.message.id, flags);
 }
 
-/** The phone's header actions: archive, delete, unread, and the rest under More. */
-export function PhoneReaderActions(props: { message: Message; conversation?: Summary[]; onLeave: () => void }) {
+/** The actions the reader's bar offers, in Mail's order. */
+export function readerActions(props: {
+  message: Message;
+  conversation?: Summary[];
+  onCompose: (mode: ComposeMode) => void;
+  onLeave?: () => void;
+  wide?: boolean;
+}): ToolbarAction[] {
   const x = (): Target => ({ message: props.message, thread: threadOf(props.message, props.conversation) });
   const m = () => props.message;
-  return (
-    <>
-      {/* Android has them in the floating toolbar. */}
-      <If when={!material && m().folder !== "archive" && m().folder !== "trash"}>
-        <IconButton icon="archive" label={t("actions.archive")} onPress={() => move(x(), "archive", props.onLeave)} testID="archive" />
-      </If>
-      <If when={!material && m().folder !== "trash"}>
-        <IconButton icon="trash" label={t("actions.delete")} onPress={() => move(x(), "trash", props.onLeave)} testID="delete" />
-      </If>
-      <IconButton
-        icon={seen(x()) ? "mail" : "mailOpen"}
-        label={seen(x()) ? t("actions.markUnread") : t("actions.markRead")}
-        onPress={() => {
-          mark(x(), { seen: !seen(x()) });
-          props.onLeave();
-        }}
-        testID="toggle-seen"
-      />
-      <Menu
-        label={t("actions.more")}
-        trigger={<IconButton icon="more" label={t("actions.more")} testID="reader-more" />}
-        actions={[
-          {
-            id: "flag",
-            label: flagged(x()) ? t("actions.unflag") : t("actions.flag"),
-            icon: flagged(x()) ? "flagFilled" : "flag",
-            onSelect: () => mark(x(), { flagged: !flagged(x()) }),
-          },
-        ]}
-      />
-    </>
-  );
+  const actions: ToolbarAction[] = [
+    { icon: "arrowshape.turn.up.left", label: t("actions.reply"), onPress: () => props.onCompose("reply"), testID: "reply" },
+    { icon: "arrowshape.turn.up.right", label: t("actions.forward"), onPress: () => props.onCompose("forward"), testID: "forward" },
+  ];
+  if (props.wide) {
+    actions.push({
+      icon: flagged(x()) ? "flag.fill" : "flag",
+      label: flagged(x()) ? t("actions.unflag") : t("actions.flag"),
+      onPress: () => mark(x(), { flagged: !flagged(x()) }),
+      testID: "toggle-flag",
+    });
+    actions.push({
+      icon: seen(x()) ? "envelope" : "envelope.open",
+      label: seen(x()) ? t("actions.markUnread") : t("actions.markRead"),
+      onPress: () => mark(x(), { seen: !seen(x()) }),
+      testID: "toggle-seen",
+    });
+  }
+  if (m().folder !== "archive" && m().folder !== "trash") {
+    actions.push({ icon: "archivebox", label: t("actions.archive"), onPress: () => move(x(), "archive", props.onLeave), testID: "archive" });
+  }
+  if (m().folder !== "trash") {
+    actions.push({ icon: "trash", label: t("actions.delete"), onPress: () => move(x(), "trash", props.onLeave), testID: "delete" });
+  }
+  return actions;
 }
-
-/** M3E's floating toolbar, vibrant, over the end of the message: reply first, then
- * forward, archive and delete; wide windows add read and flag, which phones keep in the header. */
-function ReaderToolbar(props: { target: Target; onCompose: (mode: ComposeMode) => void; onLeave?: () => void; wide?: boolean }) {
-  const x = () => props.target;
-  const m = () => props.target.message;
-  return (
-    <View class="absolute inset-x-0 bottom-0 items-center pb-[env(safe-area-inset-bottom)]" style={{ pointerEvents: "box-none" }}>
-      <View class="mb-4">
-        <FloatingToolbar label={t("reader.actions")} vibrant testID="reader-toolbar">
-          <ToolbarButton icon="reply" label={t("actions.reply")} emphasized vibrant onPress={() => props.onCompose("reply")} testID="reply" />
-          <ToolbarButton icon="replyAll" label={t("actions.replyAll")} vibrant onPress={() => props.onCompose("replyAll")} testID="reply-all" />
-          <ToolbarButton icon="forward" label={t("actions.forward")} vibrant onPress={() => props.onCompose("forward")} testID="forward" />
-          <If when={m().folder !== "archive" && m().folder !== "trash"}>
-            <ToolbarButton icon="archive" label={t("actions.archive")} vibrant onPress={() => move(x(), "archive", props.onLeave)} testID="archive" />
-          </If>
-          <If when={m().folder !== "trash"}>
-            <ToolbarButton icon="trash" label={t("actions.delete")} vibrant onPress={() => move(x(), "trash", props.onLeave)} testID="delete" />
-          </If>
-          <If when={props.wide}>
-            <ToolbarButton
-              icon={seen(x()) ? "mail" : "mailOpen"}
-              label={seen(x()) ? t("actions.markUnread") : t("actions.markRead")}
-              vibrant
-              onPress={() => mark(x(), { seen: !seen(x()) })}
-              testID="toggle-seen"
-            />
-            <ToolbarButton
-              icon={flagged(x()) ? "flagFilled" : "flag"}
-              label={flagged(x()) ? t("actions.unflag") : t("actions.flag")}
-              vibrant
-              onPress={() => mark(x(), { flagged: !flagged(x()) })}
-              testID="toggle-flag"
-            />
-          </If>
-        </FloatingToolbar>
-      </View>
-    </View>
-  );
-}
-
-/** Replying on a phone: a bar at the bottom of the message, over the gesture area. */
-function ReplyBar(props: { onCompose: (mode: ComposeMode) => void }) {
-  return (
-    <View class="border-t border-outline-variant bg-surface pb-[env(safe-area-inset-bottom)]">
-      <View class="flex-row gap-2 px-4 py-3">
-        <Button variant="outlined" icon="reply" label={t("actions.reply")} onPress={() => props.onCompose("reply")} class="flex-1" testID="reply" />
-        <Button variant="outlined" icon="replyAll" label={t("actions.replyAll")} onPress={() => props.onCompose("replyAll")} class="flex-1" testID="reply-all" />
-        <Button variant="outlined" icon="forward" label={t("actions.forward")} onPress={() => props.onCompose("forward")} class="flex-1" testID="forward" />
-      </View>
-    </View>
-  );
-}
-
 
 /** A message of the conversation that is not expanded: who, when and how it starts; a tap expands it. */
-function Collapsed(props: { message: Summary; loading: boolean; pad: string }) {
+function Collapsed(props: { message: Summary }) {
   const m = () => props.message;
   const who = () => (ownAddresses().has(m().from?.email.toLowerCase() ?? "") ? t("list.me") : displayName(m().from));
   const note = () => (m().folder === "drafts" ? t("thread.draft") : m().folder === "trash" ? t("thread.inTrash") : "");
   return (
-    <Row
-      onPress={() => openMessage(m().id)}
+    <View
+      role="button"
       accessibilityLabel={[m().seen ? "" : t("list.unread"), who(), note(), listDate(m().date), m().snippet].filter(Boolean).join(", ")}
+      onPress={() => openMessage(m().id)}
       testID={`thread-message-${m().id}`}
-      class={`flex-row items-center gap-3 py-2 ${props.pad}`}
+      class="flex-row items-center gap-2.5 px-4 py-2.5 active:bg-fill"
     >
-      <Avatar name={displayName(m().from)} size="sm" />
+      <Monogram name={displayName(m().from)} size="sm" />
       <View class="min-w-0 flex-1">
         <View class="flex-row items-center gap-2">
-          <Text class={`line-clamp-1 shrink text-body-large tracking-body-large text-on-surface ${m().seen ? "" : "font-bold"}`}>{who()}</Text>
+          <Text class={`line-clamp-1 shrink ${m().seen ? "text-subheadline text-label" : "text-subheadline font-semibold text-label"}`}>{who()}</Text>
           <If when={note()}>
-            <Text class="text-label-medium text-error">{note()}</Text>
+            <Text class="text-caption1 text-system-red">{note()}</Text>
           </If>
           <View class="flex-1" />
           <If when={m().hasAttachments}>
-            <Icon name="paperclip" size="sm" tone="on-surface-variant" />
+            <Icon name="paperclip" size={12} tint="secondary-label" />
           </If>
           <If when={m().flagged}>
-            <Icon name="flagFilled" size="sm" tone="flag" />
+            <Icon name="flag.fill" size={12} tint="system-orange" />
           </If>
-          <Text class={`text-label-medium tabular-nums ${m().seen ? "text-on-surface-variant" : "font-bold text-primary"}`}>{listDate(m().date)}</Text>
+          <Text class="text-caption1 tabular-nums text-secondary-label">{listDate(m().date)}</Text>
         </View>
-        <Text class="line-clamp-1 text-body-medium tracking-body-medium text-on-surface-variant">{m().snippet}</Text>
+        <Text class="line-clamp-1 text-footnote text-secondary-label">{m().snippet}</Text>
       </View>
-      <If when={props.loading}>
-        <LoadingIndicator label={t("reader.loading")} size={24} />
+      <If when={selectedId() === m().id}>
+        <Icon name="arrow.clockwise" size={12} tint="tertiary-label" />
       </If>
-    </Row>
+    </View>
   );
 }
 
 /** How many messages one press of More adds: a long conversation stays a bounded amount of work. */
 const REVEAL = 25;
 
-/** Collapsed messages: past three, the first, how many more, and the last; More reveals the rest
- * nearest the message on screen, a page at a time, and Less puts them back. */
-function CollapsedList(props: { messages: Summary[]; threadId: string; pad: string; testID: string }) {
+/** Collapsed messages: past three, the first, how many more, and the last. */
+function CollapsedList(props: { messages: Summary[]; threadId: string; testID: string }) {
   const total = () => props.messages.length;
   const extra = () => revealed()[props.threadId] ?? 0;
   const shown = () => Math.min(total(), 3 + extra());
   const hidden = () => total() - shown();
-  const loading = (s: Summary) => selectedId() === s.id;
-  const row = (s: () => Summary) => <Collapsed message={s()} loading={loading(s())} pad={props.pad} />;
   const set = (count: number) => revealed.update((r) => ({ ...r, [props.threadId]: count }));
   return (
-    <View testID={props.testID}>
+    <View testID={props.testID} class="border-y border-separator">
       <If
         when={hidden() > 0}
         else={
           <Each of={props.messages} key={(s) => s.id}>
-            {(s) => row(s)}
+            {(s) => <Collapsed message={s()} />}
           </Each>
         }
       >
-        {row(() => props.messages[0])}
-        <View class={`flex-row items-center gap-3 py-1 ${props.pad}`}>
-          <Divider class="flex-1" />
-          <Button
-            size="xs"
-            variant="tonal"
-            label={t("thread.more", { count: hidden() })}
-            onPress={() => set(extra() + REVEAL)}
-            testID="thread-more"
-          />
-          <Divider class="flex-1" />
+        <Collapsed message={props.messages[0]} />
+        <View class="items-center py-1">
+          <Button title={t("thread.more", { count: hidden() })} variant="plain" size="small" onPress={() => set(extra() + REVEAL)} testID="thread-more" />
         </View>
         <Each of={props.messages.slice(total() - shown() + 1)} key={(s) => s.id}>
-          {(s) => row(s)}
+          {(s) => <Collapsed message={s()} />}
         </Each>
       </If>
       <If when={total() > 3 && hidden() === 0}>
-        <View class={`flex-row items-center justify-center py-1 ${props.pad}`}>
-          <Button size="xs" variant="text" label={t("thread.less")} onPress={() => set(0)} testID="thread-less" />
+        <View class="items-center py-1">
+          <Button title={t("thread.less")} variant="plain" size="small" onPress={() => set(0)} testID="thread-less" />
         </View>
       </If>
     </View>
@@ -264,155 +186,118 @@ export function Reader(props: ReaderProps) {
   const recipients = () => [...m().to, ...m().cc].map(displayName).join(", ");
   const showImages = () => !!imagesShown()[m().id];
   const html = () => (webViewAvailable() ? m().html : null);
-  const pad = touch ? "px-4" : "px-6";
-  // Rows reach the reader's edges, so their state layer does; their content lines up with the text.
-  const rowPad = touch ? "px-4" : "px-6";
   const subject = () => (target().thread?.[0].subject ?? m().subject) || t("reader.noSubject");
-  // Delete one message of a conversation: the reader moves to its neighbor first, so the conversation stays.
+  const menu = signal(false);
+  // One message of a conversation: the reader moves to its neighbour first, so the conversation stays.
   const deleteOne = () => {
     const thread = target().thread ?? [];
     const next = thread[at() + 1] ?? thread[at() - 1];
     if (next) openMessage(next.id);
     moveMessages([m().id], "trash");
   };
-  const messageMenu = () => (
-    <Menu
-      label={t("thread.messageActions")}
-      trigger={<IconButton icon="more" size="sm" label={t("thread.messageActions")} class="-me-2" testID="message-more" />}
-      actions={[
-        { id: "reply", label: t("actions.reply"), icon: "reply", onSelect: () => props.onCompose("reply") },
-        { id: "replyAll", label: t("actions.replyAll"), icon: "replyAll", onSelect: () => props.onCompose("replyAll") },
-        { id: "forward", label: t("actions.forward"), icon: "forward", onSelect: () => props.onCompose("forward") },
-        { id: "unread", label: t("actions.markUnread"), icon: "mail", onSelect: () => void setFlags(m().id, { seen: false }) },
-        ...(m().folder === "trash" ? [] : [{ id: "delete", label: t("thread.deleteMessage"), icon: "trash" as const, destructive: true, onSelect: deleteOne }]),
-      ]}
-    />
-  );
-  const header = () => (
-    <View class="gap-3">
-      <View class="flex-row items-start gap-2">
-        <Text role="header" class="flex-1 text-headline-small text-on-surface">
-          {subject()}
-        </Text>
-        <If when={props.phone}>
-          <IconButton
-            icon={flagged(target()) ? "flagFilled" : "flag"}
-            tone={flagged(target()) ? "flag" : "on-surface-variant"}
-            selected={flagged(target())}
-            label={flagged(target()) ? t("actions.unflag") : t("actions.flag")}
-            onPress={() => mark(target(), { flagged: !flagged(target()) })}
-            class="-me-2 -mt-1.5"
-            testID="toggle-flag"
-          />
-        </If>
-      </View>
-      <If when={older().length}>
-        <View class={touch ? "-mx-4" : "-mx-6"}>
-          <CollapsedList messages={older()} threadId={m().threadId} pad={rowPad} testID="thread-older" />
-        </View>
-      </If>
-      <View class="flex-row items-start gap-3">
-        <Avatar name={displayName(m().from)} />
-        <View class="min-w-0 flex-1 gap-0.5">
-          <View class="flex-row flex-wrap items-baseline gap-x-2">
-            <Text class="text-title-medium font-medium tracking-title-medium text-on-surface">{displayName(m().from)}</Text>
-            <Text class="text-body-medium tracking-body-medium text-on-surface-variant">{m().from?.email ?? ""}</Text>
-          </View>
-          <Text class="line-clamp-2 text-body-medium tracking-body-medium text-on-surface-variant">
-            {t("reader.toList", { names: recipients() || t("compose.noRecipients") })}
-          </Text>
-          <View class="flex-row items-center gap-1.5">
-            <If when={accounts().length > 1 && account()}>
-              <AccountMark index={accountIndex(m().accountId)} />
-              <Text class="text-body-small text-on-surface-variant">{account()?.email}</Text>
-              <Text class="text-body-small text-on-surface-variant">·</Text>
-            </If>
-            <Text class="text-body-small tabular-nums text-on-surface-variant">{fullDate(m().date)}</Text>
-          </View>
-        </View>
-        <If when={target().thread}>{messageMenu()}</If>
-      </View>
-    </View>
-  );
-  const newerList = () => (
-    <If when={newer().length}>
-      <CollapsedList messages={newer()} threadId={m().threadId} pad={rowPad} testID="thread-newer" />
-    </If>
-  );
-  const attachments = () => m().attachments.map((attachment) => ({ id: m().id, attachment }));
-  const tiles = () => (
-    <Each of={attachments()} key={(x) => `${x.id}:${x.attachment.index}`}>
-      {(x) => <AttachmentTile messageId={x().id} attachment={x().attachment} />}
-    </Each>
-  );
-  // Android's floating toolbar covers the end of the page: room is kept for it.
-  const floating = () => !!props.toolbar || (material && !!props.phone);
-  const end = () => (floating() ? "pb-28" : "pb-8");
-  // A mail's HTML scrolls in its own view, under the header and over the attachments: one scrollbar.
+
   return (
     <View class="flex-1">
-    <If
-      when={html()}
-      else={
-        <Scroll class="flex-1" style={enter.style} testID="reader">
-          <View selectable class={`gap-4 ${pad} ${end()} ${touch ? "pt-4" : "pt-5"}`}>
-            {header()}
-            <Divider />
-            <Text class="text-body-large tracking-body-large text-on-surface" testID="body-text">
-              {m().text ?? ""}
+      <ScrollView class="flex-1" testID="reader">
+        <View class="gap-3 pb-8 pt-3" style={enter.style}>
+          <View class="flex-row items-start gap-2 px-4">
+            <Text role="header" class="flex-1 text-title2 font-semibold text-label">
+              {subject()}
             </Text>
-            <If when={m().attachments.length}>
-              <View class="gap-2">
-                <Text class="text-title-small font-medium tracking-title-small text-on-surface-variant">{t("reader.attachments")}</Text>
-                <View class="flex-row flex-wrap items-end gap-2">{tiles()}</View>
-              </View>
-            </If>
-            <If when={newer().length}>
-              <View class={touch ? "-mx-4" : "-mx-6"}>
-                <Divider />
-                {newerList()}
-              </View>
-            </If>
+            <Button icon="ellipsis" label={t("thread.messageActions")} variant="plain" onPress={() => menu.set(true)} testID="message-more" />
           </View>
-        </Scroll>
-      }
-    >
-      {(source) => (
-        <View class={`flex-1 gap-3 ${floating() ? "pb-24" : "pb-4"} ${touch ? "pt-4" : "pt-5"}`} style={enter.style} testID="reader">
-          <View selectable class={`gap-4 ${pad}`}>
-            {header()}
-            <If when={m().remoteImages.length > 0 && !showImages()}>
-              <View class="flex-row items-center gap-3 rounded-large bg-surface-container-high py-2 pe-2 ps-4">
-                <Icon name="image" size="sm" tone="on-surface-variant" />
-                <Text class="flex-1 text-body-medium tracking-body-medium text-on-surface-variant">{t("reader.imagesBlocked")}</Text>
-                <Button
-                  size="xs"
-                  variant="tonal"
-                  label={t("reader.loadImages")}
-                  onPress={() => imagesShown.update((s) => ({ ...s, [m().id]: true }))}
-                />
-              </View>
-            </If>
-          </View>
-          {/* The mail card stays white in both appearances on purpose: mail is designed on white and its colors are not inverted. */}
-          <View class={`min-h-48 flex-1 overflow-hidden rounded-large border border-outline-variant bg-white ${touch || !wide() ? "mx-2" : "mx-6"}`}>
-            <MailView html={source()} remote={showImages()} onUnavailable={() => webViewAvailable.set(false)} class="flex-1" />
-          </View>
-          <If when={m().attachments.length}>
-            <Scroll horizontal class="shrink-0" contentClass={`flex-row items-end gap-2 ${pad}`} testID="attachments">
-              {tiles()}
-            </Scroll>
+          <If when={older().length > 0}>
+            <CollapsedList messages={older()} threadId={m().threadId} testID="thread-older" />
           </If>
-          {newerList()}
+          <View class="flex-row items-start gap-2.5 px-4">
+            <Monogram name={displayName(m().from)} />
+            <View class="min-w-0 flex-1 gap-0.5">
+              <View class="flex-row flex-wrap items-baseline gap-x-2">
+                <Text class="text-headline font-semibold text-label">{displayName(m().from)}</Text>
+                <Text class="text-subheadline text-secondary-label">{m().from?.email ?? ""}</Text>
+              </View>
+              <Text class="line-clamp-2 text-footnote text-secondary-label">
+                {t("reader.toList", { names: recipients() || t("compose.noRecipients") })}
+              </Text>
+              <View class="flex-row flex-wrap items-center gap-1.5">
+                <If when={accounts().length > 1 && account()}>
+                  <AccountMark index={accountIndex(m().accountId)} />
+                  <Text class="text-caption1 text-secondary-label">{account()?.email}</Text>
+                  <Text class="text-caption1 text-tertiary-label">·</Text>
+                </If>
+                <Text class="text-caption1 tabular-nums text-secondary-label">{fullDate(m().date)}</Text>
+              </View>
+            </View>
+          </View>
+          <If when={m().remoteImages.length > 0 && !showImages()}>
+            <View class="mx-4 flex-row items-center gap-2 rounded-row bg-fill px-3 py-2">
+              <Icon name="photo" size={16} tint="secondary-label" />
+              <Text class="flex-1 text-footnote text-secondary-label">{t("reader.imagesBlocked")}</Text>
+              <Button title={t("reader.loadImages")} variant="plain" size="small" onPress={() => imagesShown.update((s) => ({ ...s, [m().id]: true }))} />
+            </View>
+          </If>
+          <If when={m().attachments.length}>
+            <View class="gap-1.5 px-4">
+              <Text class="text-footnote font-semibold text-secondary-label">{t("reader.attachments")}</Text>
+              <ScrollView horizontal class="shrink-0" style={{ height: 64 }} testID="attachments">
+                <View class="flex-row items-start gap-2 px-0.5">
+                  <Each of={m().attachments} key={(a) => `${m().id}:${a.index}`}>
+                    {(attachment) => <AttachmentTile messageId={m().id} attachment={attachment()} />}
+                  </Each>
+                </View>
+              </ScrollView>
+            </View>
+          </If>
+          <If
+            when={html()}
+            else={
+              <View class="px-4" selectable>
+                <Text class="text-body leading-relaxed text-label" testID="body-text">
+                  {m().text ?? ""}
+                </Text>
+              </View>
+            }
+          >
+            {(source) => (
+              // The mail card stays white in both appearances on purpose: mail is designed on white and its colors are not inverted.
+              <View class="h-[560px] overflow-hidden border-y border-separator bg-white">
+                <MailView html={source()} remote={showImages()} onUnavailable={() => webViewAvailable.set(false)} class="flex-1" />
+              </View>
+            )}
+          </If>
+          <If when={newer().length > 0}>
+            <CollapsedList messages={newer()} threadId={m().threadId} testID="thread-newer" />
+          </If>
         </View>
-      )}
-    </If>
-    <If when={floating()}>
-      <ReaderToolbar target={target()} onCompose={props.onCompose} onLeave={props.onLeave} wide={!props.phone} />
-    </If>
-    <If when={props.phone && !material}>
-      <ReplyBar onCompose={props.onCompose} />
-    </If>
+      </ScrollView>
+      <ActionSheet
+        open={menu()}
+        title={t("thread.messageActions")}
+        actions={[
+          { id: "flag", title: m().flagged ? t("actions.unflag") : t("actions.flag") },
+          { id: "reply", title: t("actions.reply") },
+          { id: "forward", title: t("actions.forward") },
+          { id: "seen", title: m().seen ? t("actions.markUnread") : t("actions.markRead") },
+          ...(m().folder === "trash" ? [] : [{ id: "delete", title: t("thread.deleteMessage"), destructive: true }]),
+        ]}
+        cancel={t("common.cancel")}
+        onOpenChange={({ open }: { open: boolean }) => menu.set(open)}
+        onAction={({ id }: { id: string }) => {
+          menu.set(false);
+          if (id === "flag") void setFlags(m().id, { flagged: !m().flagged });
+          if (id === "reply") props.onCompose("reply");
+          if (id === "forward") props.onCompose("forward");
+          if (id === "seen") void setFlags(m().id, { seen: !m().seen });
+          if (id === "delete") deleteOne();
+        }}
+        testID="message-menu"
+      />
+      <If when={props.toolbar}>
+        <Toolbar
+          label={t("reader.actions")}
+          actions={readerActions({ message: m(), conversation: props.conversation, onCompose: props.onCompose, onLeave: props.onLeave, wide: !props.phone })}
+        />
+      </If>
     </View>
   );
 }
@@ -440,14 +325,20 @@ function AttachmentTile(props: { messageId: string; attachment: Attachment }) {
     }
   };
   return (
-    <FileTile
-      name={a().filename ?? t("reader.untitledAttachment")}
-      detail={fileSize(a().size)}
-      thumbnail={thumbnail()}
-      busy={busy()}
-      busyLabel={t("reader.openingAttachment")}
+    <View
+      role="button"
+      accessibilityLabel={`${a().filename ?? t("reader.untitledAttachment")}, ${fileSize(a().size)}`}
       onPress={() => void open()}
       testID={`attachment-${a().index}`}
-    />
+      class="w-48 flex-row items-center gap-2 rounded-row border border-separator bg-secondary-system-background px-2 py-2 active:bg-fill"
+    >
+      <If when={thumbnail()} else={<Icon name={a().mimeType.startsWith("image/") ? "photo" : "doc"} size={22} tint="system-blue" />}>
+        <Image src={thumbnail() ?? ""} class="size-8 rounded-[6px]" />
+      </If>
+      <View class="min-w-0 flex-1">
+        <Text class="line-clamp-1 text-footnote text-label">{a().filename ?? t("reader.untitledAttachment")}</Text>
+        <Text class="text-caption2 text-secondary-label">{busy() ? t("reader.openingAttachment") : fileSize(a().size)}</Text>
+      </View>
+    </View>
   );
 }

@@ -1,11 +1,10 @@
 // Settings → API keys: the keys agents read and write the feed with. A key's
 // token is shown once, when it is created; revoking stops its agent at once.
 import { signal, Text, View } from "nsh";
-import { AlertDialog } from "nsh/base";
 import { t } from "nsh/i18n";
 import type { ApiKey } from "agentinbox/native";
-import { AppBar, Button, Card, Divider, IconButton, ListItem, Menu, Page, SectionLabel } from "../ui";
-import { PageHeader, PageScroll } from "../components/PageHeader";
+import { ActionSheet, Button, Icon, List, ListTile, Section } from "cupertino";
+import { Page } from "../components/Page";
 import { fullDate } from "../lib/format";
 import { NavContext } from "../nav";
 import { apiKeys, apiKeysState, keySources, loadKeys, revokeKey, serverInbox } from "../notify";
@@ -22,6 +21,7 @@ export function keyExpiry(key: ApiKey) {
 export function ApiKeysPage() {
   const nav = NavContext();
   const busy = signal<string | null>(null);
+  const revoking = signal<ApiKey | null>(null);
   // The list loads when the page first shows, once per visit.
   const asked = signal(false);
   if (!asked()) {
@@ -29,15 +29,6 @@ export function ApiKeysPage() {
     void loadKeys();
   }
   const revoke = async (key: ApiKey) => {
-    const { action } = await AlertDialog.show({
-      title: t("keys.revokeTitle", { name: key.name }),
-      description: t("keys.revokeBody"),
-      actions: [
-        { id: "cancel", label: t("common.cancel"), role: "cancel" },
-        { id: "revoke", label: t("keys.revoke"), role: "destructive" },
-      ],
-    });
-    if (action !== "revoke") return;
     busy.set(key.id);
     try {
       await revokeKey(key);
@@ -49,78 +40,94 @@ export function ApiKeysPage() {
   };
   const lastUsed = (key: ApiKey) => (key.lastUsedAt ? t("keys.lastUsed", { date: fullDate(key.lastUsedAt) }) : t("keys.neverUsed"));
   const create = () => nav.stack.push({ name: "newKey" });
-  const createAction = () => (
-    <If when={serverInbox()}>
-      <IconButton icon="plus" label={t("keys.create")} onPress={create} testID="keys-add-top" />
-    </If>
-  );
   return (
     <Page
       title={t("keys.title")}
-      header={<PageHeader title={t("keys.title")} actions={createAction()} />}
-      appBar={<AppBar title={t("keys.title")} actions={createAction()} />}
-    >
-      <PageScroll contentClass="gap-6 p-4" testID="api-keys">
-        <Text class="px-1 text-body-medium tracking-body-medium text-on-surface-variant">{t("keys.intro")}</Text>
-        <If when={!serverInbox()}>
-          <Card class="items-start gap-1 p-4" testID="keys-local">
-            <Text class="text-title-small font-medium tracking-title-small text-on-surface">{t("keys.localTitle")}</Text>
-            <Text class="text-body-medium tracking-body-medium text-on-surface-variant">{t("keys.localBody")}</Text>
-          </Card>
-        </If>
+      back={t("common.back")}
+      onBack={nav.close}
+      trailing={
         <If when={serverInbox()}>
-          <View class="gap-1">
-            <SectionLabel label={t("keys.list")} class="px-1" />
+          <Button icon="plus" label={t("keys.create")} variant="plain" onPress={create} testID="keys-add-top" />
+        </If>
+      }
+      testID="api-keys"
+    >
+      <List>
+        <Section footer={t("keys.intro")}>
+          <If when={!serverInbox()}>
+            <View class="gap-1 px-4 py-3" testID="keys-local">
+              <Text class="text-body font-medium text-label">{t("keys.localTitle")}</Text>
+              <Text class="text-subheadline text-secondary-label">{t("keys.localBody")}</Text>
+            </View>
+          </If>
+        </Section>
+        <If when={serverInbox()}>
+          <Section header={t("keys.list")}>
             <If
               when={apiKeys().length}
               else={
-                <Card class="items-start gap-2 p-4">
-                  <Text class="text-body-large tracking-body-large text-on-surface">{t("keys.empty")}</Text>
-                  <Text class="text-body-medium tracking-body-medium text-on-surface-variant">{t("keys.emptyHint")}</Text>
-                  <Button icon="plus" label={t("keys.create")} onPress={create} class="mt-2" testID="keys-add-empty" />
-                </Card>
+                <View class="gap-2 px-4 py-4">
+                  <Text class="text-body text-label">{t("keys.empty")}</Text>
+                  <Text class="text-subheadline text-secondary-label">{t("keys.emptyHint")}</Text>
+                  <Button title={t("keys.create")} icon="plus" onPress={create} class="self-start" testID="keys-add-empty" />
+                </View>
               }
             >
-              <Card>
-                <Each of={apiKeys()} key={(k) => k.id}>
-                  {(key, index) => (
-                    <>
-                      <If when={index() > 0}>
-                        <Divider inset />
-                      </If>
-                      <View class="min-h-[72px] flex-row items-center gap-3 py-2 pe-2 ps-4">
-                        <View class="min-w-0 flex-1 gap-0.5">
-                          <Text class="line-clamp-1 text-body-large tracking-body-large text-on-surface" testID={`key-${key().id}`}>
-                            {key().name}
-                          </Text>
-                          <Text class="line-clamp-1 text-body-medium tracking-body-medium text-on-surface-variant">
-                            {`${key().prefix}… · ${keyScopes(key())} · ${keySources(key())}`}
-                          </Text>
-                          <Text class="line-clamp-1 text-body-small tracking-body-small text-on-surface-variant">
-                            {`${lastUsed(key())} · ${keyExpiry(key())}`}
-                          </Text>
-                        </View>
-                        <Menu
-                          label={t("keys.actions", { name: key().name })}
-                          trigger={<IconButton icon="more" label={t("keys.actions", { name: key().name })} testID={`key-more-${index()}`} />}
-                          actions={[{ id: "revoke", label: t("keys.revoke"), icon: "trash", destructive: true, onSelect: () => void revoke(key()) }]}
-                        />
+              <Each of={apiKeys()} key={(k) => k.id}>
+                {(k, index) => (
+                  <ListTile
+                    title={k().name}
+                    subtitle={`${k().prefix}… · ${keyScopes(k())} · ${keySources(k())}`}
+                    accessory="none"
+                    separator
+                    onPress={() => revoking.set(k())}
+                    testID={`key-${k().id}`}
+                  >
+                    <View class="flex-row items-center gap-2">
+                      <Text class="text-caption1 text-secondary-label">{lastUsed(k())}</Text>
+                      <View
+                        role="button"
+                        accessibilityLabel={t("keys.actions", { name: k().name })}
+                        onPress={() => revoking.set(k())}
+                        class="size-9 items-center justify-center rounded-full active:bg-fill"
+                        testID={`key-more-${index()}`}
+                      >
+                        <Icon name="ellipsis" size={18} tint="system-blue" />
                       </View>
-                    </>
-                  )}
-                </Each>
-                <Divider inset />
-                <View class="p-3">
-                  <Button variant="text" icon="plus" label={t("keys.create")} onPress={create} class="self-start" testID="keys-add" />
-                </View>
-              </Card>
+                    </View>
+                  </ListTile>
+                )}
+              </Each>
             </If>
-          </View>
+          </Section>
+          <If when={apiKeys().length}>
+            <Section>
+              <ListTile title={t("keys.create")} leading="plus" accessory="none" separator={false} onPress={create} testID="keys-add" />
+            </Section>
+          </If>
         </If>
         <If when={apiKeysState() === "error"}>
-          <ListItem icon="alert" headline={t("keys.loadFailed")} supporting={t("keys.loadFailedHint")} onPress={() => void loadKeys()} testID="keys-retry" />
+          <Section>
+            <ListTile title={t("keys.loadFailed")} subtitle={t("keys.loadFailedHint")} leading="exclamationmark.triangle" onPress={() => void loadKeys()} testID="keys-retry" />
+          </Section>
         </If>
-      </PageScroll>
+      </List>
+      <ActionSheet
+        open={!!revoking()}
+        title={t("keys.revokeTitle", { name: revoking()?.name ?? "" })}
+        message={t("keys.revokeBody")}
+        actions={[{ id: "revoke", title: t("keys.revoke"), destructive: true }]}
+        cancel={t("common.cancel")}
+        onOpenChange={({ open }: { open: boolean }) => {
+          if (!open) revoking.set(null);
+        }}
+        onAction={({ id }: { id: string }) => {
+          const k = revoking();
+          revoking.set(null);
+          if (id === "revoke" && k) void revoke(k);
+        }}
+        testID="key-revoke-confirm"
+      />
     </Page>
   );
 }

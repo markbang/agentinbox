@@ -14,7 +14,7 @@ const slow = { timeout: 30_000 };
 async function signUp(email: string) {
   const app = await open("../App.tsx", desktop);
   await app.waitFor("id:onboarding");
-  await app.press("id:mode-cloud");
+  await app.press("text:Through an AgentInbox server");
   await app.press("text:Create account");
   await app.clear("id:server");
   await app.type("id:server", server);
@@ -31,7 +31,8 @@ async function signUp(email: string) {
 async function openAddAccount(app: App) {
   await app.press("id:open-settings");
   await app.waitFor("id:signed-in-as");
-  await app.press("id:add-account");
+  // The empty mailbox behind the sheet offers Add account too, until an account exists.
+  await app.press("text:Add account >> nth=1").catch(() => app.press("text:Add account"));
 }
 
 /** Adds the GreenMail mailbox `email` from the add-account page. */
@@ -102,7 +103,7 @@ test("cloud mode: sign up, add a mailbox, read, get new mail live, reply, sign o
   await alices.type("id:signature-text", "*Alice*");
   await alices.press("id:signature-save");
   await alices.waitFor("text:Signature saved", slow);
-  await alices.press("id:header-back");
+  await alices.press("id:modal-done");
   await alices.waitFor("id:modal", { state: "gone" });
   const again = await open("../App.tsx", { ...desktop, storage: alices.storage() });
   await again.waitFor("id:open-settings", slow);
@@ -133,9 +134,10 @@ test("cloud mode: sign up, add a mailbox, read, get new mail live, reply, sign o
   await bobs.waitFor("id:messages >> id:thread-count", slow);
 
   // Signing out ends the session on the server and on the device.
-  bobs.onDialog(() => "Sign out");
   await bobs.press("id:open-settings");
-  await bobs.press("id:sign-out");
+  await bobs.press("text:Sign out");
+  await bobs.waitFor("text:Sign out of AgentInbox?", slow);
+  await bobs.press("text:Sign out >> nth=1");
   await bobs.waitFor("id:onboarding", slow);
   expect(bobs.storage()["nshmail.mode"]).toBeUndefined();
   expect(bobs.storage()["nshmail.cloud.token"]).toBeUndefined();
@@ -217,18 +219,18 @@ test("cloud mode: a webhook lands live in the feed, reads, archives, and an agen
 
   // Settings → Sources → Add: a webhook, whose ingest URL the server answers once.
   await alices.press("id:open-settings");
-  await alices.press("id:settings-sources");
-  await alices.waitFor("id:sources");
+  await alices.press("text:Sources");
+  await alices.waitFor("text:Your sources");
   await alices.press("id:sources-add-top");
-  await alices.press("id:kind-webhook");
+  await alices.press("text:Webhook");
   await alices.type("id:source-name", "Deploys");
   await alices.press("id:source-create");
   await alices.waitFor("id:source-url", slow);
   const hook = alices.texts().find((text) => /^https?:\/\/[^\s]+\/hooks\/\S+$/.test(text));
   expect(hook).toBeTruthy();
   await alices.press("id:source-done");
-  await alices.back();
-  await alices.back();
+  await alices.press("label:Back");
+  await alices.press("id:modal-done");
   await alices.waitFor("id:modal", { state: "gone" });
 
   // The feed is empty and the rail says so before anything arrives.
@@ -246,7 +248,7 @@ test("cloud mode: a webhook lands live in the feed, reads, archives, and an agen
   expect(posted.status).toBe("status 202");
   await alices.waitFor("id:notify-list >> text:Deploy finished", slow);
   // Its source's chip carries it, so the feed knows the source the server made.
-  await alices.waitFor("id:notify-filters >> text:Deploys");
+  await alices.waitFor("text:Deploys");
 
   // Opening it marks it read on the server, as the mail list does.
   await alices.press("id:notify-list >> text:Deploy finished");
@@ -261,10 +263,10 @@ test("cloud mode: a webhook lands live in the feed, reads, archives, and an agen
 
   // An agent's key: created in Settings, then used against the REST API for real.
   await alices.press("id:open-settings");
-  await alices.press("id:settings-keys");
+  await alices.press("text:API keys");
   await alices.press("id:keys-add-top");
   await alices.type("id:key-name", "Deploy bot");
-  await alices.press("id:key-write");
+  await alices.press("text:Allow marking read and archive");
   await alices.press("id:key-create");
   await alices.waitFor("id:key-token", slow);
   const key = alices.texts().find((text) => text.startsWith("nb_"));

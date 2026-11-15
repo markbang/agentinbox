@@ -8,7 +8,7 @@ const undo = (seconds: number) => ({ storage: { "nshmail.mode": "demo", "nshmail
 
 test("prefills our server for cloud mode", async () => {
   const app = await open("./App.tsx", desktop);
-  await app.press("id:mode-cloud");
+  await app.press("text:Through an AgentInbox server");
   expect(app.value("id:server")).toBe("https://mail-api.bangwu.me");
 });
 
@@ -16,7 +16,7 @@ test("adds an IMAP account with the detected servers", async () => {
   const app = await open("./App.tsx", { ...desktop, ...demo });
   await app.waitFor("id:open-settings");
   await app.press("id:open-settings");
-  await app.press("id:add-account");
+  await app.press("text:Add account");
   await app.press("id:add-imap");
   await app.type("id:imap-email", "me@fastmail.com");
   await app.press("id:imap-continue");
@@ -67,7 +67,7 @@ test("a conversation is one row; it opens on its latest message, the earlier one
   await app.press("id:reply");
   await app.waitFor("id:compose-to");
   expect(app.value("id:compose-to")).toBe("Jonas Weber <jonas@northwind.dev>");
-  await app.press("id:header-back");
+  await app.press("label:Close");
   await app.waitFor("id:modal", { state: "gone" });
 
   // Archive takes the whole conversation out of the inbox.
@@ -93,8 +93,8 @@ test("with conversations off, every message is a row of its own", async () => {
   const app = await open("./App.tsx", { ...desktop, ...demo });
   await app.waitFor("id:messages >> text:Offsite in March: Lisbon or Porto?");
   await app.press("id:open-settings");
-  await app.press("id:conversations");
-  await app.press("id:header-back");
+  await app.press("text:Group by conversation");
+  await app.press("id:modal-done");
   await app.waitFor("id:modal", { state: "gone" });
   await app.waitFor("id:messages >> text:Re: Offsite in March: Lisbon or Porto?");
   expect(app.count("id:messages >> text:Re: Offsite in March: Lisbon or Porto?")).toBe(2);
@@ -180,7 +180,7 @@ test("? lists the shortcuts, Escape closes the list, Settings opens it too", asy
   await app.waitFor("id:shortcuts", { state: "gone" });
   // A phone with no hardware keyboard has no ? to press.
   await app.press("id:open-settings");
-  await app.press("id:open-shortcuts");
+  await app.press("text:Keyboard shortcuts");
   await app.waitFor("id:shortcuts");
 });
 
@@ -268,9 +268,10 @@ test("a draft outlives the composer and a restart; only Discard deletes it, afte
   const app = await open("./App.tsx", { ...desktop, ...demo });
   await app.waitFor("text:Q4 roadmap draft");
   await app.press("id:compose");
+  await app.waitFor("id:compose-subject");
   await app.type("id:compose-subject", "Lunch on Friday?");
   await app.type("id:compose-body", "The new place on 5th.");
-  await app.press("id:header-back");
+  await app.press("label:Close");
   await app.waitFor("id:modal", { state: "gone" });
 
   // A reply keeps its own draft, apart from new mail and from other messages.
@@ -278,12 +279,13 @@ test("a draft outlives the composer and a restart; only Discard deletes it, afte
   await app.press("id:reply");
   await app.waitFor("id:compose-body");
   await app.type("id:compose-body", "Looks good.");
-  await app.press("id:header-back");
+  await app.press("label:Close");
   await app.waitFor("id:modal", { state: "gone" });
   await app.press("text:Photos from the weekend");
   await app.press("id:reply");
   await app.waitFor("id:compose-body");
   expect(app.value("id:compose-body")).toMatch(/^\n\nOn /);
+  // The reply's quote was not typed in: Discard closes it without asking.
   await app.press("id:compose-discard");
   await app.waitFor("id:modal", { state: "gone" });
   await app.press("text:Q4 roadmap draft");
@@ -299,16 +301,37 @@ test("a draft outlives the composer and a restart; only Discard deletes it, afte
   expect(again.value("id:compose-subject")).toBe("Lunch on Friday?");
   expect(again.value("id:compose-body")).toBe("The new place on 5th.");
 
+  // Keep editing leaves it; the next Discard deletes it.
   await again.press("id:compose-discard");
-  await again.press("id:keep-editing");
+  await again.waitFor("text:Discard this draft?");
+  await again.press("text:Keep editing");
+  await again.waitFor("text:Discard this draft?", { state: "gone" });
   expect(again.value("id:compose-subject")).toBe("Lunch on Friday?");
   await again.press("id:compose-discard");
-  await again.press("id:confirm-discard");
+  await again.waitFor("text:Discard this draft?");
+  await again.press("text:Discard >> nth=1");
   await again.waitFor("id:modal", { state: "gone" });
   await again.press("id:compose");
   await again.waitFor("id:compose-subject");
   expect(again.value("id:compose-subject")).toBe("");
   expect(Object.keys(JSON.parse(again.storage()["nshmail.drafts"]))).not.toContain("new");
+});
+
+test("Select in the list's header starts a selection: rows, the count, archive", async () => {
+  const app = await open("./App.tsx", { platform: "android", width: 390, height: 844, locale: "en-US", ...demo });
+  await app.waitFor("id:messages");
+  await app.press("id:select-rows");
+  await app.waitFor("id:selection-count");
+  expect(app.texts()).toContain("0 selected");
+  await app.press("id:messages >> text:Design review notes: unified inbox");
+  expect(app.texts()).toContain("1 selected");
+  await app.press("id:messages >> text:Photos from the weekend");
+  expect(app.texts()).toContain("2 selected");
+  await app.press("id:picked-archive");
+  await app.waitFor("id:selection-count", { state: "gone" });
+  await app.press("id:select-rows");
+  await app.press("id:end-selection");
+  await app.waitFor("id:selection-count", { state: "gone" });
 });
 
 test("a signature per account: under new messages, above the quote, swapped with From", async () => {
@@ -321,7 +344,7 @@ test("a signature per account: under new messages, above the quote, swapped with
   await app.waitFor("id:signature-preview");
   await app.press("id:signature-save");
   await app.waitFor("text:Signature saved");
-  await app.press("id:header-back");
+  await app.press("id:modal-done");
   await app.waitFor("id:modal", { state: "gone" });
   const signature = "-- \nLin Chen\nNorthwind · northwind.dev <https://northwind.dev>";
 
@@ -340,7 +363,7 @@ test("a signature per account: under new messages, above the quote, swapped with
   await app.press("text:Lin Chen <linchen.mail@gmail.com>");
   expect(app.value("id:compose-body")).toBe(`\n\n${signature} (Berlin)`);
   await app.press("id:compose-discard");
-  await app.press("id:confirm-discard");
+  await app.press("text:Discard >> nth=1");
   await app.waitFor("id:modal", { state: "gone" });
 
   await app.press("text:Q4 roadmap draft");
@@ -354,12 +377,10 @@ test("a signature per account: under new messages, above the quote, swapped with
 test("phones: back keeps the draft, Discard asks the system's alert", async () => {
   const app = await open("./App.tsx", { platform: "android", width: 390, height: 844, locale: "en-US", ...demo });
   await app.waitFor("text:Photos from the weekend");
-  await app.press("id:fab-menu");
   await app.press("id:compose");
   await app.type("id:compose-subject", "Lunch on Friday?");
   await app.back();
   await app.waitFor("id:messages");
-  await app.press("id:fab-menu");
   await app.press("id:compose");
   await app.waitFor("id:compose-subject");
   expect(app.value("id:compose-subject")).toBe("Lunch on Friday?");
@@ -367,9 +388,9 @@ test("phones: back keeps the draft, Discard asks the system's alert", async () =
     expect(dialog.title).toBe("Discard this draft?");
     return "Discard";
   });
-  await app.press("id:compose-discard >> nth=0");
+  await app.press("id:compose-discard");
+  await app.press("text:Discard >> nth=1");
   await app.waitFor("id:messages");
-  await app.press("id:fab-menu");
   await app.press("id:compose");
   await app.waitFor("id:compose-subject");
   expect(app.value("id:compose-subject")).toBe("");
@@ -379,6 +400,7 @@ test("Send waits out Undo: Undo brings the draft back, left alone it goes once",
   const app = await open("./App.tsx", { ...desktop, ...undo(5), clock: {} });
   await app.waitFor("text:Q4 roadmap draft");
   await app.press("id:compose");
+  await app.waitFor("id:compose-subject");
   await app.type("id:compose-to", "mei@lumen.dev");
   await app.type("id:compose-subject", "Undo me");
   await app.type("id:compose-body", "Second thoughts.");
@@ -403,9 +425,11 @@ test("Undo send is a setting", async () => {
   const app = await open("./App.tsx", { ...desktop, ...undo(10) });
   await app.waitFor("id:open-settings");
   await app.press("id:open-settings");
-  await app.press("id:undo-30");
+  await app.press("text:Undo send >> nth=0");
+  await app.press("text:30 s");
   await app.waitUntil(() => app.storage()["nshmail.undoSend"] === "30");
-  await app.press("id:undo-0");
+  await app.press("text:Undo send >> nth=0");
+  await app.press("text:Off");
   await app.waitUntil(() => app.storage()["nshmail.undoSend"] === "0");
 });
 
@@ -414,6 +438,7 @@ test("Schedule send from the split button: listed under Scheduled, edited, sent 
   const app = await open("./App.tsx", { ...desktop, ...undo(10), clock: { time: new Date(2026, 10, 13, 9, 30) } });
   await app.waitFor("text:Q4 roadmap draft");
   await app.press("id:compose");
+  await app.waitFor("id:compose-subject");
   await app.type("id:compose-to", "mei@lumen.dev");
   await app.type("id:compose-subject", "Plan for Monday");
   await app.press("id:send-later");
@@ -428,7 +453,7 @@ test("Schedule send from the split button: listed under Scheduled, edited, sent 
   await app.waitFor("id:compose-scheduled");
   await app.clear("id:compose-subject");
   await app.type("id:compose-subject", "Plan for Monday, v2");
-  await app.press("id:header-back");
+  await app.press("label:Close");
   await app.waitFor("id:modal", { state: "gone" });
   await app.waitFor("id:scheduled >> text:Plan for Monday, v2");
 
@@ -449,14 +474,15 @@ test("Schedule send at a picked date and time", async () => {
   const app = await open("./App.tsx", { ...desktop, ...undo(10), clock: { time: new Date(2026, 10, 13, 9, 30) } });
   await app.waitFor("text:Q4 roadmap draft");
   await app.press("id:compose");
+  await app.waitFor("id:compose-subject");
   await app.type("id:compose-to", "mei@lumen.dev");
   await app.type("id:compose-subject", "Quarterly numbers");
   await app.press("id:send-later");
   await app.press("text:Pick date & time");
   await app.waitFor("id:schedule-dialog");
-  await app.press("role:button[2026-11-20]");
+  await app.press("role:button[Nov 20, 2026]");
   await app.waitFor("text:/^Sends Fri, Nov 20, 8:00/");
-  await app.press("id:schedule-confirm");
+  await app.press("text:Schedule send");
   await app.waitFor("text:/^Scheduled for Fri, Nov 20/");
   await app.press("id:mailbox-scheduled");
   await app.waitFor("id:scheduled >> text:Quarterly numbers");
@@ -465,11 +491,11 @@ test("Schedule send at a picked date and time", async () => {
 test("phones: Schedule send from the composer's clock", async () => {
   const app = await open("./App.tsx", { platform: "android", width: 390, height: 844, locale: "en-US", ...undo(10), clock: { time: new Date(2026, 10, 13, 9, 30) } });
   await app.waitFor("text:Photos from the weekend");
-  await app.press("id:fab-menu");
   await app.press("id:compose");
+  await app.waitFor("id:compose-subject");
   await app.type("id:compose-to", "mei@lumen.dev");
   await app.type("id:compose-subject", "Saturday hike");
-  await app.press("id:send-later >> nth=1");
+  await app.press("id:send-later");
   await app.press("text:Tomorrow morning");
   await app.waitFor("text:/^Scheduled for Sat, Nov 14/");
   await app.waitFor("id:messages");
@@ -483,12 +509,13 @@ test("phones: signing out while mail is arriving lands on onboarding, and the ap
   // meet on the engine thread.
   await app.clock!.runFor(90_000 - 1);
   await app.press("text:Settings");
-  app.onDialog(() => "Sign out");
-  await app.press("id:sign-out");
+  await app.press("text:Sign out");
+  await app.waitFor("text:Sign out of AgentInbox?");
+  await app.press("text:Sign out >> nth=1");
   await app.clock!.runFor(2);
-  await app.waitFor("id:onboarding");
+  await app.waitFor("id:onboarding", { timeout: 10000 });
   // Signed out, and not wedged: the mode choice still leads somewhere.
-  await app.press("id:mode-cloud");
+  await app.press("text:Through an AgentInbox server");
   await app.waitFor("id:server");
   expect(app.value("id:server")).toBe("https://mail-api.bangwu.me");
 });

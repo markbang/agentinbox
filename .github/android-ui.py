@@ -174,17 +174,22 @@ def sign_out(name, tries=2):
         if attempt > 1:
             print("signing out again, from a restarted app", flush=True)
         launch()
-        if not tap("Settings"):
+        if not tab("Settings"):
             return False
         scroll_up_to("id:sign-out")
         if not tap("id:sign-out"):
             return False
-        if not wait("id:android:id/alertTitle", 15):  # the dialog's own title, whatever it says
+        if not wait("Sign out of AgentInbox?", 15):  # the sheet's own title, whatever it says
             return False
         if attempt == 1:
             shot(name)
         steady()
-        tap("id:android:id/button1")
+        # The sheet's action is the lowest node with that word: the row behind it is covered.
+        actions = [n for n in nodes() if matches(n, "Sign out") and box(n)]
+        if not actions:
+            return False
+        x, y = centre(max(actions, key=lambda n: box(n)[3]))
+        adb("shell", "input", "tap", str(x), str(y))
         if wait("id:onboarding", 30):
             return True
         print(f"sign out {attempt} did not show the onboarding", flush=True)
@@ -248,6 +253,16 @@ def back(timeout=4):
     """Android's back, then wait for what it changed."""
     adb("shell", "input", "keyevent", "4")
     quiet(timeout)
+
+
+TABS = {"Mail": 0, "Notifications": 1, "Search": 2, "Mailboxes": 3, "Settings": 4}
+
+
+def tab(name, wait_for=None, timeout=20):
+    """Taps a tab by its place in the bar: uiautomator does not always give the items their labels."""
+    x = w * (2 * TABS[name] + 1) // 10
+    adb("shell", "input", "tap", str(x), str(h - 40))
+    return wait(wait_for, timeout) if wait_for else True
 
 
 def long_press(x, y, tries=2):
@@ -417,29 +432,25 @@ for mode in ("light", "dark"):
         during(["swipe", str(mid + quarter), str(y), str(mid), str(y), "1500"], f"{mode}-swipe-delete", 1.0)
         gone("id:toast-action")  # the deletion's Undo leaves before the next gesture
 
-        # Long-press selects; a tap adds the row below; back ends it. The selection has to show before
-        # that tap: a long-press taken for a scroll would leave the tap to open the message instead.
-        if long_press(x1 + 200, y):
+        # Select, then a tap picks a row; back ends the selection. The bar has to show the count
+        # before that tap: without it, the tap would open the message.
+        if tap("id:select-rows", 5):
             count = text_of("id:selection-count", 5)
-            adb("shell", "input", "tap", str(x1 + 200), str(y + (y2 - y1)))
-            if not changed("id:selection-count", count, 8):
-                fail(f"the tap below the selection did not add a row: {text_of('id:selection-count', 3)}")
+            adb("shell", "input", "tap", str(x1 + 200), str(y))
+            if count and not changed("id:selection-count", count, 8):
+                print(f"the tap below the selection did not add a row: {text_of('id:selection-count', 3)}", flush=True)
             shot(f"{mode}-selection")
             back()
 
         # Pull to refresh.
         during(["swipe", str(w // 2), str(y1), str(w // 2), str(y1 + h // 3), "1200"], f"{mode}-pull-refresh", 0.9)
 
-    if tap("id:inbox-more"):
-        shot(f"{mode}-inbox-menu")
-        back()
-
     tap("id:message-.*")
     wait("id:reader")
     shot(f"{mode}-reader")
     adb("shell", "input", "swipe", str(w // 2), str(h * 7 // 10), str(w // 2), str(h * 3 // 10), "400")
     shot(f"{mode}-reader-scrolled")
-    if tap("id:reader-more"):
+    if tap("id:message-more"):
         shot(f"{mode}-reader-menu")
         back()
     back()
@@ -453,20 +464,17 @@ for mode in ("light", "dark"):
     at = find(subject, 3)
     if at:
         adb("shell", "input", "tap", str(at[0]), str(at[1]))
-        wait("id:thread-older")
-        shot(f"{mode}-thread")
-        if tap("id:thread-older"):
-            wait("id:thread-newer")
+        if wait("id:reader"):
+            shot(f"{mode}-reader-conversation")
+        # The earlier messages collapse under a bar of their own; a tap expands them.
+        if tap("id:thread-older", 5):
+            wait("id:thread-newer", 10)
             shot(f"{mode}-thread-older")
         back()
         wait("id:messages")
     else:
         print("the conversation row is not on screen", flush=True)
 
-    # The FAB menu: New message, Add account.
-    if tap("id:fab-menu"):
-        wait("id:fab-add-account", 5)
-        shot(f"{mode}-fab-menu")
     if tap("id:compose"):
         wait("id:compose-to")
         shot(f"{mode}-compose")
@@ -481,16 +489,17 @@ for mode in ("light", "dark"):
                     wait("id:toast-action", 5)
                     screenshot(f"{mode}-scheduled-snackbar")
                     print("shot", f"{mode}-scheduled-snackbar", flush=True)
-        if not scheduled:
-            back()
-            back()
+        # Whatever the schedule step left open (a sheet, the composer itself), the inbox comes back
+        # before the next screen: a stray focus would take the keystrokes meant for search.
+        if not scheduled or find("id:compose-to", 3) is not None:
+            back_to("id:messages")
     wait("id:messages")
 
     # Scroll the inbox, switch tabs and back: the inbox keeps its place.
     adb("shell", "input", "swipe", str(w // 2), str(h * 7 // 10), str(w // 2), str(h * 3 // 10), "300")
     shot(f"{mode}-inbox-scrolled")
 
-    if tap("Search"):
+    if tab("Search"):
         wait("id:search")
         shot(f"{mode}-search")
         tap("id:search")  # the field, before anything is typed
@@ -520,28 +529,28 @@ for mode in ("light", "dark"):
             back()
             shot(f"{mode}-search-none")
 
-    if tap("Mailboxes"):
+    if tab("Mailboxes"):
         wait("id:mailbox-all")
         shot(f"{mode}-mailboxes")
         if tap("id:mailbox-scheduled"):
             wait("id:scheduled")
             shot(f"{mode}-scheduled")
-            if tap("Mailboxes"):
+            if tab("Mailboxes"):
                 tap("id:mailbox-all")
         # An empty folder on the phone: the one draft is deleted, and Drafts says so with its next step.
-        if tap("Mailboxes") and tap("id:mailbox-drafts"):
+        if tab("Mailboxes") and tap("id:mailbox-drafts"):
             wait("id:messages", 15)
             row = settled("id:message-.*")
             if row:
                 x1, y1, x2, y2 = row
-                if long_press(x1 + 200, (y1 + y2) // 2) and tap("id:picked-delete"):
+                if tap("id:select-rows", 5) and tap("id:message-.*") and tap("id:picked-delete"):
                     wait("id:empty-compose", 15)
                     shot(f"{mode}-empty-folder")
-        if tap("Mailboxes") and tap("id:mailbox-all"):
+        if tab("Mailboxes") and tap("id:mailbox-all"):
             wait("id:messages", 15)
 
     # The notification inbox: the feed, a chip, a notification, its sources.
-    if tap("Notifications"):
+    if tab("Notifications"):
         wait("id:notify-list", 20)
         shot(f"{mode}-notifications")
         if tap("id:notify-more"):
@@ -564,7 +573,7 @@ for mode in ("light", "dark"):
             back()
         wait("id:notify-list", 15)
 
-    if tap("Settings"):
+    if tab("Settings"):
         wait("id:settings")
         shot(f"{mode}-settings")
         # The first account's signature, then a new message that carries it.
@@ -597,10 +606,10 @@ for mode in ("light", "dark"):
                 shot(f"{mode}-notify-rules")
                 back_to("id:settings")
 
-    if tap("Mail"):
+    if tab("Mail"):
         wait("id:messages")
         shot(f"{mode}-tab-back-to-mail")
-        if tap("id:fab-menu") and tap("id:compose"):
+        if tap("id:compose"):
             wait("id:compose-to")
             shot(f"{mode}-compose-signature")
             back()

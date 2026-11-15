@@ -3,13 +3,24 @@
   "id": "top.bangwu.nshmail",
   "version": "0.0.4",
   "build": 6,
-  "rust": ".",
+  "rust": [
+    "../vendor/nsh-cupertino",
+    "."
+  ],
   "theme": "theme.json",
   "icon": "icon.png",
-  "schemes": ["nshmail"],
+  "schemes": [
+    "nshmail"
+  ],
   "capabilities": {
-    "network": { "hosts": ["*"] },
-    "webview": { "hosts": [] },
+    "network": {
+      "hosts": [
+        "*"
+      ]
+    },
+    "webview": {
+      "hosts": []
+    },
     "statusBar": true,
     "clipboard": true,
     "picker": true,
@@ -18,26 +29,76 @@
     "windows": true
   },
   "tailwind": {
-    "radius": { "extra-small": 4, "small": 8, "medium": 12, "large": 16, "large-increased": 20, "extra-large": 28, "extra-large-increased": 32, "extra-extra-large": 48 },
-    "fontSize": { "display-large": [57, 1.1228], "display-medium": [45, 1.1556], "display-small": [36, 1.2222], "headline-large": [32, 1.25], "headline-medium": [28, 1.2857], "headline-small": [24, 1.3333], "title-large": [22, 1.2727], "title-medium": [16, 1.5], "title-small": [14, 1.4286], "body-large": [16, 1.5], "body-medium": [14, 1.4286], "body-small": [12, 1.3333], "label-large": [14, 1.4286], "label-medium": [12, 1.3333], "label-small": [11, 1.4545] },
-    "tracking": { "display-large": -0.0035, "display-large-emphasized": 0.0, "display-medium": 0.0, "display-small": 0.0, "headline-large": 0.0, "headline-medium": 0.0, "headline-small": 0.0, "title-large": 0.0, "title-medium": 0.0125, "title-medium-emphasized": 0.0094, "title-small": 0.0071, "body-large": 0.0312, "body-large-emphasized": 0.0094, "body-medium": 0.0143, "body-medium-emphasized": 0.0179, "body-small": 0.0333, "label-large": 0.0071, "label-medium": 0.0417, "label-small": 0.0455 },
-    "shadow": {
-      "elevation-1": "0px 1px 2px 0px rgb(0 0 0 / 0.3), 0px 1px 3px 1px rgb(0 0 0 / 0.15)",
-      "elevation-2": "0px 1px 2px 0px rgb(0 0 0 / 0.3), 0px 2px 6px 2px rgb(0 0 0 / 0.15)",
-      "elevation-3": "0px 1px 3px 0px rgb(0 0 0 / 0.3), 0px 4px 8px 3px rgb(0 0 0 / 0.15)",
-      "elevation-4": "0px 2px 3px 0px rgb(0 0 0 / 0.3), 0px 6px 10px 4px rgb(0 0 0 / 0.15)",
-      "elevation-5": "0px 4px 4px 0px rgb(0 0 0 / 0.3), 0px 8px 12px 6px rgb(0 0 0 / 0.15)"
+    "radius": {
+      "row": 10,
+      "sheet": 14,
+      "button": 12,
+      "search": 9
     },
-    "ease": {
-      "spatial-fast": [0.42, 1.67, 0.21, 0.9], "spatial-default": [0.38, 1.21, 0.22, 1], "spatial-slow": [0.39, 1.29, 0.35, 0.98],
-      "effects-fast": [0.31, 0.94, 0.34, 1], "effects-default": [0.34, 0.8, 0.34, 1], "effects-slow": [0.34, 0.88, 0.34, 1],
-      "emphasized": [0.2, 0, 0, 1], "emphasized-decelerate": [0.05, 0.7, 0.1, 1], "emphasized-accelerate": [0.3, 0, 0.8, 0.15]
+    "fontSize": {
+      "largeTitle": [
+        34,
+        1.206
+      ],
+      "title1": [
+        28,
+        1.214
+      ],
+      "title2": [
+        22,
+        1.273
+      ],
+      "title3": [
+        20,
+        1.25
+      ],
+      "headline": [
+        17,
+        1.294
+      ],
+      "body": [
+        17,
+        1.294
+      ],
+      "callout": [
+        16,
+        1.312
+      ],
+      "subheadline": [
+        15,
+        1.333
+      ],
+      "footnote": [
+        13,
+        1.385
+      ],
+      "caption1": [
+        12,
+        1.333
+      ],
+      "caption2": [
+        11,
+        1.182
+      ]
+    },
+    "fontWeight": {
+      "regular": 400,
+      "medium": 500,
+      "semibold": 600,
+      "bold": 700
     }
   },
   "window": {
     "title": "AgentInbox",
-    "defaultSize": { "width": 1180, "height": 760 },
-    "minSize": { "width": 380, "height": 520 },
+    "defaultSize": {
+      "width": 1180,
+      "height": 760
+    },
+    "minSize": {
+      "width": 380,
+      "height": 520
+    },
     "closeOnPress": false
-  }
+  },
+  "appearance": "system"
 }

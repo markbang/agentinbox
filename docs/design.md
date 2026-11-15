@@ -268,6 +268,23 @@ GitHub Actions, on every PR:
 | web | ubuntu-24.04 + wasm32 | static site `.zip` |
 | release | ubuntu-24.04 (`v*` tags; a manual run with `upload_to` back-fills an existing release's Android packages) | GitHub Release: Android `.apk` per ABI + universal + `.aab`, Linux `.tar.gz`, Windows `.zip` + installer, `SHA256SUMS.txt`; notes from `docs/releases/<version>.md` and `.zh-CN.md` |
 
-## 9. First version scope
+## 9. The client UI
+
+One design language on every platform: Cupertino, from the shared
+[`nsh-cupertino`](https://github.com/markbang/nsh-cupertino) library, vendored as
+the `vendor/nsh-cupertino` submodule and pinned to a tag (`nsh.json` lists it in
+`"rust"`; `app/Cargo.toml` takes it by path). The app's `app/theme.json` is the
+library's theme with the three light-appearance overrides its issue #3 records,
+and `scripts/theme-check.py` + `scripts/contrast.py` gate it.
+
+The shell follows the window: from 1080 pt a split view (sidebar, list, reader,
+as Mail on an iPad), 840–1080 pt the list and the reader with the mailboxes in a
+sheet, below that a tab bar over a navigation stack per section. Compose and the
+settings flows open in sheets with a stack of their own on wide windows and push
+on phones. Android keeps the system back gesture and button. The list of
+components, the rows, the reader and the composer are described in
+[`app/DESIGN.md`](../app/DESIGN.md).
+
+## 10. First version scope
 
 Adding accounts (IMAP + OAuth), unified inbox, reading, composing and replying, search, local mode fully working; cloud mode syncs and pushes; CI produces artifacts for all four platforms. Not yet: multi-select bulk actions, folder management, rules, PGP.

@@ -3,8 +3,8 @@
 import { Clipboard, Text, View } from "nsh";
 import { t } from "nsh/i18n";
 import type { Source } from "agentinbox/native";
-import { AppBar, Button, Card, Icon, IconButton, Page, SectionLabel } from "../ui";
-import { PageHeader, PageScroll } from "../components/PageHeader";
+import { Button, Icon, List, Section } from "cupertino";
+import { Page } from "../components/Page";
 import { SourceMark } from "../components/SourceMark";
 import { NavContext } from "../nav";
 import { testSource } from "../notify";
@@ -27,40 +27,45 @@ export function SourceIngestPage(props: { source: Source; url: string; created: 
     }
   };
   return (
-    <Page title={t("sources.ingest")} header={<PageHeader title={t("sources.ingest")} />} appBar={<AppBar title={t("sources.ingest")} />}>
-      <PageScroll contentClass="gap-6 p-4" testID="source-ingest">
-        <View class="flex-row items-center gap-3 px-1">
-          <SourceMark source={props.source} />
-          <View class="min-w-0 flex-1">
-            <Text class="line-clamp-1 text-title-medium text-on-surface">{props.source.name}</Text>
-            <Text class="text-body-medium tracking-body-medium text-on-surface-variant">{t(`source.kind.${props.source.kind}`)}</Text>
+    <Page title={t("sources.ingest")} back={t("common.back")} onBack={back} testID="source-ingest">
+      <List>
+        <Section>
+          <View class="flex-row items-center gap-3 px-4 py-3">
+            <SourceMark source={props.source} />
+            <View class="min-w-0 flex-1">
+              <Text class="line-clamp-1 text-body font-medium text-label">{props.source.name}</Text>
+              <Text class="text-footnote text-secondary-label">{t(`source.kind.${props.source.kind}`)}</Text>
+            </View>
           </View>
-        </View>
+        </Section>
         <If when={props.created}>
-          <View class="flex-row items-start gap-3 rounded-large bg-tertiary-container p-4">
-            <Icon name="alert" tone="on-tertiary-container" />
-            <Text class="flex-1 text-body-medium tracking-body-medium text-on-tertiary-container">{t("sources.onlyOnce")}</Text>
-          </View>
+          <Section>
+            <View class="flex-row items-start gap-2 px-4 py-3">
+              <Icon name="exclamationmark.triangle" size={16} tint="system-orange" />
+              <Text class="flex-1 text-subheadline text-label">{t("sources.onlyOnce")}</Text>
+            </View>
+          </Section>
         </If>
-        <View class="gap-2">
-          <SectionLabel label={t("sources.url")} class="px-1" />
-          <Card class="gap-3 p-4">
-            <View selectable class="rounded-medium bg-surface-container-highest p-3">
-              <Text class="text-body-medium tracking-body-medium text-on-surface" testID="source-url">
+        <Section header={t("sources.url")} footer={t(`source.send.${props.source.kind}`)}>
+          <View class="gap-3 px-4 py-3">
+            <View class="rounded-[8px] bg-fill px-3 py-2.5">
+              <Text class="text-footnote text-label" testID="source-url">
+
                 {props.url}
               </Text>
             </View>
             <View class="flex-row items-center gap-2">
-              <Button variant="tonal" icon="copy" label={t("sources.copy")} onPress={() => void copy()} testID="source-copy" />
-              <Button variant="text" icon="bell" label={t("sources.test")} onPress={() => void testSource(props.source)} testID="source-test" />
+              <Button title={t("sources.copy")} icon="doc" variant="tinted" onPress={() => void copy()} testID="source-copy" />
+              <Button title={t("sources.test")} icon="bell" variant="plain" onPress={() => void testSource(props.source)} testID="source-test" />
             </View>
-            <Text class="text-body-small tracking-body-small text-on-surface-variant">{t(`source.send.${props.source.kind}`)}</Text>
-          </Card>
-        </View>
-        <Card class="p-3">
-          <Button icon="check" label={t("common.done")} onPress={() => back()} testID="source-done" />
-        </Card>
-      </PageScroll>
+          </View>
+        </Section>
+        <Section>
+          <View class="px-4 py-3">
+            <Button title={t("common.done")} onPress={back} class="w-full" testID="source-done" />
+          </View>
+        </Section>
+      </List>
     </Page>
   );
 }

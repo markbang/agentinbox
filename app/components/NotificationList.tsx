@@ -1,18 +1,17 @@
 // The feed's list: one row per notification under the day it arrived on,
-// grouped by day, the source's icon and colour leading it, unread in
-// emphasized type with a dot, a high priority's in the error colour, tags
-// after the snippet. Touch screens swipe a row right to archive it, left to
-// mark it read, and long-press it for its actions.
+// grouped by day, the source's mark leading it, unread in emphasized type
+// with a dot, a high priority's in red, tags after the snippet. Touch
+// screens swipe right to archive, left to toggle read, and long-press for
+// the actions.
 import { List, signal, Text, View, type JSX } from "nsh";
 import { Haptics } from "nsh/mobile";
 import { t } from "nsh/i18n";
 import type { Notification } from "agentinbox/native";
-import { Icon, ListItem, material, Row, Sheet, touch } from "../ui";
+import { ActionSheet, Icon, SwipeRow } from "cupertino";
 import { dayLabel, dayOf, relativeDate } from "../lib/format";
 import { wide } from "../layout";
 import { archiveNotifications, markNotifications, sourceById } from "../notify";
 import { PriorityDot, SourceMark, Tags } from "./SourceMark";
-import { Swipe } from "./Swipe";
 
 /** A heading for a day, or a notification under it. */
 interface FeedRow {
@@ -48,7 +47,7 @@ export function NotificationList(props: {
   empty: JSX.Element;
   testID?: string;
 }) {
-  const dense = () => !touch || wide();
+  const oneLine = () => !wide();
   const actions = signal<Notification | null>(null);
   const find = (id: string) => props.items.find((n) => n.id === id);
   const archive = (id: string) => {
@@ -59,11 +58,6 @@ export function NotificationList(props: {
     const n = find(id);
     if (n) void markNotifications([n.id], !n.read);
   };
-  const act = (fn: (n: Notification) => void) => {
-    const n = actions();
-    actions.set(null);
-    if (n) fn(n);
-  };
   return (
     <View class="flex-1">
       <List
@@ -71,72 +65,75 @@ export function NotificationList(props: {
         accessibilityLabel={t("notify.list")}
         each={rows(props.items)}
         keyExtractor={(row) => row.key}
-        estimatedItemSize={dense() ? 104 : 132}
+        estimatedItemSize={oneLine() ? 96 : 88}
         refreshing={props.refreshing ?? false}
         onRefresh={props.onRefresh}
         onLoadMore={props.onLoadMore}
         testID={props.testID}
         empty={props.empty}
         class="flex-1"
-        contentClass={material && !wide() ? undefined : "px-2 pb-2"}
+        contentClass="pb-[env(safe-area-inset-bottom)]"
       >
         {(row) => (
           <If
             when={row().note}
             else={
-              <View class="px-4 pb-1 pt-4">
-                <Text role="header" class="text-label-large font-medium tracking-label-large text-on-surface-variant">
+              <View class="bg-system-grouped-background px-4 pb-1 pt-5">
+                <Text role="header" class="text-footnote font-semibold uppercase text-secondary-label">
                   {dayLabel(row().day ?? 0)}
                 </Text>
               </View>
             }
           >
             {(note) => (
-              <Swipe
-                id={row().key}
-                onArchive={archive}
-                onDelete={toggleRead}
-                leftIcon={note().read ? "mail" : "mailOpen"}
-                leftTone="secondary"
+              <SwipeRow
+                leading={[{ id: "archive", title: t("actions.archive"), icon: "archivebox", tint: "system-teal" }]}
+                trailing={[{ id: "read", title: note().read ? t("actions.markUnread") : t("actions.markRead"), icon: "envelope.open", tint: "system-blue" }]}
+                fullSwipe="archive"
+                onAction={({ id }: { id: string }) => {
+                  if (id === "archive") archive(note().id);
+                  if (id === "read") toggleRead(note().id);
+                }}
               >
-                <NotificationRow
+                <Row
                   note={note()}
                   selected={props.selectedId === row().key}
-                  dense={dense()}
+                  oneLine={oneLine()}
                   onPress={() => props.onOpen(row().key)}
-                  onLongPress={
-                    touch
-                      ? () => {
-                          Haptics.impact("medium");
-                          actions.set(note());
-                        }
-                      : undefined
-                  }
+                  onLongPress={() => {
+                    Haptics.impact("medium");
+                    actions.set(note());
+                  }}
                 />
-              </Swipe>
+              </SwipeRow>
             )}
           </If>
         )}
       </List>
-      <Sheet open={!!actions()} onClose={() => actions.set(null)} side="bottom" label={t("notify.actions")}>
-        <View class="gap-1 p-3">
-          <Text role="header" class="line-clamp-2 px-4 pb-2 text-title-medium text-on-surface">
-            {actions()?.title ?? ""}
-          </Text>
-          <ListItem
-            icon={actions()?.read ? "mail" : "mailOpen"}
-            headline={actions()?.read ? t("actions.markUnread") : t("actions.markRead")}
-            onPress={() => act((n) => void markNotifications([n.id], !n.read))}
-            testID="notify-action-read"
-          />
-          <ListItem icon="archive" headline={t("actions.archive")} onPress={() => act((n) => archiveNotifications([n.id]))} testID="notify-action-archive" />
-        </View>
-      </Sheet>
+      <ActionSheet
+        open={!!actions()}
+        title={actions()?.title}
+        actions={[
+          { id: "read", title: actions()?.read ? t("actions.markUnread") : t("actions.markRead") },
+          { id: "archive", title: t("actions.archive") },
+        ]}
+        cancel={t("common.cancel")}
+        onOpenChange={({ open }: { open: boolean }) => {
+          if (!open) actions.set(null);
+        }}
+        onAction={({ id }: { id: string }) => {
+          const n = actions();
+          actions.set(null);
+          if (!n) return;
+          if (id === "read") void markNotifications([n.id], !n.read);
+          if (id === "archive") archiveNotifications([n.id]);
+        }}
+      />
     </View>
   );
 }
 
-function NotificationRow(props: { note: Notification; selected: boolean; dense: boolean; onPress: () => void; onLongPress?: () => void }) {
+function Row(props: { note: Notification; selected: boolean; oneLine: boolean; onPress: () => void; onLongPress?: () => void }) {
   const n = () => props.note;
   const source = () => sourceById(n().sourceId);
   const label = () =>
@@ -144,45 +141,38 @@ function NotificationRow(props: { note: Notification; selected: boolean; dense: 
       .filter(Boolean)
       .join(", ");
   return (
-    <Row
-      selected={props.selected}
-      onPress={props.onPress}
-      onLongPress={props.onLongPress}
+    <View
+      role="button"
       accessibilityLabel={label()}
+      accessibilityState={{ selected: props.selected }}
+      onPress={() => props.onPress()}
+      onLongPress={props.onLongPress}
       testID={`notify-${n().id}`}
-      class="mb-0.5 flex-row gap-3 py-3 ps-3 pe-4"
+      class={`w-full flex-row items-start gap-2.5 bg-system-background pl-3 pr-4 active:bg-fill ${props.selected ? "bg-fill" : ""}`}
     >
-      <If when={source()}>{(s) => <SourceMark source={s()} size={props.dense ? "sm" : "md"} />}</If>
-      <View class="min-w-0 flex-1 gap-0.5">
-        <View class="flex-row items-center gap-1.5">
-          <Text class={`line-clamp-1 shrink text-label-large tracking-label-large ${n().read ? "text-on-surface-variant" : "font-medium text-on-surface"}`}>
-            {n().sender}
-          </Text>
-          <Text class="line-clamp-1 text-label-medium tracking-label-medium text-on-surface-variant">
-            {source()?.name === n().sender ? "" : (source()?.name ?? "")}
-          </Text>
+      <View class="pt-3">
+        <If when={source()}>{(s) => <SourceMark source={s()} size="md" />}</If>
+      </View>
+      <View class={`min-w-0 flex-1 gap-0.5 border-b border-separator py-2.5`}>
+        <View class="flex-row items-baseline gap-1.5">
+          <Text class={`line-clamp-1 shrink text-footnote ${n().read ? "text-secondary-label" : "font-semibold text-label"}`}>{n().sender}</Text>
+          <Text class="line-clamp-1 text-caption1 text-tertiary-label">{source()?.name === n().sender ? "" : (source()?.name ?? "")}</Text>
           <View class="flex-1" />
-          <Text class={`text-label-medium tabular-nums tracking-label-medium ${n().read ? "text-on-surface-variant" : "font-medium text-primary"}`}>
-            {relativeDate(n().receivedAt)}
-          </Text>
+          <Text class="shrink-0 text-caption1 tabular-nums text-secondary-label">{relativeDate(n().receivedAt)}</Text>
           <If when={!n().read}>
-            <View accessibilityElementsHidden class="size-2 rounded-full bg-unread" />
+            <View accessibilityElementsHidden class="size-2 rounded-full bg-system-blue" />
           </If>
         </View>
         <View class="flex-row items-center gap-1.5">
           <PriorityDot priority={n().priority} />
-          <Text class={`line-clamp-1 flex-1 text-body-large ${n().read ? "tracking-body-large text-on-surface" : "font-bold tracking-body-large-emphasized text-on-surface"}`}>
-            {n().title}
-          </Text>
+          <Text class={`line-clamp-1 flex-1 text-subheadline ${n().read ? "text-label" : "font-semibold text-label"}`}>{n().title}</Text>
+          <If when={n().link}>
+            <Icon name="arrow.up.right" size={12} tint="tertiary-label" />
+          </If>
         </View>
-        <Text class={`${props.dense ? "line-clamp-1" : "line-clamp-2"} text-body-medium tracking-body-medium text-on-surface-variant`}>
-          {n().body.replace(/\s+/g, " ")}
-        </Text>
+        <Text class={`${props.oneLine ? "line-clamp-2" : "line-clamp-1"} text-subheadline text-secondary-label`}>{n().body.replace(/\s+/g, " ")}</Text>
         <Tags tags={n().tags} />
       </View>
-      <If when={n().link}>
-        <Icon name="external" size="sm" tone="on-surface-variant" />
-      </If>
-    </Row>
+    </View>
   );
 }

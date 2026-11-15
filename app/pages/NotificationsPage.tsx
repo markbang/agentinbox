@@ -1,63 +1,67 @@
-// The phone's Notifications tab: every source's notifications in one feed,
-// filter chips and search over it, and the open one on a page of its own.
-import { View } from "nsh";
+// The Notifications tab: every source's notifications in one feed, the
+// filters and search over it, and the open one on a page of its own.
+import { signal, View } from "nsh";
 import { t } from "nsh/i18n";
-import { AppBar, IconButton, Menu, Page } from "../ui";
+import { ActionSheet, Button } from "cupertino";
+import { Page } from "../components/Page";
 import { FeedEmpty } from "../components/FeedEmpty";
 import { FeedFilters, FeedSearch } from "../components/FeedFilters";
 import { NotificationList } from "../components/NotificationList";
-import { PageHeader } from "../components/PageHeader";
 import { NavContext } from "../nav";
 import { feedStatus, loadMoreFeed, notifications, openNotificationAt, reloadFeed, serverInbox, setFeedFilter } from "../notify";
 
 export function NotificationsPage() {
   const nav = NavContext();
+  const menu = signal(false);
   const open = (id: string) => {
     openNotificationAt(id);
     nav.stack.push({ name: "notification", id });
   };
-  const more = () => (
-    <Menu
-      label={t("notify.actions")}
-      trigger={<IconButton icon="more" label={t("notify.actions")} testID="notify-more" />}
-      actions={[
-        { id: "refresh", label: t("actions.refresh"), icon: "refresh", onSelect: () => void reloadFeed("refreshing") },
-        { id: "sources", label: t("sources.title"), icon: "bell", onSelect: () => nav.stack.push({ name: "sources" }) },
-        ...(serverInbox() ? [{ id: "keys", label: t("keys.title"), icon: "key" as const, onSelect: () => nav.stack.push({ name: "apiKeys" }) }] : []),
-        { id: "rules", label: t("rules.title"), icon: "settings", onSelect: () => nav.stack.push({ name: "notifyRules" }) },
-      ]}
-    />
-  );
-  const list = () => (
-    <NotificationList
-      items={notifications()}
-      onOpen={open}
-      refreshing={feedStatus() === "refreshing"}
-      onRefresh={() => void reloadFeed("refreshing")}
-      onLoadMore={() => void loadMoreFeed()}
-      empty={
-        <FeedEmpty
-          onAddSource={() => nav.stack.push({ name: "addSource" })}
-          onAddAccount={() => nav.stack.push({ name: "addAccount" })}
-          onClearFilters={() => setFeedFilter(null)}
-        />
-      }
-      testID="notify-list"
-    />
-  );
   return (
     <Page
       title={t("notify.title")}
-      header={<PageHeader title={t("notify.title")} actions={more()} />}
-      headerRight={more()}
-      appBar={<AppBar title={t("notify.title")} actions={more()} />}
-      root
+      trailing={<Button icon="ellipsis" label={t("notify.actions")} variant="plain" onPress={() => menu.set(true)} testID="notify-more" />}
+      testID="notifications"
     >
-      <View class="flex-1 bg-surface" testID="notifications">
-        <FeedFilters />
-        <FeedSearch />
-        {list()}
+      <FeedFilters />
+      <FeedSearch />
+      <View class="min-h-0 flex-1">
+        <NotificationList
+          items={notifications()}
+          onOpen={open}
+          refreshing={feedStatus() === "refreshing"}
+          onRefresh={() => void reloadFeed("refreshing")}
+          onLoadMore={() => void loadMoreFeed()}
+          empty={
+            <FeedEmpty
+              onAddSource={() => nav.stack.push({ name: "addSource" })}
+              onAddAccount={() => nav.stack.push({ name: "addAccount" })}
+              onClearFilters={() => setFeedFilter(null)}
+            />
+          }
+          testID="notify-list"
+        />
       </View>
+      <ActionSheet
+        open={menu()}
+        title={t("notify.actions")}
+        actions={[
+          { id: "refresh", title: t("actions.refresh") },
+          { id: "sources", title: t("sources.title") },
+          ...(serverInbox() ? [{ id: "keys", title: t("keys.title") }] : []),
+          { id: "rules", title: t("rules.title") },
+        ]}
+        cancel={t("common.cancel")}
+        onOpenChange={({ open }: { open: boolean }) => menu.set(open)}
+        onAction={({ id }: { id: string }) => {
+          menu.set(false);
+          if (id === "refresh") void reloadFeed("refreshing");
+          if (id === "sources") nav.stack.push({ name: "sources" });
+          if (id === "keys") nav.stack.push({ name: "apiKeys" });
+          if (id === "rules") nav.stack.push({ name: "notifyRules" });
+        }}
+        testID="notify-menu"
+      />
     </Page>
   );
 }

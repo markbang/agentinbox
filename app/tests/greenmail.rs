@@ -180,7 +180,7 @@ fn local_mode_reads_replies_and_searches_real_mail() {
     let bob = format!("bob{}@test.local", std::process::id());
     deliver(&host, &bob, "Lunch on Friday?");
 
-    let ui_sets: Vec<Registry> = vec![nsh_base::registry(), nsh_app_agentinbox::registry()];
+    let ui_sets: Vec<Registry> = vec![nsh_base::registry(), nsh_cupertino::registry(), nsh_app_agentinbox::registry()];
     let entry = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("App.tsx");
     let bundle = nsh_testing::compile_tsx(entry, &ui_sets).expect("App.tsx builds");
     let mut config = EngineConfig {
@@ -206,7 +206,11 @@ fn local_mode_reads_replies_and_searches_real_mail() {
     let carol = format!("carol{}@test.local", std::process::id());
     for (name, email) in [("Bob", &bob), ("Carol", &carol)] {
         step(&mut app, |a| a.press("id:open-settings"));
-        step(&mut app, |a| a.press("id:add-account"));
+        step(&mut app, |a| {
+            // The empty mailbox behind the sheet shows an Add account button too, until an account exists.
+            a.press("text:Add account >> nth=1")
+                .or_else(|_| a.press("text:Add account"))
+        });
         step(&mut app, |a| a.press("id:add-imap"));
         step(&mut app, |a| a.type_text("id:imap-email", email));
         step(&mut app, |a| a.type_text("id:imap-name", name));
@@ -243,7 +247,7 @@ fn local_mode_reads_replies_and_searches_real_mail() {
     step(&mut app, |a| {
         a.wait_for_within("text:Signature saved", WAIT)
     });
-    step(&mut app, |a| a.press("id:header-back"));
+    step(&mut app, |a| a.press("id:modal-done"));
     step(&mut app, |a| a.wait_for_gone("id:modal", WAIT));
     let signature = "-- \nBob\nbob.example <https://bob.example>";
     let body = |a: &Headless| {
@@ -397,13 +401,12 @@ fn local_mode_reads_replies_and_searches_real_mail() {
     // Sources in local mode are the mail accounts, and the page says so instead of offering
     // what only a server can do.
     step(&mut app, |a| a.press("id:open-settings"));
-    step(&mut app, |a| a.press("id:settings-sources"));
-    step(&mut app, |a| a.wait_for_within("id:sources-local", WAIT));
+    step(&mut app, |a| a.press("text:Sources"));
     step(&mut app, |a| {
-        a.wait_for_within(&format!("id:sources >> text:{bob}"), WAIT)
+        a.wait_for_within("text:Only your mail on this device", WAIT)
     });
     step(&mut app, |a| {
-        a.wait_for_within("id:sources >> text:Mail", WAIT)
+        a.wait_for_within(&format!("text:{bob}"), WAIT)
     });
     assert!(!app.shows("id:sources-add"));
     assert!(!app.shows("id:sources-add-top"));

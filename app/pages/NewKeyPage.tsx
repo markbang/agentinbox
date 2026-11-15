@@ -1,9 +1,10 @@
 // A new API key: what it is called, whether its agent may mark read and
 // archive, which sources it sees, and when it expires. The token comes next.
-import { signal, Text, View } from "nsh";
+import { signal, View } from "nsh";
 import { t } from "nsh/i18n";
-import { AppBar, Button, Card, Checkbox, Choice, Page, SectionLabel, Switch, TextField } from "../ui";
-import { PageHeader, PageScroll } from "../components/PageHeader";
+import { ActionSheet, Button, List, ListTile, Section, Switch } from "cupertino";
+import { Page } from "../components/Page";
+import { FieldRow, FormNote } from "../components/Fields";
 import { NavContext } from "../nav";
 import { createKey, sources } from "../notify";
 import { errorText } from "../store";
@@ -24,6 +25,7 @@ export function NewKeyPage() {
   const expires = signal("90");
   const error = signal<string | null>(null);
   const saving = signal(false);
+  const pickingExpiry = signal(false);
 
   const save = async () => {
     if (!name().trim()) {
@@ -47,59 +49,67 @@ export function NewKeyPage() {
     }
   };
 
+  const expiryLabel = () => t(`keys.${expiry.find((e) => e.value === expires())?.key ?? "never"}`);
   return (
-    <Page title={t("keys.new")} header={<PageHeader title={t("keys.new")} />} appBar={<AppBar title={t("keys.new")} />}>
-      <PageScroll contentClass="gap-6 p-4" testID="new-key">
-        <TextField value={name()} onChange={name.set} label={t("keys.name")} supporting={t("keys.nameHint")} error={error()} autoFocus testID="key-name" />
-        <Card class="px-4 py-3">
-          <Switch checked={write()} onChange={write.set} label={t("keys.allowWrite")} description={t("keys.allowWriteDetail")} testID="key-write" />
-        </Card>
-        <View class="gap-3">
-          <SectionLabel label={t("keys.sources")} class="px-1" />
-          <Choice
-            label={t("keys.scope")}
-            value={allSources() ? "all" : "picked"}
-            options={[
-              { value: "all", label: t("keys.allSources"), testID: "key-scope-all" },
-              { value: "picked", label: t("keys.pickedSources"), testID: "key-scope-picked" },
-            ]}
-            onChange={(v) => allSources.set(v === "all")}
+    <Page title={t("keys.new")} back={t("common.back")} onBack={nav.close} testID="new-key">
+      <List>
+        <Section footer={t("keys.nameHint")}>
+          <FieldRow label={t("keys.name")} value={name()} onChange={name.set} autoFocus testID="key-name" />
+        </Section>
+        <Section>
+          <ListTile title={t("keys.allowWrite")} subtitle={t("keys.allowWriteDetail")} accessory="none" separator={false} onPress={() => write.set(!write())} testID="key-write">
+            <Switch checked={write()} label={t("keys.allowWrite")} onChange={({ value: on }: { value: boolean }) => write.set(on)} />
+          </ListTile>
+        </Section>
+        <Section header={t("keys.sources")}>
+          <ListTile
+            title={t("keys.allSources")}
+            accessory="checkmark"
+            checked={allSources()}
+            onPress={() => allSources.set(true)}
+            testID="key-scope-all"
+          />
+          <ListTile
+            title={t("keys.pickedSources")}
+            accessory="checkmark"
+            checked={!allSources()}
+            separator={!allSources()}
+            onPress={() => allSources.set(false)}
+            testID="key-scope-picked"
           />
           <If when={!allSources()}>
-            <Card class="gap-3 p-4">
-              <Each of={sources()} key={(s) => s.id}>
-                {(s) => (
-                  <Checkbox
-                    checked={!!picked()[s().id]}
-                    onChange={(on) => picked.update((p) => ({ ...p, [s().id]: on }))}
-                    label={s().name}
-                    testID={`key-source-${s().id}`}
-                  />
-                )}
-              </Each>
-            </Card>
+            <Each of={sources()} key={(s) => s.id}>
+              {(s) => (
+                <ListTile title={s().name} accessory="none" separator testID={`key-source-${s().id}`}>
+                  <Switch checked={!!picked()[s().id]} label={s().name} onChange={({ value: on }: { value: boolean }) => picked.update((p) => ({ ...p, [s().id]: on }))} />
+                </ListTile>
+              )}
+            </Each>
           </If>
-        </View>
-        <View class="gap-3">
-          <SectionLabel label={t("keys.expiry")} class="px-1" />
-          <Choice
-            label={t("keys.expiry")}
-            value={expires()}
-            options={expiry.map((e) => ({ value: e.value, label: t(`keys.${e.key}`), testID: `key-expiry-${e.key}` }))}
-            onChange={expires.set}
-          />
-        </View>
-        <If when={error()}>
-          {(text) => (
-            <Text role="alert" class="px-1 text-body-medium text-error" testID="key-error">
-              {text()}
-            </Text>
-          )}
-        </If>
-        <Card class="p-3">
-          <Button icon="key" label={t("keys.create")} onPress={() => void save()} loading={saving()} testID="key-create" />
-        </Card>
-      </PageScroll>
+        </Section>
+        <Section header={t("keys.expiry")}>
+          <ListTile title={t("keys.expiry")} subtitle={expiryLabel()} accessory="chevron" separator={false} onPress={() => pickingExpiry.set(true)} testID="key-expiry" />
+        </Section>
+        <FormNote text={error()} error testID="key-error" />
+        <Section>
+          <View class="px-4 py-3">
+            <Button title={t("keys.create")} icon="key" disabled={saving()} onPress={() => void save()} class="w-full" testID="key-create" />
+          </View>
+        </Section>
+      </List>
+      <ActionSheet
+        open={pickingExpiry()}
+        title={t("keys.expiry")}
+        actions={expiry.map((e) => ({ id: e.value, title: t(`keys.${e.key}`) }))}
+        cancel={t("common.cancel")}
+        onOpenChange={({ open }: { open: boolean }) => {
+          if (!open) pickingExpiry.set(false);
+        }}
+        onAction={({ id }: { id: string }) => {
+          pickingExpiry.set(false);
+          expires.set(id);
+        }}
+      />
     </Page>
   );
 }

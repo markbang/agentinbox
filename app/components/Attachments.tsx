@@ -1,8 +1,8 @@
-// The composer's attachments as chips: name, size (or how much is uploaded),
+// The composer's attachments as tiles: name, size (or how much is uploaded),
 // and a button that takes the file out of the draft.
 import { Text, View } from "nsh";
 import { t } from "nsh/i18n";
-import { Icon, IconButton, touch } from "../ui";
+import { Icon } from "cupertino";
 import { fileSize } from "../lib/format";
 import type { Attachments } from "../lib/attachments";
 
@@ -10,33 +10,42 @@ export function AttachmentChips(props: { files: Attachments; error?: string | nu
   return (
     <>
       <If when={props.error}>
-        <Text class={`text-error ${touch ? "px-4 pb-2 text-body-medium" : "px-3 pb-2 text-body-small"}`} testID="compose-attachment-error">
+        <Text class="px-4 pb-1 text-footnote text-system-red" testID="compose-attachment-error">
           {props.error}
         </Text>
       </If>
       <If when={props.files.items().length}>
-        <View class={`flex-row flex-wrap gap-2 ${touch ? "px-4 pb-3" : "px-3 pb-2"}`} testID="compose-attachments">
+        <View class="flex-row flex-wrap gap-2 px-4 pb-2" testID="compose-attachments">
           <Each of={props.files.items()} key={(a) => a.key}>
             {(a) => {
               const staging = () => !a().ref && !a().failed;
               const share = () => (a().size ? Math.min(1, a().sent / a().size) : 1);
               return (
                 <View
-                  class={`relative h-8 max-w-80 flex-row items-center gap-2 overflow-hidden rounded-small ps-2 pe-1 ${a().failed ? "bg-error-container" : "border border-outline-variant"}`}
+                  class={`relative h-8 max-w-72 flex-row items-center gap-1.5 overflow-hidden rounded-[8px] border pl-2 pr-1 ${
+                    a().failed ? "border-system-red/40 bg-system-red/10" : "border-separator bg-secondary-system-background"
+                  }`}
                   testID="compose-attachment"
                 >
-                  <Icon name="paperclip" size="sm" tone={a().failed ? "error" : "on-surface-variant"} />
-                  <Text class={`line-clamp-1 shrink text-label-large font-medium ${a().failed ? "text-on-error-container" : "text-on-surface"}`}>{a().name}</Text>
-                  <Text class="text-label-medium tabular-nums text-on-surface-variant">
+                  <Icon name="doc" size={14} tint={a().failed ? "system-red" : "secondary-label"} />
+                  <Text class={`line-clamp-1 shrink text-footnote ${a().failed ? "text-system-red" : "text-label"}`}>{a().name}</Text>
+                  <Text class="text-caption1 tabular-nums text-secondary-label">
                     {a().failed
                       ? t("compose.attachFailed")
                       : staging()
                         ? t("compose.uploading", { percent: Math.round(share() * 100) })
                         : fileSize(a().size)}
                   </Text>
-                  <IconButton icon="close" size="xs" width="narrow" class="!h-6 !w-6" label={t("compose.removeAttachment", { name: a().name })} onPress={() => props.files.remove(a().key)} />
+                  <View
+                    role="button"
+                    accessibilityLabel={t("compose.removeAttachment", { name: a().name })}
+                    onPress={() => props.files.remove(a().key)}
+                    class="size-6 items-center justify-center rounded-full active:bg-fill"
+                  >
+                    <Icon name="xmark.circle.fill" size={14} tint="tertiary-label" />
+                  </View>
                   <If when={staging()}>
-                    <View class="absolute bottom-0 left-0 h-0.5 bg-primary" style={{ width: `${share() * 100}%` }} />
+                    <View class="absolute bottom-0 left-0 h-0.5 bg-system-blue" style={{ width: `${share() * 100}%` }} />
                   </If>
                 </View>
               );

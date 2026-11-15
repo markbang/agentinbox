@@ -1,13 +1,15 @@
-// One notification on a phone: its source, sender, tags, body and actions.
+// One notification on a page of its own: its source, sender, tags, body and
+// actions.
 import { t } from "nsh/i18n";
-import { Empty, Page } from "../ui";
+import { Page } from "../components/Page";
+import { Empty } from "../components/Empty";
 import { NotificationReader } from "../components/NotificationReader";
-import { PageHeader } from "../components/PageHeader";
-import { phoneStack, selectTab, TAB } from "../nav";
+import { NavContext, phoneStack, selectTab, TAB } from "../nav";
 import { archiveNotifications, markNotifications, notifications, sourceById } from "../notify";
 import { openMessage } from "../store";
 
 export function NotificationPage(props: { id: string }) {
+  const nav = NavContext();
   const note = () => notifications().find((n) => n.id === props.id);
   const source = () => sourceById(note()?.sourceId);
   const openMail = () => {
@@ -16,13 +18,8 @@ export function NotificationPage(props: { id: string }) {
     phoneStack.setRoutes([{ name: "inbox" }, { name: "message", id: props.id }]);
   };
   return (
-    <Page title={source()?.name ?? t("notify.title")} header={<PageHeader title={source()?.name ?? t("notify.title")} />}>
-      <If
-        when={note()}
-        else={
-          <Empty icon="bell" title={t("notify.gone")} description={t("notify.goneHint")} />
-        }
-      >
+    <Page title={source()?.name ?? t("notify.title")} back={t("common.back")} onBack={nav.close} testID="notification-page">
+      <If when={note()} else={<Empty icon="bell" title={t("notify.gone")} description={t("notify.goneHint")} />}>
         {(n) => (
           <NotificationReader
             note={n()}
@@ -30,7 +27,7 @@ export function NotificationPage(props: { id: string }) {
             onToggleRead={() => void markNotifications([n().id], !n().read)}
             onArchive={() => {
               archiveNotifications([n().id]);
-              phoneStack.pop();
+              nav.close();
             }}
             onOpenMail={n().threadId ? openMail : undefined}
           />
