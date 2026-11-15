@@ -206,7 +206,7 @@ fn local_mode_reads_replies_and_searches_real_mail() {
     let carol = format!("carol{}@test.local", std::process::id());
     for (name, email) in [("Bob", &bob), ("Carol", &carol)] {
         step(&mut app, |a| a.press("id:open-settings"));
-        step(&mut app, |a| a.press("id:add-account"));
+        step(&mut app, |a| a.press("text:Add account"));
         step(&mut app, |a| a.press("id:add-imap"));
         step(&mut app, |a| a.type_text("id:imap-email", email));
         step(&mut app, |a| a.type_text("id:imap-name", name));
@@ -243,7 +243,7 @@ fn local_mode_reads_replies_and_searches_real_mail() {
     step(&mut app, |a| {
         a.wait_for_within("text:Signature saved", WAIT)
     });
-    step(&mut app, |a| a.press("id:header-back"));
+    step(&mut app, |a| a.press("id:modal-done"));
     step(&mut app, |a| a.wait_for_gone("id:modal", WAIT));
     let signature = "-- \nBob\nbob.example <https://bob.example>";
     let body = |a: &Headless| {
@@ -397,13 +397,12 @@ fn local_mode_reads_replies_and_searches_real_mail() {
     // Sources in local mode are the mail accounts, and the page says so instead of offering
     // what only a server can do.
     step(&mut app, |a| a.press("id:open-settings"));
-    step(&mut app, |a| a.press("id:settings-sources"));
-    step(&mut app, |a| a.wait_for_within("id:sources-local", WAIT));
+    step(&mut app, |a| a.press("text:Sources"));
     step(&mut app, |a| {
-        a.wait_for_within(&format!("id:sources >> text:{bob}"), WAIT)
+        a.wait_for_within("text:Only your mail on this device", WAIT)
     });
     step(&mut app, |a| {
-        a.wait_for_within("id:sources >> text:Mail", WAIT)
+        a.wait_for_within(&format!("text:{bob}"), WAIT)
     });
     assert!(!app.shows("id:sources-add"));
     assert!(!app.shows("id:sources-add-top"));

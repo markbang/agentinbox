@@ -83,7 +83,7 @@ log("signed up");
 
 for (const [email, name] of accounts) {
   await press("open-settings");
-  await page.getByText("Add account").first().click();
+  await page.getByText("Add account").last().click();
   await press("add-imap");
   await fill("imap-email", email);
   await fill("imap-name", name);
@@ -157,7 +157,7 @@ for (const theme of ["light", "dark"]) {
   await shot("signature", theme);
   await page.getByLabel("Done").first().click();
 
-  await page.getByText("Add account").first().click();
+  await page.getByText("Add account").last().click();
   await id("add-imap").waitFor();
   await shot("add-account", theme);
 
