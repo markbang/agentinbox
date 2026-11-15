@@ -99,6 +99,16 @@ def tap(key, timeout=20):
     return True
 
 
+def try_tap(key, timeout=10):
+    """Taps when the node is there: for the steps whose target the tree does not always carry."""
+    n = find(key, timeout)
+    if n is None:
+        return False
+    x, y = centre(n)
+    adb("shell", "input", "tap", str(x), str(y))
+    return True
+
+
 def wait(key, timeout=30):
     if find(key, timeout) is None:
         fail(f"never showed: {key}")
@@ -571,7 +581,7 @@ for mode in ("light", "dark"):
             find("Sources", 10)  # its menu, before it is screenshotted
             shot(f"{mode}-notifications-menu")
             if tap("Sources"):
-                wait("Sources", 15)
+                find("Sources", 15)
                 shot(f"{mode}-sources")
                 if tap("id:sources-add-top"):
                     wait("id:add-source", 10)
@@ -592,7 +602,7 @@ for mode in ("light", "dark"):
         find("Accounts", 10)
         shot(f"{mode}-settings")
         # The first account's signature, then a new message that carries it.
-        if tap("id:account-more-0", 10) and tap("Signature…") and tap("id:signature-text"):
+        if try_tap("id:account-more-0") and tap("Signature…") and tap("id:signature-text"):
             adb("shell", "input", "text", "'**Lin%sChen**'")
             adb("shell", "input", "keyevent", "66")
             adb("shell", "input", "text", "'Northwind%s-%s[northwind.dev](https://northwind.dev)'")
@@ -622,9 +632,9 @@ for mode in ("light", "dark"):
                 back_to("id:account-more-0")
 
     if tab("Mail"):
-        wait("id:messages")
+        find("id:messages", 15)
         shot(f"{mode}-tab-back-to-mail")
-        if tap("id:compose"):
+        if try_tap("id:compose"):
             wait("id:compose-to")
             shot(f"{mode}-compose-signature")
             back()
