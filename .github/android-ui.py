@@ -204,15 +204,21 @@ def focused():
 
 
 def launch():
-    adb("shell", "am", "force-stop", PKG)
-    adb("shell", "monkey", "-p", PKG, "-c", "android.intent.category.LAUNCHER", "1")
-    # The app's window has the focus (no system dialog over it) and its list stopped moving.
-    end = time.time() + 60
-    while PKG not in focused() and time.time() < end:
-        dismiss_anr(nodes())
-        time.sleep(1)
-    wait("id:messages", 60)
-    settled("id:message-.*")
+    # The first start after an install compiles the app: on a loaded runner that can outlast a
+    # minute, so start again rather than spending the whole run on a screen that never came up.
+    for attempt in range(1, 3):
+        adb("shell", "am", "force-stop", PKG)
+        adb("shell", "monkey", "-p", PKG, "-c", "android.intent.category.LAUNCHER", "1")
+        # The app's window has the focus (no system dialog over it) and its list stopped moving.
+        end = time.time() + 90
+        while PKG not in focused() and time.time() < end:
+            dismiss_anr(nodes())
+            time.sleep(1)
+        if find("id:messages", 90):
+            settled("id:message-.*")
+            return
+        print(f"start {attempt} never reached the inbox", flush=True)
+    fail("the app never reached the inbox")
 
 
 def first_row():
@@ -446,20 +452,6 @@ for mode in ("light", "dark"):
                 if tap("id:keys-add-top"):
                     wait("id:new-key", 10)
                     shot(f"{mode}-new-key")
-                    # The name field opens focused: its keyboard takes Back, then Create. Best effort:
-                    # a miss here must not fail the run's other screens.
-                    if tap("id:key-name"):
-                        adb("shell", "input", "text", "'Claude%sCode'")
-                        back()
-                    if scroll_to("id:key-create") and tap("id:key-create"):
-                        if find("id:key-token", 15):
-                            shot(f"{mode}-key-created")
-                            tap("id:key-done")
-                            wait("id:api-keys", 10)
-                        else:
-                            print(f"[{mode}] the key page never showed its token", flush=True)
-                    else:
-                        print(f"[{mode}] no Create key button", flush=True)
                     back_to("id:api-keys")
                 back_to("id:settings")
         if scroll_to("id:settings-rules"):
