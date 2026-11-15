@@ -732,7 +732,8 @@ export async function setNotificationsEnabled(on: boolean) {
 
 /** After onboarding or signing out: the engine's new session. */
 export async function sessionChanged() {
-  await clearDrafts();
+  // A draft store that cannot be written must not keep the app from changing screens.
+  await clearDrafts().catch(() => undefined);
   batch(() => {
     status.set(Mail.status());
     items.set([]);

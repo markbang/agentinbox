@@ -474,3 +474,21 @@ test("phones: Schedule send from the composer's clock", async () => {
   await app.waitFor("text:/^Scheduled for Sat, Nov 14/");
   await app.waitFor("id:messages");
 });
+
+test("phones: signing out while mail is arriving lands on onboarding, and the app answers after", async () => {
+  const app = await open("./App.tsx", { platform: "android", width: 390, height: 844, locale: "en-US", ...demo, clock: {} });
+  await app.clock!.runFor(1000);
+  await app.waitFor("text:Q4 roadmap draft");
+  // The next arrival comes due as the confirmation is answered: the delivery and the sign-out
+  // meet on the engine thread.
+  await app.clock!.runFor(90_000 - 1);
+  await app.press("text:Settings");
+  app.onDialog(() => "Sign out");
+  await app.press("id:sign-out");
+  await app.clock!.runFor(2);
+  await app.waitFor("id:onboarding");
+  // Signed out, and not wedged: the mode choice still leads somewhere.
+  await app.press("id:mode-cloud");
+  await app.waitFor("id:server");
+  expect(app.value("id:server")).toBe("https://mail-api.bangwu.me");
+});

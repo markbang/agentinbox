@@ -309,14 +309,19 @@ impl Mail {
 
     /// Ends the session: back to onboarding.
     pub async fn sign_out() -> Result<(), JsError> {
-        if let Some(backend) = with(|s| s.backend.take()) {
-            backend.sign_out().await.map_err(js)?;
-        }
-        with(|s| {
+        // The session ends before the backend is told: a teardown that fails or panics (a server
+        // that cannot be reached, a stuck task) must not leave the app half signed out — no
+        // backend, a session still shown — where every call rejects and only a restart helps.
+        let backend = with(|s| {
+            let backend = s.backend.take();
             s.status = no_session();
             s.syncing.clear();
+            backend
         });
         remember(None, None, None);
+        if let Some(backend) = backend {
+            backend.sign_out().await.map_err(js)?;
+        }
         Ok(())
     }
 
