@@ -117,7 +117,7 @@ for (const theme of ["light", "dark"]) {
 
   await page.getByText("Booking confirmed: Shanghai").first().click();
   await id("reader").waitFor();
-  await page.getByText("E-ticket-K7Q2XM.pdf").first().waitFor();
+  await id("attachments").waitFor();
   await shot("reader", theme);
 
   // A conversation: the latest reply expanded, the message it answers collapsed above.
@@ -213,7 +213,7 @@ for (const theme of ["light", "dark"]) {
   await shot("narrow-inbox", theme);
   await page.getByText("Booking confirmed: Shanghai").first().click();
   await id("reader").waitFor();
-  await page.getByText("E-ticket-K7Q2XM.pdf").first().waitFor();
+  await id("attachments").waitFor();
   await shot("narrow-reader", theme);
   // The 600px booking mail fits the phone's width: no sideways scroll.
   let overflow = null;

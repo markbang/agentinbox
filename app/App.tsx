@@ -165,7 +165,8 @@ function App() {
         </If>
         {/* Under the tab bar on phones, over the reader's toolbar on wide windows. */}
         <If when={wide()}>
-          <Toasts class="bottom-4" />
+          {/* Above the reader's toolbar, which the sheet and the toast share the bottom with. */}
+          <Toasts class="bottom-20" />
         </If>
       </View>
     </Theme>
