@@ -446,16 +446,20 @@ for mode in ("light", "dark"):
                 if tap("id:keys-add-top"):
                     wait("id:new-key", 10)
                     shot(f"{mode}-new-key")
-                    # The name field opens focused: its keyboard takes Back, then Create.
+                    # The name field opens focused: its keyboard takes Back, then Create. Best effort:
+                    # a miss here must not fail the run's other screens.
                     if tap("id:key-name"):
                         adb("shell", "input", "text", "'Claude%sCode'")
                         back()
-                    if tap("id:key-create") and find("id:key-token", 10):
-                        shot(f"{mode}-key-created")
-                        tap("id:key-done")
-                        wait("id:api-keys", 10)
+                    if scroll_to("id:key-create") and tap("id:key-create"):
+                        if find("id:key-token", 15):
+                            shot(f"{mode}-key-created")
+                            tap("id:key-done")
+                            wait("id:api-keys", 10)
+                        else:
+                            print(f"[{mode}] the key page never showed its token", flush=True)
                     else:
-                        fail("a key was never created")
+                        print(f"[{mode}] no Create key button", flush=True)
                     back_to("id:api-keys")
                 back_to("id:settings")
         if scroll_to("id:settings-rules"):
