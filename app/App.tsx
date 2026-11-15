@@ -154,7 +154,7 @@ function App() {
   void start();
   return (
     <Theme contrast="normal">
-      <View class="flex-1 bg-system-background">
+      <View class="h-full overflow-hidden bg-system-background">
         <If when={isStarted()}>
           <If when={mailStatus().mode !== "none"} else={<Onboarding />}>
             <Main />
