@@ -349,3 +349,99 @@ async fn migration_projects_mail_written_before_the_feed() {
     );
     assert_eq!(counts(&db), (2, 1));
 }
+
+/// A field the API does not know is refused with the list of ones it does, and `preset` is taken
+/// at the top level as well as inside `config`.
+#[tokio::test]
+async fn unknown_fields_are_refused_and_preset_aliases() {
+    let dir = temp_dir();
+    let server = start(dir).await;
+    let alice = server.signup("alice@test.local").await;
+
+    let (status, body) = server
+        .send(
+            "POST",
+            &alice,
+            "/sources",
+            Some(json!({ "kind": "webhook", "name": "Kuma", "presett": "uptime-kuma" })),
+        )
+        .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
+    let message = body["message"].as_str().unwrap_or_default();
+    assert!(message.contains("presett"), "{message}");
+    assert!(message.contains("preset"), "{message}");
+
+    let (status, body) = server
+        .send(
+            "POST",
+            &alice,
+            "/sources",
+            Some(json!({ "kind": "webhook", "name": "Kuma", "preset": "uptime-kumma" })),
+        )
+        .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
+    assert!(
+        body["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("uptime-kuma"),
+        "{body}"
+    );
+
+    let (status, body) = server
+        .send(
+            "POST",
+            &alice,
+            "/sources",
+            Some(json!({ "kind": "webhook", "name": "Kuma", "preset": "uptime-kuma" })),
+        )
+        .await;
+    assert_eq!(status, StatusCode::CREATED, "{body}");
+    let source = &body["source"];
+    assert_eq!(source["config"]["preset"], "uptime-kuma");
+    let id = source["id"].as_str().unwrap().to_string();
+
+    let (status, updated) = server
+        .send(
+            "PATCH",
+            &alice,
+            &format!("/sources/{id}"),
+            Some(json!({ "preset": "github", "mappingg": {} })),
+        )
+        .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{updated}");
+    assert!(updated["message"].as_str().unwrap().contains("mappingg"));
+
+    let (status, updated) = server
+        .send(
+            "PATCH",
+            &alice,
+            &format!("/sources/{id}"),
+            Some(json!({ "preset": "github" })),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{updated}");
+    assert_eq!(updated["config"]["preset"], "github");
+
+    // `config.preset` still works, and an empty preset clears it.
+    let (status, updated) = server
+        .send(
+            "PATCH",
+            &alice,
+            &format!("/sources/{id}"),
+            Some(json!({ "config": { "preset": "grafana" } })),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{updated}");
+    assert_eq!(updated["config"]["preset"], "grafana");
+    let (status, updated) = server
+        .send(
+            "PATCH",
+            &alice,
+            &format!("/sources/{id}"),
+            Some(json!({ "preset": "" })),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{updated}");
+    assert!(updated["config"].get("preset").is_none(), "{updated}");
+}

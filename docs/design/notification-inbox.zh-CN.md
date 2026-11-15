@@ -58,7 +58,8 @@
 - 请求体：JSON 或表单；`?format=` 可强制指定。表单会变成一个扁平对象，所以同一套路径都能用。
 - 映射：source 的 `config.mapping` 里每个字段一条表达式——`sender`、`title`、`body`、`bodyHtml`、`link`、`priority`、`tags`、`externalId`。表达式可以是路径（`$.issue.title`、`.a.b[0].c`、`$['a']`）、回退链（`a || b`，取第一个有值且非空的）、模板（`{{repository.full_name}}: {{action}}`）或字面量（`3`）。路径只做普通取值，没有过滤器和通配符。`priority` 取 0–10，也可以给级别（`error`、`warning`、`info`、`debug`、`critical`、`alerting`、`ok`）。
 - 没配置字段时的默认值：`title` 取 `title`/`subject`/`message`/`text`/`name` 里第一个；`sender` 取 `sender`/`from`/`author`/`app`/`service`/`user`；`link` 取 `url`/`link`/`html_url`/`permalink`；`externalId` 取 `id`/`event_id`/`guid`/`uuid`/`fingerprint`；`priority` 取 `priority` 或级别；`body` 是 JSON 其余部分的 pretty 文本。
-- 预设（内置可改，`GET /v1/sources/presets`）：GitHub（issue、PR、Actions、release）、GitLab（pipeline、MR）、Sentry、Grafana、Uptime Kuma。source 用 `config.preset` 选一个，`config.mapping` 覆盖单个字段。
+- 预设（内置可改，`GET /v1/sources/presets`）：GitHub（issue、PR、Actions、release）、GitLab（pipeline、MR）、Sentry、Grafana、Uptime Kuma。source 用 `config.preset` 选一个，`config.mapping` 覆盖单个字段。`POST /v1/sources` 和 `PATCH /v1/sources/{id}` 的顶层也接受 `preset`，含义相同：都会写成 `config.preset`，创建时以顶层为准，patch 里 `preset: ""` 表示去掉。
+- 接口不认识的字段，或没有任何预设对应的 `preset` 名字，直接返回 `400` 并在消息里列出可用的值。如果忽略，source 就没有映射，之后每条通知都只能以原始 JSON 到达。
 - 可选签名校验：source 配了 secret 时，`X-Hub-Signature-256`（GitHub 风格 HMAC-SHA256，对原始请求体）必须匹配，否则 `401`。
 - 返回 `202 {"id": "…"}`（`externalId` 重复时同样返回、不入库）；`401` token 或签名错、`403` source 已暂停、`413` 超过 256 KiB、`429` 超过每 source 限流（60/分，突发 120）。
 

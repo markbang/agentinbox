@@ -215,6 +215,8 @@ pub struct NewSource {
     pub color: Option<String>,
     pub config: Option<Value>,
     pub min_priority: Option<i64>,
+    /// Shorthand for `config.preset`: the API accepts either, and this one wins on create.
+    pub preset: Option<String>,
 }
 
 /// Every field left `None` stays as it is.
@@ -227,6 +229,8 @@ pub struct SourcePatch {
     pub config: Option<Value>,
     pub min_priority: Option<i64>,
     pub enabled: Option<bool>,
+    /// Shorthand for `config.preset`; an empty string removes the preset.
+    pub preset: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -556,12 +560,15 @@ impl Feed {
         if name.is_empty() {
             return Err(err(ErrorCode::InvalidInput, "a source needs a name"));
         }
-        let config = new
+        let mut config = new
             .config
             .clone()
             .unwrap_or_else(|| Value::Object(Default::default()));
         if !config.is_object() {
             return Err(err(ErrorCode::InvalidInput, "config must be a JSON object"));
+        }
+        if let Some(preset) = new.preset.as_deref().filter(|p| !p.trim().is_empty()) {
+            config["preset"] = Value::String(preset.trim().to_string());
         }
         let id = format!("src_{}", new_id());
         self.conn().execute(
@@ -609,6 +616,23 @@ impl Feed {
                 ));
             }
             source.config = config.clone();
+        }
+        if let Some(preset) = &patch.preset {
+            if source.is_mail() {
+                return Err(err(
+                    ErrorCode::InvalidInput,
+                    "a mail source follows its account; change the account instead",
+                ));
+            }
+            let preset = preset.trim();
+            match preset.is_empty() {
+                false => source.config["preset"] = Value::String(preset.to_string()),
+                true => {
+                    if let Value::Object(map) = &mut source.config {
+                        map.remove("preset");
+                    }
+                }
+            }
         }
         if let Some(p) = patch.min_priority {
             source.min_priority = p.clamp(0, 10);
