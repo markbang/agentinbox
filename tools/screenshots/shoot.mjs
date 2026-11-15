@@ -168,6 +168,18 @@ for (const theme of ["light", "dark"]) {
   await id("add-imap").waitFor();
   await shot("add-account", theme);
 
+  // The notification inbox: the feed (empty until a source posts), and where sources come from.
+  await home();
+  await press("rail-notifications");
+  await id("notify-list").waitFor({ timeout: 30_000 }).catch(() => {});
+  await shot("notifications", theme);
+  await home();
+  await press("open-settings");
+  await id("signed-in-as").waitFor();
+  await page.getByText("Sources").first().click();
+  await id("sources").waitFor({ timeout: 30_000 }).catch(() => {});
+  await shot("sources", theme);
+
   await home();
   await page.keyboard.press("Shift+/");
   await id("shortcuts").waitFor({ timeout: 10_000 });
