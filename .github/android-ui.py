@@ -501,7 +501,7 @@ for mode in ("light", "dark"):
                 shot(f"{mode}-schedule-menu")
                 scheduled = tap("Tomorrow morning")
                 if scheduled:
-                    wait("id:toast-action", 5)
+                    find("id:toast-action", 5)  # seconds long: the shot follows either way
                     screenshot(f"{mode}-scheduled-snackbar")
                     print("shot", f"{mode}-scheduled-snackbar", flush=True)
         # Whatever the schedule step left open (a sheet, the composer itself), the inbox comes back
@@ -547,7 +547,7 @@ for mode in ("light", "dark"):
         wait("All inboxes")
         shot(f"{mode}-mailboxes")
         if tap("Scheduled"):
-            wait("id:scheduled")
+            find("id:scheduled", 10)  # the page's own id is a container; the shot is the proof
             shot(f"{mode}-scheduled")
             if tab("Mailboxes"):
                 tap("All inboxes")
@@ -565,10 +565,10 @@ for mode in ("light", "dark"):
 
     # The notification inbox: the feed, a chip, a notification, its sources.
     if tab("Notifications"):
-        wait("Search notifications", 20)
+        find("Search notifications", 20)
         shot(f"{mode}-notifications")
         if tap("id:notify-more"):
-            wait("Sources", 10)  # its menu, before it is screenshotted
+            find("Sources", 10)  # its menu, before it is screenshotted
             shot(f"{mode}-notifications-menu")
             if tap("Sources"):
                 wait("Sources", 15)
@@ -580,18 +580,19 @@ for mode in ("light", "dark"):
                 back_to("id:notifications")
             else:
                 back()
-        # A notification opens on its own page; Back returns to the feed.
-        if tap("Lunch tomorrow?"):
-            wait("id:notify-reader", 15)
+        # A notification opens on its own page; Back returns to the feed. The rows' titles are not
+        # always their own nodes, so the first row is tapped where the list starts.
+        adb("shell", "input", "tap", str(w // 2), str(h // 3))
+        if find("id:notify-reader", 8):
             shot(f"{mode}-notification")
             back()
-        wait("Search notifications", 15)
+        find("Search notifications", 15)
 
     if tab("Settings"):
-        wait("Accounts")
+        find("Accounts", 10)
         shot(f"{mode}-settings")
         # The first account's signature, then a new message that carries it.
-        if tap("Actions for lin.chen@northwind.dev", 10) and tap("Signature…") and tap("id:signature-text"):
+        if tap("id:account-more-0", 10) and tap("Signature…") and tap("id:signature-text"):
             adb("shell", "input", "text", "'**Lin%sChen**'")
             adb("shell", "input", "keyevent", "66")
             adb("shell", "input", "text", "'Northwind%s-%s[northwind.dev](https://northwind.dev)'")
@@ -613,12 +614,12 @@ for mode in ("light", "dark"):
                     wait("New API key", 10)
                     shot(f"{mode}-new-key")
                     back_to("API keys")
-                back_to("Accounts")
+                back_to("id:account-more-0")
         if scroll_to("Per source and priority"):
             if tap("Per source and priority"):
                 wait("Per source and priority", 15)
                 shot(f"{mode}-notify-rules")
-                back_to("Accounts")
+                back_to("id:account-more-0")
 
     if tab("Mail"):
         wait("id:messages")
