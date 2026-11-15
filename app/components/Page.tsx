@@ -28,7 +28,8 @@ export function Page(props: PageProps) {
   return (
     <View class="flex-1 bg-system-background pt-[env(safe-area-inset-top)]">
       <If when={bar()}>
-        <NavigationBar title={props.title} back={props.back} onBack={props.onBack}>
+        {/* collapsed drives the compact title's fade-in from 0, and nothing scrolls this bar. */}
+        <NavigationBar title={props.title} back={props.back} onBack={props.onBack} collapsed={1}>
           <If when={props.trailing} else={<If when={done()}><Button title={t("common.done")} variant="plain" onPress={nav.done} testID="modal-done" /></If>}>
             {props.trailing}
           </If>
