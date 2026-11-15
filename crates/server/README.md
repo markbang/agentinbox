@@ -47,7 +47,7 @@ Every setting also answers to its old `NSHMAIL_*` name, so an existing `.env` ke
 - `GET /v1/events?device=<id>` — while this socket is open, that device gets no push.
 - `GET /v1/oauth/{provider}/start?token=…&return=native|web` — ends at `nshmail://oauth-done?account=<id>` or `<PUBLIC_URL>/?oauth-done&account=<id>`; failures carry `error=<message>`.
 - Push data: `{type:"newMail", account, id, from?, subject?}`.
-- `GET|POST /v1/sources`, `GET|PATCH|DELETE /v1/sources/{id}`, `POST /v1/sources/{id}/token`, `POST /v1/sources/{id}/test` — notification sources (see [docs/design/notification-inbox.md](../../docs/design/notification-inbox.md)). A mail account is a `kind: "mail"` source created and deleted with the account. Creating a webhook/Gotify/ntfy source answers `{source, token, ingestUrl}` once; `/token` rotates it and the old URL stops working. Every mail message is also projected into the feed (`feed_messages`) by triggers in `mail_core`, so list and search behave the same for mail and for ingested notifications.
+- `GET|POST /v1/sources`, `GET|PATCH|DELETE /v1/sources/{id}`, `POST /v1/sources/{id}/token`, `POST /v1/sources/{id}/test` — notification sources (see [docs/design/notification-inbox.md](../../docs/design/notification-inbox.md)). A mail account is a `kind: "mail"` source created and deleted with the account. Creating a webhook/Gotify/ntfy source answers `{source, token, ingestUrl}` once; `/token` rotates it and the old URL stops working. Create takes `kind`, `name`, `icon`, `color`, `config`, `minPriority`, `preset`, `secret`; patch the same without `kind`, plus `enabled`. A field the API does not know answers `400` with the accepted names, because a field that is silently dropped is a lost mapping. Every mail message is also projected into the feed (`feed_messages`) by triggers in `mail_core`, so list and search behave the same for mail and for ingested notifications.
 
 ## Ingestion
 
@@ -55,7 +55,7 @@ Notifications arrive on URLs outside `/v1`; each one is a source, and the token 
 
 | Front end | URL | Notes |
 |---|---|---|
-| Webhook | `POST /hooks/{token}` | JSON or form; `config.preset` (`github`, `gitlab`, `sentry`, `grafana`, `uptime-kuma`) or `config.mapping` (`sender`, `title`, `body`, `bodyHtml`, `link`, `priority`, `tags`, `externalId` as a path, `a || b` chain, `{{template}}` or literal). Answers `202 {"id": …}`. |
+| Webhook | `POST /hooks/{token}` | JSON or form; a preset — `preset` at the top level of the source or `config.preset` (`github`, `gitlab`, `sentry`, `grafana`, `uptime-kuma`) — or `config.mapping` (`sender`, `title`, `body`, `bodyHtml`, `link`, `priority`, `tags`, `externalId` as a path, `a || b` chain, `{{template}}` or literal). Answers `202 {"id": …}`. |
 | Gotify | `POST /message?token={token}` | Gotify's JSON in, Gotify's JSON out. |
 | ntfy | `PUT|POST /{topic}` | The topic is the token; ntfy headers, JSON publish or plain body. `GET /{topic}/json` streams NDJSON, replaying from `?since=<seq>`. |
 

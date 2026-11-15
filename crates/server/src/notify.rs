@@ -2,6 +2,7 @@
 //! by its account (see `mail_core::feed`); every other kind is created here, and the HTTP kinds get
 //! an ingest URL whose token is shown once and only stored hashed.
 
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use axum::{
@@ -83,6 +84,9 @@ pub struct CreateSource {
     /// Write-only: the HMAC key a webhook's `X-Hub-Signature-256` is checked against.
     #[serde(default)]
     secret: Option<String>,
+    /// Whatever the caller sent that we do not know: refused below, never ignored.
+    #[serde(flatten)]
+    extra: BTreeMap<String, Value>,
 }
 
 #[derive(Deserialize)]
@@ -93,6 +97,70 @@ pub struct UpdateSource {
     /// Empty string clears it.
     #[serde(default)]
     secret: Option<String>,
+    #[serde(flatten)]
+    extra: BTreeMap<String, Value>,
+}
+
+const CREATE_FIELDS: [&str; 8] = [
+    "kind",
+    "name",
+    "icon",
+    "color",
+    "config",
+    "minPriority",
+    "preset",
+    "secret",
+];
+
+const UPDATE_FIELDS: [&str; 8] = [
+    "name",
+    "icon",
+    "color",
+    "config",
+    "minPriority",
+    "enabled",
+    "preset",
+    "secret",
+];
+
+/// A misspelled or invented field would be stored nowhere and lost without a word, and a lost
+/// `preset` means every notification arrives as raw JSON (see `ingest::Mapping`).
+fn reject_unknown(extra: &BTreeMap<String, Value>, allowed: &[&str]) -> ApiResult<()> {
+    let Some((first, _)) = extra.first_key_value() else {
+        return Ok(());
+    };
+    let more = match extra.len() {
+        1 => String::new(),
+        n => format!(" (and {} more)", n - 1),
+    };
+    Err(ApiError::bad_request(format!(
+        "unknown field {first:?}{more}; a source takes {}. Mapping rules go in `config.mapping`.",
+        allowed.join(", ")
+    )))
+}
+
+/// A preset name nothing answers leaves the source without a mapping, so refuse it here rather
+/// than at the first notification. An empty name means "no preset" and is skipped.
+fn check_presets<'a>(names: impl IntoIterator<Item = &'a str>) -> ApiResult<()> {
+    let shipped = ingest::presets::ALL.map(|(name, _)| name).join(", ");
+    for name in names {
+        if !name.trim().is_empty() && ingest::presets::get(name).is_none() {
+            return Err(ApiError::bad_request(format!(
+                "unknown preset {name:?}; the shipped ones are {shipped}. For your own payloads \
+                 send `config.mapping` instead."
+            )));
+        }
+    }
+    Ok(())
+}
+
+/// The presets a create or patch would store: the top-level shorthand and `config.preset`.
+fn presets_of<'a>(config: Option<&'a Value>, preset: Option<&'a str>) -> Vec<&'a str> {
+    let mut names: Vec<&str> = preset.into_iter().collect();
+    if let Some(name) = config.and_then(|c| c.get("preset")).and_then(Value::as_str) {
+        names.push(name);
+    }
+    names
 }
 
 /// The shipped presets the settings UI offers; each is a mapping the user can then edit.
@@ -155,6 +223,11 @@ pub async fn create_source(
     user: AuthUser,
     Json(input): Json<CreateSource>,
 ) -> ApiResult<impl IntoResponse> {
+    reject_unknown(&input.extra, &CREATE_FIELDS)?;
+    check_presets(presets_of(
+        input.source.config.as_ref(),
+        input.source.preset.as_deref(),
+    ))?;
     let feed = s.mail_db.feed(user.id);
     let (token, hash) = match mail_core::feed::TOKEN_KINDS.contains(&input.source.kind.as_str()) {
         true => {
@@ -182,6 +255,11 @@ pub async fn update_source(
     Path(id): Path<String>,
     Json(input): Json<UpdateSource>,
 ) -> ApiResult<impl IntoResponse> {
+    reject_unknown(&input.extra, &UPDATE_FIELDS)?;
+    check_presets(presets_of(
+        input.patch.config.as_ref(),
+        input.patch.preset.as_deref(),
+    ))?;
     let source = s.mail_db.feed(user.id).update_source(&id, &input.patch)?;
     if let Some(secret) = input.secret {
         let key = ingest::secret_key(&id);

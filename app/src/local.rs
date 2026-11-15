@@ -498,6 +498,7 @@ impl Backend for LocalBackend {
                 config: source.config.clone(),
                 min_priority: Some(i64::from(source.min_priority)),
                 enabled: Some(source.enabled),
+                preset: None,
             };
             Ok(source_of(&feed.update_source(&source.id, &patch)?))
         })

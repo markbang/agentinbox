@@ -252,6 +252,57 @@ async fn presets_map_real_payloads() {
     }
 }
 
+/// `preset` at the top level of the create body, as the design document writes it, means the same
+/// as `config.preset`: the source must map the payload either way.
+#[tokio::test]
+async fn top_level_preset_maps_real_payloads() {
+    let server = start(temp_dir()).await;
+    let session = server.signup("owner@test.local").await;
+
+    for (fixture, preset, title, sender) in [
+        (
+            include_str!("fixtures/github-issue.json"),
+            "github",
+            "markbang/agentinbox: Sync drops messages above 5k",
+            "bangwu",
+        ),
+        (
+            include_str!("fixtures/uptime-kuma.json"),
+            "uptime-kuma",
+            "[Down] imap.bangwu.me",
+            "imap.bangwu.me",
+        ),
+    ] {
+        let res = server
+            .http
+            .post(format!("{}/sources", server.base))
+            .bearer_auth(&session)
+            .json(&json!({ "kind": "webhook", "name": "Uptime Kuma", "preset": preset }))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::CREATED, "{preset}");
+        let created: Value = res.json().await.unwrap();
+        assert_eq!(created["source"]["config"]["preset"], preset);
+        let url = created["ingestUrl"].as_str().unwrap().to_string();
+        let token = created["token"].as_str().unwrap().to_string();
+
+        let res = server
+            .http
+            .post(server.at(&url))
+            .header("content-type", "application/json")
+            .body(fixture)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::ACCEPTED, "{preset}");
+        let feed = server.feed(&server.source_id_of(&token));
+        assert_eq!(feed.len(), 1, "{preset}");
+        assert_eq!(feed[0].0, title, "{preset} title");
+        assert_eq!(feed[0].2.as_deref(), Some(sender), "{preset} sender");
+    }
+}
+
 #[tokio::test]
 async fn own_mapping_forms_and_html() {
     let dir = temp_dir();

@@ -47,7 +47,7 @@ curl localhost:8080/healthz
 - `GET /v1/events?device=<id>` — 这个连接打开期间，该设备不再收推送。
 - `GET /v1/oauth/{provider}/start?token=…&return=native|web` — 结束时跳到 `nshmail://oauth-done?account=<id>` 或 `<PUBLIC_URL>/?oauth-done&account=<id>`；失败时带 `error=<说明>`。
 - 推送数据：`{type:"newMail", account, id, from?, subject?}`。
-- `GET|POST /v1/sources`、`GET|PATCH|DELETE /v1/sources/{id}`、`POST /v1/sources/{id}/token`、`POST /v1/sources/{id}/test` — 通知来源（见 [docs/design/notification-inbox.zh-CN.md](../../docs/design/notification-inbox.zh-CN.md)）。邮件账号就是一个 `kind: "mail"` 的 source，随账号创建和删除。新建 webhook/Gotify/ntfy 来源时返回一次 `{source, token, ingestUrl}`；`/token` 用于轮换，旧地址立刻失效。每封邮件也会被 `mail_core` 里的触发器投影进 feed（`feed_messages`），所以邮件和接收来的通知在列表与搜索里表现一致。
+- `GET|POST /v1/sources`、`GET|PATCH|DELETE /v1/sources/{id}`、`POST /v1/sources/{id}/token`、`POST /v1/sources/{id}/test` — 通知来源（见 [docs/design/notification-inbox.zh-CN.md](../../docs/design/notification-inbox.zh-CN.md)）。邮件账号就是一个 `kind: "mail"` 的 source，随账号创建和删除。新建 webhook/Gotify/ntfy 来源时返回一次 `{source, token, ingestUrl}`；`/token` 用于轮换，旧地址立刻失效。创建接受 `kind`、`name`、`icon`、`color`、`config`、`minPriority`、`preset`、`secret`；patch 除 `kind` 外相同，另加 `enabled`。接口不认识的字段返回 `400` 并列出可用的字段名——被悄悄丢掉的字段就是丢掉的映射。每封邮件也会被 `mail_core` 里的触发器投影进 feed（`feed_messages`），所以邮件和接收来的通知在列表与搜索里表现一致。
 
 ## 接收
 
@@ -55,7 +55,7 @@ curl localhost:8080/healthz
 
 | 入口 | 地址 | 说明 |
 |---|---|---|
-| Webhook | `POST /hooks/{token}` | JSON 或表单；用 `config.preset`（`github`、`gitlab`、`sentry`、`grafana`、`uptime-kuma`）或 `config.mapping`（`sender`、`title`、`body`、`bodyHtml`、`link`、`priority`、`tags`、`externalId`，取值可以写路径、`a || b` 回退链、`{{模板}}` 或字面量）。返回 `202 {"id": …}`。 |
+| Webhook | `POST /hooks/{token}` | JSON 或表单；用预设——source 顶层的 `preset` 或 `config.preset`（`github`、`gitlab`、`sentry`、`grafana`、`uptime-kuma`）——或 `config.mapping`（`sender`、`title`、`body`、`bodyHtml`、`link`、`priority`、`tags`、`externalId`，取值可以写路径、`a || b` 回退链、`{{模板}}` 或字面量）。返回 `202 {"id": …}`。 |
 | Gotify | `POST /message?token={token}` | 收 Gotify 的 JSON，回 Gotify 的 JSON。 |
 | ntfy | `PUT|POST /{topic}` | topic 就是 token；支持 ntfy 请求头、JSON 发布或直接正文。`GET /{topic}/json` 输出 NDJSON，可用 `?since=<seq>` 补发。 |
 
