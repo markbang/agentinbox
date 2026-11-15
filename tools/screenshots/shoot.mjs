@@ -236,7 +236,9 @@ for (const theme of ["light", "dark"]) {
   await shot("narrow-reader", theme);
   // The settings tab, and its end: the last row must clear the tab bar.
   try {
-    // The bar's slots are drawn, not DOM text: the fifth of five, in the middle of the bar.
+    // The reader covers the bar: back to the list first, then the bar's fifth slot of five.
+    await page.keyboard.press("Escape");
+    await id("messages").waitFor({ timeout: 30_000 });
     await page.mouse.click(412 * 0.9, 915 - 25);
     await id("settings").waitFor({ timeout: 30_000 });
     await shot("narrow-settings", theme);
