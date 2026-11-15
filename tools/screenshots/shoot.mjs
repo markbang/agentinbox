@@ -107,8 +107,7 @@ await page.getByText("Signature…").click();
 await fill("signature-text", "**Lin Chen**\nNorthwind · [northwind.dev](https://northwind.dev)");
 await press("signature-save");
 await page.getByText("Signature saved").waitFor();
-await id("signature-text").waitFor({ state: "detached", timeout: 10_000 }).catch(() => {});
-await press("modal-done").catch(() => page.getByLabel("Back").first().click());
+await id("signature-text").waitFor({ state: "detached", timeout: 20_000 }).catch(() => {});
 log("signature set");
 
 for (const theme of ["light", "dark"]) {
@@ -162,9 +161,9 @@ for (const theme of ["light", "dark"]) {
   await id("signature-preview").waitFor();
   await press("signature-save");
   await page.getByText("Signature saved").waitFor({ timeout: 30_000 });
+  // Saving returns to Settings, which is where the next shot comes from.
   await id("signature-text").waitFor({ state: "detached", timeout: 20_000 }).catch(() => {});
-  await press("modal-done");
-
+  await id("signed-in-as").waitFor();
   await page.getByText("Add account").last().click();
   await id("add-imap").waitFor();
   await shot("add-account", theme);
