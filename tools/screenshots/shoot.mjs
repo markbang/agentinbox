@@ -149,8 +149,12 @@ for (const theme of ["light", "dark"]) {
   await page.getByText("Keyboard shortcuts").first().click();
   await id("shortcuts").waitFor();
   await shot("shortcuts", theme);
+  // Escape closes a sheet: the shortcut list's, and the settings one it sat on.
   await page.keyboard.press("Escape");
   await id("shortcuts").waitFor({ state: "detached", timeout: 10_000 }).catch(() => {});
+  await home();
+  await press("open-settings");
+  await id("signed-in-as").waitFor();
 
   await press("account-more-0");
   await page.getByText("Signature…").click();

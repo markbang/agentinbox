@@ -263,10 +263,10 @@ test("cloud mode: a webhook lands live in the feed, reads, archives, and an agen
 
   // An agent's key: created in Settings, then used against the REST API for real.
   await alices.press("id:open-settings");
-  await alices.press("id:settings-keys");
+  await alices.press("text:API keys");
   await alices.press("id:keys-add-top");
   await alices.type("id:key-name", "Deploy bot");
-  await alices.press("id:key-write");
+  await alices.press("text:Allow marking read and archive");
   await alices.press("id:key-create");
   await alices.waitFor("id:key-token", slow);
   const key = alices.texts().find((text) => text.startsWith("nb_"));
