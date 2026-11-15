@@ -85,7 +85,8 @@ test("adding a webhook source shows its URL once, and again only by rotating it"
   await app.waitFor("id:sources >> text:Buildkite");
   // The URL is not kept on screen: rotating the source makes a new one.
   expect(app.texts().some((text) => text.includes("/hooks/"))).toBe(false);
-  await app.press("id:source-more-10");
+  // The row's own menu: its accessible name, so the demo's source list can change.
+  await app.press("label:Buildkite actions");
   await app.press("text:Show ingest URL");
   await app.waitFor("id:source-url");
   const rotated = app.texts().find((text) => text.startsWith("https://") && text.includes("/hooks/"));
