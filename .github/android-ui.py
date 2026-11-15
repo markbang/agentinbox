@@ -179,12 +179,17 @@ def sign_out(name, tries=2):
         scroll_up_to("id:sign-out")
         if not tap("id:sign-out"):
             return False
-        if not wait("id:android:id/alertTitle", 15):  # the dialog's own title, whatever it says
+        if not wait("Sign out of AgentInbox?", 15):  # the sheet's own title, whatever it says
             return False
         if attempt == 1:
             shot(name)
         steady()
-        tap("id:android:id/button1")
+        # The sheet's action is the lowest node with that word: the row behind it is covered.
+        actions = [n for n in nodes() if matches(n, "Sign out") and box(n)]
+        if not actions:
+            return False
+        x, y = centre(max(actions, key=lambda n: box(n)[3]))
+        adb("shell", "input", "tap", str(x), str(y))
         if wait("id:onboarding", 30):
             return True
         print(f"sign out {attempt} did not show the onboarding", flush=True)
@@ -430,16 +435,12 @@ for mode in ("light", "dark"):
         # Pull to refresh.
         during(["swipe", str(w // 2), str(y1), str(w // 2), str(y1 + h // 3), "1200"], f"{mode}-pull-refresh", 0.9)
 
-    if tap("id:inbox-more"):
-        shot(f"{mode}-inbox-menu")
-        back()
-
     tap("id:message-.*")
     wait("id:reader")
     shot(f"{mode}-reader")
     adb("shell", "input", "swipe", str(w // 2), str(h * 7 // 10), str(w // 2), str(h * 3 // 10), "400")
     shot(f"{mode}-reader-scrolled")
-    if tap("id:reader-more"):
+    if tap("message-more"):
         shot(f"{mode}-reader-menu")
         back()
     back()
@@ -463,10 +464,6 @@ for mode in ("light", "dark"):
     else:
         print("the conversation row is not on screen", flush=True)
 
-    # The FAB menu: New message, Add account.
-    if tap("id:fab-menu"):
-        wait("id:fab-add-account", 5)
-        shot(f"{mode}-fab-menu")
     if tap("id:compose"):
         wait("id:compose-to")
         shot(f"{mode}-compose")
@@ -600,7 +597,7 @@ for mode in ("light", "dark"):
     if tap("Mail"):
         wait("id:messages")
         shot(f"{mode}-tab-back-to-mail")
-        if tap("id:fab-menu") and tap("id:compose"):
+        if tap("id:compose"):
             wait("id:compose-to")
             shot(f"{mode}-compose-signature")
             back()
