@@ -12,6 +12,15 @@ test("prefills our server for cloud mode", async () => {
   expect(app.value("id:server")).toBe("https://mail-api.bangwu.me");
 });
 
+test("a wide window opens its pages in a sheet at most 640 pt wide", async () => {
+  const app = await open("./App.tsx", { platform: "linux", width: 1920, height: 1080, locale: "en-US", ...demo });
+  await app.waitFor("id:open-settings");
+  await app.press("id:open-settings");
+  await app.waitFor("text:Keyboard shortcuts");
+  // The app measures the sheet's content; the library caps the panel it sits in.
+  expect(app.texts().find((text) => text.startsWith("sheet "))).toBe("sheet 640");
+});
+
 test("adds an IMAP account with the detected servers", async () => {
   const app = await open("./App.tsx", { ...desktop, ...demo });
   await app.waitFor("id:open-settings");

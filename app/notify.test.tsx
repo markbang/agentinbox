@@ -121,11 +121,16 @@ test("an API key is created, copied once, listed and revoked", async () => {
   await app.waitFor("text:Build agent");
   expect(app.texts().some((text) => text.startsWith("nb_") && text === token)).toBe(false);
 
-  await app.press("id:key-more-2");
+  await app.press("id:key-more-3");
   await app.waitFor("text:/Revoke Build agent/");
   await app.press("text:Revoke");
-  await app.waitFor("text:Build agent", { state: "gone" });
   await app.waitFor("text:/^Build agent revoked/");
+  // The server lists revoked keys too: the row stays, greyed, with no actions.
+  expect(app.texts().some((text) => text.includes(" · revoked "))).toBe(true);
+  expect(app.shows("id:key-more-3")).toBe(false);
+  const revoked = app.spanStyle("id:key-key-4 >> text:Build agent");
+  const active = app.spanStyle("id:key-key-1 >> text:Claude Code");
+  expect(revoked.color).not.toBe(active.color);
 });
 
 test("the rules keep a mode per source and priority band", async () => {

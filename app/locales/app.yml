@@ -1324,6 +1324,9 @@ keys.revokeBody:
 keys.revoked:
   en: "%{name} revoked."
   zh-CN: 已撤销 %{name}。
+keys.revokedAt:
+  en: revoked %{date}
+  zh-CN: 已于 %{date} 撤销
 keys.actions:
   en: "%{name} actions"
   zh-CN: "%{name} 的操作"

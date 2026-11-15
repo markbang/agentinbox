@@ -4,6 +4,8 @@ English | [简体中文](next.zh-CN.md)
 
 ## Improved
 
+- Sheets are at most 640 pt wide and centred on a wide window (a settings, compose or form sheet is a card, as on iPad) instead of stretching the full width.
+
 ## Fixed
 
 - Every page shows its title again: the bar's compact title faded in from a scroll value nothing drove, so it stayed at zero opacity.
@@ -17,4 +19,4 @@ English | [简体中文](next.zh-CN.md)
   where SF Pro is the font it was measured against.
 - **One spinner.** The list's pull to refresh is the Cupertino indicator; the
   platform's teal Material spinner no longer appears beside the bar's.
-
+- API keys: a revoked key stays in the list as a greyed, unclickable row with the date it was revoked, as the server keeps it, instead of disappearing as if it were still usable.

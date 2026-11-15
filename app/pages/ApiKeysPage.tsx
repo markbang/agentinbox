@@ -18,6 +18,11 @@ export function keyExpiry(key: ApiKey) {
   return key.expiresAt ? t("keys.expires", { date: fullDate(key.expiresAt) }) : t("keys.noExpiry");
 }
 
+/** A revoked key's line: it stays in the list as the server's record, disabled. */
+export function keyRevoked(key: ApiKey) {
+  return t("keys.revokedAt", { date: fullDate(key.revokedAt ?? 0) });
+}
+
 export function ApiKeysPage() {
   const nav = NavContext();
   const busy = signal<string | null>(null);
@@ -75,27 +80,41 @@ export function ApiKeysPage() {
             >
               <Each of={apiKeys()} key={(k) => k.id}>
                 {(k, index) => (
-                  <ListTile
-                    title={k().name}
-                    subtitle={`${k().prefix}… · ${keyScopes(k())} · ${keySources(k())}`}
-                    accessory="none"
-                    separator
-                    onPress={() => revoking.set(k())}
-                    testID={`key-${k().id}`}
+                  <If
+                    when={!k().revokedAt}
+                    else={
+                      <ListTile
+                        title={k().name}
+                        subtitle={`${k().prefix}… · ${keyRevoked(k())}`}
+                        accessory="none"
+                        disabled={true}
+                        separator
+                        testID={`key-${k().id}`}
+                      />
+                    }
                   >
-                    <View class="flex-row items-center gap-2">
-                      <Text class="text-caption1 text-secondary-label">{lastUsed(k())}</Text>
-                      <View
-                        role="button"
-                        accessibilityLabel={t("keys.actions", { name: k().name })}
-                        onPress={() => revoking.set(k())}
-                        class="size-9 items-center justify-center rounded-full active:bg-fill"
-                        testID={`key-more-${index()}`}
-                      >
-                        <Icon name="ellipsis" size={18} tint="system-blue" />
+                    <ListTile
+                      title={k().name}
+                      subtitle={`${k().prefix}… · ${keyScopes(k())} · ${keySources(k())}`}
+                      accessory="none"
+                      separator
+                      onPress={() => revoking.set(k())}
+                      testID={`key-${k().id}`}
+                    >
+                      <View class="flex-row items-center gap-2">
+                        <Text class="text-caption1 text-secondary-label">{lastUsed(k())}</Text>
+                        <View
+                          role="button"
+                          accessibilityLabel={t("keys.actions", { name: k().name })}
+                          onPress={() => revoking.set(k())}
+                          class="size-9 items-center justify-center rounded-full active:bg-fill"
+                          testID={`key-more-${index()}`}
+                        >
+                          <Icon name="ellipsis" size={18} tint="system-blue" />
+                        </View>
                       </View>
-                    </View>
-                  </ListTile>
+                    </ListTile>
+                  </If>
                 )}
               </Each>
             </If>
