@@ -105,7 +105,8 @@ impl Data {
 
     /// A notification that arrives on its own, as a webhook or a bot's would.
     fn deliver_notification(&mut self) -> Option<Notification> {
-        let (source, sender, title, body, priority, tags) = NOTICES[self.arrivals % NOTICES.len()];
+        // Each arrival once: a demo refreshed all afternoon should not pile up the same message.
+        let (source, sender, title, body, priority, tags) = *NOTICES.get(self.arrivals)?;
         self.arrivals += 1;
         if self.sources.iter().all(|s| s.id != source) {
             return None;
@@ -374,7 +375,7 @@ fn now_hex(data: &Data) -> u64 {
 
 /// Where a source's token is sent: the design's three ingest shapes.
 fn ingest_url(kind: SourceKind, token: &str) -> Option<String> {
-    let base = "https://mail-api.bangwu.me";
+    let base = "https://agentinbox.example";
     match kind {
         SourceKind::Webhook => Some(format!("{base}/hooks/{token}")),
         SourceKind::Gotify => Some(format!("{base}/message?token={token}")),
@@ -1977,33 +1978,6 @@ const SOURCE_SEEDS: &[(&str, SourceKind, &str, &str, Option<&str>, bool, u8)] = 
         true,
         0,
     ),
-    (
-        "src-telegram",
-        SourceKind::Telegram,
-        "Team bot",
-        "chart-3",
-        None,
-        true,
-        0,
-    ),
-    (
-        "src-slack",
-        SourceKind::Slack,
-        "Northwind HQ",
-        "chart-1",
-        None,
-        true,
-        3,
-    ),
-    (
-        "src-discord",
-        SourceKind::Discord,
-        "Game night",
-        "chart-2",
-        None,
-        true,
-        0,
-    ),
 ];
 
 /// Notifications in the feed besides mail's.
@@ -2042,28 +2016,6 @@ const NOTICE_SEEDS: &[(&str, f64, &str, &str, &str, u8, &[&str], bool, Option<&s
         None,
     ),
     (
-        "src-slack",
-        1.1 * HOUR,
-        "Priya Raman",
-        "Priya mentioned you in #app",
-        "can you look at the FTS index before the release? the second table is missing from the migration",
-        5,
-        &["mention"],
-        false,
-        None,
-    ),
-    (
-        "src-telegram",
-        1.4 * HOUR,
-        "Maya Patel",
-        "The venue confirmed",
-        "The river venue confirmed 12–14 March. I'll send the contract tomorrow morning.",
-        4,
-        &["team"],
-        false,
-        None,
-    ),
-    (
         "src-backup",
         3.2 * HOUR,
         "Backup script",
@@ -2079,22 +2031,11 @@ const NOTICE_SEEDS: &[(&str, f64, &str, &str, &str, u8, &[&str], bool, Option<&s
         5.0 * HOUR,
         "northwind/atlas",
         "Deploy failed: production",
-        "Deploy agentinbox-server to mail-api.bangwu.me failed at the health check.\n\nThe container restarted 3 times in 90s.",
+        "Deploy agentinbox-server to status.northwind.dev failed at the health check.\n\nThe container restarted 3 times in 90s.",
         9,
         &["deploy", "production"],
         false,
         Some("https://github.com/northwind/atlas/actions"),
-    ),
-    (
-        "src-discord",
-        6.5 * HOUR,
-        "Daniel Okafor",
-        "Saturday raid",
-        "We're four short for Saturday, still in? Same time as last week.",
-        2,
-        &["game-night"],
-        true,
-        None,
     ),
     (
         "src-github",
@@ -2122,7 +2063,7 @@ const NOTICE_SEEDS: &[(&str, f64, &str, &str, &str, u8, &[&str], bool, Option<&s
         "src-kuma",
         2.6 * DAY,
         "Uptime Kuma",
-        "api.bangwu.me is up",
+        "status.northwind.dev is up",
         "Response 200 in 214 ms, after 3 minutes down.",
         1,
         &["uptime"],
@@ -2137,28 +2078,6 @@ const NOTICE_SEEDS: &[(&str, f64, &str, &str, &str, u8, &[&str], bool, Option<&s
         "2160p HDR · 24.8 GB · ready in Plex.",
         2,
         &["download"],
-        true,
-        None,
-    ),
-    (
-        "src-telegram",
-        3.4 * DAY,
-        "Jonas Weber",
-        "Standup notes",
-        "Porto booked, the agenda is in the shared folder. Add your session ideas by Wednesday.",
-        3,
-        &["team"],
-        true,
-        None,
-    ),
-    (
-        "src-slack",
-        4.2 * DAY,
-        "Northwind HQ",
-        "Weekly digest: 12 threads you follow",
-        "#app: 404 is retried twice before failing; #design: the empty states shipped.",
-        1,
-        &["digest"],
         true,
         None,
     ),
@@ -2183,18 +2102,26 @@ const NOTICES: &[(&str, &str, &str, &str, u8, &[&str])] = &[
         &["backup"],
     ),
     (
-        "src-slack",
-        "Maya Patel",
-        "Maya mentioned you in #design",
-        "the new source colours look right in dark mode, ship it",
-        5,
-        &["mention"],
+        "src-kuma",
+        "Uptime Kuma",
+        "Heartbeat: 5 monitors up",
+        "status.northwind.dev, api, web and two cron checks answered in under 300 ms.",
+        1,
+        &["uptime"],
     ),
     (
-        "src-telegram",
-        "Team bot",
-        "Deploy finished",
-        "mail-api.bangwu.me runs v0.0.4, health check green.",
+        "src-sonarr",
+        "Sonarr",
+        "Downloaded: The Bear S03E04",
+        "1080p WEB-DL · 1.4 GB · ready in Plex.",
+        2,
+        &["download"],
+    ),
+    (
+        "src-github",
+        "northwind/atlas",
+        "Deploy passed: staging",
+        "staging.northwind.dev runs 0.0.4; health check green.",
         4,
         &["deploy"],
     ),

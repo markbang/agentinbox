@@ -336,15 +336,21 @@ def focused():
 
 
 def launch():
-    adb("shell", "am", "force-stop", PKG)
-    adb("shell", "monkey", "-p", PKG, "-c", "android.intent.category.LAUNCHER", "1")
-    # The app's window has the focus (no system dialog over it) and its list stopped moving.
-    end = time.time() + 60
-    while PKG not in focused() and time.time() < end:
-        dismiss_anr(nodes())
-        time.sleep(1)
-    wait("id:messages", 60)
-    settled("id:message-.*")
+    # The first start after an install compiles the app: on a loaded runner that can outlast a
+    # minute, so start again rather than spending the whole run on a screen that never came up.
+    for attempt in range(1, 3):
+        adb("shell", "am", "force-stop", PKG)
+        adb("shell", "monkey", "-p", PKG, "-c", "android.intent.category.LAUNCHER", "1")
+        # The app's window has the focus (no system dialog over it) and its list stopped moving.
+        end = time.time() + 90
+        while PKG not in focused() and time.time() < end:
+            dismiss_anr(nodes())
+            time.sleep(1)
+        if find("id:messages", 90):
+            settled("id:message-.*")
+            return
+        print(f"start {attempt} never reached the inbox", flush=True)
+    fail("the app never reached the inbox")
 
 
 def first_row():
@@ -440,7 +446,13 @@ for mode in ("light", "dark"):
     wait("id:messages")
 
     # A conversation: its latest message expanded, the earlier ones collapsed above; a tap expands one.
-    if tap("Offsite in March: Lisbon or Porto?"):
+    # The inbox may be scrolled past it: look above, and skip the screen rather than fail on it.
+    subject = "Offsite in March: Lisbon or Porto?"
+    if not find(subject, 3):
+        scroll_up_to(subject)
+    at = find(subject, 3)
+    if at:
+        adb("shell", "input", "tap", str(at[0]), str(at[1]))
         wait("id:thread-older")
         shot(f"{mode}-thread")
         if tap("id:thread-older"):
@@ -448,6 +460,8 @@ for mode in ("light", "dark"):
             shot(f"{mode}-thread-older")
         back()
         wait("id:messages")
+    else:
+        print("the conversation row is not on screen", flush=True)
 
     # The FAB menu: New message, Add account.
     if tap("id:fab-menu"):

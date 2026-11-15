@@ -10,8 +10,8 @@ const PROTOCOL_VERSIONS: [&str; 3] = ["2025-06-18", "2025-03-26", "2024-11-05"];
 const LIST_BODY_CHARS: usize = 280;
 const GET_BODY_CHARS: usize = 32_000;
 
-const INSTRUCTIONS: &str = "The notification inbox: mail, webhooks, chat bots and push services all \
-land in one feed. list_unread shows what is new, search looks across everything, get reads one \
+const INSTRUCTIONS: &str = "The notification inbox: mail, webhooks and push services all land \
+in one feed. list_unread shows what is new, search looks across everything, get reads one \
 notification in full, list_sources says where messages come from, and mark_read takes a handled \
 notification out of the unread list. Prefer list_unread over guessing; ids come only from this server.";
 
@@ -22,8 +22,8 @@ pub fn tools() -> Value {
         {
             "name": "list_unread",
             "description": "List unread notifications, newest first, across every source the API key \
-                can see: mail, webhooks (GitHub, GitLab, Sentry, Grafana, Uptime Kuma), Gotify, ntfy and \
-                chat bots. Use it to check what is new. Bodies are shortened here; call get with an id \
+                can see: mail, webhooks (GitHub, GitLab, Sentry, Grafana, Uptime Kuma), Gotify and ntfy. \
+                Use it to check what is new. Bodies are shortened here; call get with an id \
                 for the full text.",
             "inputSchema": {
                 "type": "object",
@@ -107,7 +107,7 @@ pub fn tools() -> Value {
         {
             "name": "list_sources",
             "description": "List the notification sources this API key can read — id, kind (mail, \
-                webhook, gotify, ntfy, telegram, …), name, whether it is enabled and its minimum \
+                webhook, gotify, ntfy), name, whether it is enabled and its minimum \
                 priority. Use the ids to filter list_unread and search.",
             "inputSchema": {
                 "type": "object",

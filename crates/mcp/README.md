@@ -2,7 +2,7 @@ English | [简体中文](README.zh-CN.md)
 
 # agentinbox-mcp
 
-A [Model Context Protocol](https://modelcontextprotocol.io) server for the AgentInbox **notification inbox**: mail, webhooks (GitHub, GitLab, Sentry, Grafana, Uptime Kuma), Gotify, ntfy and chat bots all land in one feed, and an agent reads it with a single API key that starts with `nb_`.
+A [Model Context Protocol](https://modelcontextprotocol.io) server for the AgentInbox **notification inbox**: mail, webhooks (GitHub, GitLab, Sentry, Grafana, Uptime Kuma), Gotify and ntfy all land in one feed, and an agent reads it with a single API key that starts with `nb_`.
 
 It is a thin, honest client: five tools, two transports (stdio and streamable HTTP), and the inbox server's own error messages passed through unchanged.
 
