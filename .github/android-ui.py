@@ -99,6 +99,27 @@ def tap(key, timeout=20):
     return True
 
 
+def wait_any(keys, timeout=15):
+    """The first of `keys` that is on screen (a list is added from a bar button, or a row, or an
+    empty state's button), or None."""
+    end = time.time() + timeout
+    while time.time() < end:
+        found = nodes()
+        for key in keys:
+            if any(matches(n, key) and box(n) for n in found):
+                return key
+        time.sleep(1)
+    return None
+
+
+def tap_any(keys, timeout=15):
+    key = wait_any(keys, timeout)
+    if key is None:
+        fail(f"not found: {' or '.join(keys)}")
+        return False
+    return tap(key)
+
+
 def try_tap(key, timeout=10):
     """Taps when the node is there: for the steps whose target the tree does not always carry."""
     n = find(key, timeout)
@@ -264,6 +285,9 @@ def back(timeout=4):
     adb("shell", "input", "keyevent", "4")
     quiet(timeout)
 
+
+# Adding a source: a bar button on a server, a row or an empty state's button on a device.
+SOURCES_ADD = ["id:sources-add-top", "id:sources-add", "id:sources-add-empty"]
 
 TABS = {"Mail": 0, "Notifications": 1, "Search": 2, "Mailboxes": 3, "Settings": 4}
 
@@ -612,16 +636,16 @@ for mode in ("light", "dark"):
         find("Search notifications", 20)
         shot(f"{mode}-notifications")
         if tap("id:notify-more"):
-            wait("id:sources-add-top", 10)  # its menu, before it is screenshotted
+            wait_any(SOURCES_ADD, 10)  # its menu, before it is screenshotted
             shot(f"{mode}-notifications-menu")
             if tap("Sources"):
-                wait("id:sources-add-top", 15)
+                wait_any(SOURCES_ADD, 15)
                 shot(f"{mode}-sources")
-                if tap("id:sources-add-top"):
+                if tap_any(SOURCES_ADD):
                     wait("id:add-source", 10)
                     shot(f"{mode}-source-kinds")
                     back_to("Sources")
-                back_to("id:notifications")
+                back_to("id:notify-list")
             else:
                 back()
         # A notification opens on its own page; Back returns to the feed.
