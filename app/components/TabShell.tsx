@@ -34,8 +34,9 @@ export function TabShell(props: { page: (route: Route) => JSX.Element }) {
   });
   const covered = () => depth() > 1;
   return (
-    <View class="flex-1 bg-system-background">
-      <View class="flex-1">
+    <View class="flex-1 flex-col bg-system-background">
+      {/* min-h-0: a long list must scroll inside the pane, not push the bar off the screen. */}
+      <View class="min-h-0 flex-1">
         <Each of={tabs} key={(tab) => tab.name}>
           {(tab, index) => (
             <View class={index() === selectedTab() ? "flex-1" : "hidden"}>
