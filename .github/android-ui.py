@@ -489,9 +489,10 @@ for mode in ("light", "dark"):
                     wait("id:toast-action", 5)
                     screenshot(f"{mode}-scheduled-snackbar")
                     print("shot", f"{mode}-scheduled-snackbar", flush=True)
-        if not scheduled:
-            back()
-            back()
+        # Whatever the schedule step left open (a sheet, the composer itself), the inbox comes back
+        # before the next screen: a stray focus would take the keystrokes meant for search.
+        if not scheduled or find("id:compose-to", 3) is not None:
+            back_to("id:messages")
     wait("id:messages")
 
     # Scroll the inbox, switch tabs and back: the inbox keeps its place.
