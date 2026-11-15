@@ -492,12 +492,13 @@ test("phones: signing out while mail is arriving lands on onboarding, and the ap
   // meet on the engine thread.
   await app.clock!.runFor(90_000 - 1);
   await app.press("text:Settings");
-  app.onDialog(() => "Sign out");
-  await app.press("id:sign-out");
+  await app.press("text:Sign out");
+  await app.waitFor("text:Sign out of AgentInbox?");
+  await app.press("text:Sign out >> nth=1");
   await app.clock!.runFor(2);
-  await app.waitFor("id:onboarding");
+  await app.waitFor("id:onboarding", { timeout: 10000 });
   // Signed out, and not wedged: the mode choice still leads somewhere.
-  await app.press("id:mode-cloud");
+  await app.press("text:Through an AgentInbox server");
   await app.waitFor("id:server");
   expect(app.value("id:server")).toBe("https://mail-api.bangwu.me");
 });

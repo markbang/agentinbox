@@ -3,7 +3,7 @@
 import { appInfo, Notifications, platform, signal, Text, View } from "nsh";
 import { t } from "nsh/i18n";
 import { Mail, type Account } from "agentinbox/native";
-import { ActionSheet, AlertDialog, Icon, List, ListTile, Section, Switch } from "cupertino";
+import { ActionSheet, Icon, List, ListTile, Section, Switch } from "cupertino";
 import { Page } from "../components/Page";
 import { NavContext } from "../nav";
 import { sources } from "../notify";
@@ -215,7 +215,7 @@ export function SettingsPage() {
           void setUndoDelay(Number(id));
         }}
       />
-      <AlertDialog
+      <ActionSheet
         open={!!confirm()}
         title={confirm()?.kind === "remove" ? t("accounts.removeTitle", { email: confirm()?.account?.email ?? "" }) : t("settings.signOutTitle")}
         message={
@@ -225,10 +225,8 @@ export function SettingsPage() {
               ? t("settings.signOutLocal")
               : t("settings.signOutCloud")
         }
-        actions={[
-          { id: "cancel", title: t("common.cancel") },
-          { id: "go", title: confirm()?.kind === "remove" ? t("accounts.remove") : t("settings.signOut"), destructive: true },
-        ]}
+        actions={[{ id: "go", title: confirm()?.kind === "remove" ? t("accounts.remove") : t("settings.signOut"), destructive: true }]}
+        cancel={t("common.cancel")}
         onOpenChange={({ open }: { open: boolean }) => {
           if (!open) confirm.set(null);
         }}
