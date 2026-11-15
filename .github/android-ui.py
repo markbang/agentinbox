@@ -539,6 +539,8 @@ for mode in ("light", "dark"):
         scheduled = False
         if tap("id:compose-to"):
             adb("shell", "input", "text", "maya@northwind.dev")
+            back()  # the keyboard covers the clock's sheet
+            quiet(1)
             if tap("id:send-later") and find("Tomorrow morning", 5) is not None:
                 shot(f"{mode}-schedule-menu")
                 scheduled = tap("Tomorrow morning")
@@ -610,7 +612,7 @@ for mode in ("light", "dark"):
         find("Search notifications", 20)
         shot(f"{mode}-notifications")
         if tap("id:notify-more"):
-            wait("id:sources", 10)  # its menu, before it is screenshotted
+            wait("id:sources-add-top", 10)  # its menu, before it is screenshotted
             shot(f"{mode}-notifications-menu")
             if tap("Sources"):
                 wait("id:sources-add-top", 15)
@@ -623,7 +625,7 @@ for mode in ("light", "dark"):
             else:
                 back()
         # A notification opens on its own page; Back returns to the feed.
-        row = first_by("notify-.*")
+        row = first_by("notify-[nm][0-9]+")
         if row:
             x, y = centre(row)
             adb("shell", "input", "tap", str(x), str(y))
