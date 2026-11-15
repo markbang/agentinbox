@@ -174,7 +174,7 @@ def sign_out(name, tries=2):
         if attempt > 1:
             print("signing out again, from a restarted app", flush=True)
         launch()
-        if not tap("Settings"):
+        if not tab("Settings"):
             return False
         scroll_up_to("id:sign-out")
         if not tap("id:sign-out"):
@@ -253,6 +253,16 @@ def back(timeout=4):
     """Android's back, then wait for what it changed."""
     adb("shell", "input", "keyevent", "4")
     quiet(timeout)
+
+
+TABS = {"Mail": 0, "Notifications": 1, "Search": 2, "Mailboxes": 3, "Settings": 4}
+
+
+def tab(name, wait_for=None, timeout=20):
+    """Taps a tab by its place in the bar: uiautomator does not always give the items their labels."""
+    x = w * (2 * TABS[name] + 1) // 10
+    adb("shell", "input", "tap", str(x), str(h - 40))
+    return wait(wait_for, timeout) if wait_for else True
 
 
 def long_press(x, y, tries=2):
@@ -440,7 +450,7 @@ for mode in ("light", "dark"):
     shot(f"{mode}-reader")
     adb("shell", "input", "swipe", str(w // 2), str(h * 7 // 10), str(w // 2), str(h * 3 // 10), "400")
     shot(f"{mode}-reader-scrolled")
-    if tap("message-more"):
+    if tap("id:message-more"):
         shot(f"{mode}-reader-menu")
         back()
     back()
@@ -454,10 +464,11 @@ for mode in ("light", "dark"):
     at = find(subject, 3)
     if at:
         adb("shell", "input", "tap", str(at[0]), str(at[1]))
-        wait("id:thread-older")
-        shot(f"{mode}-thread")
-        if tap("id:thread-older"):
-            wait("id:thread-newer")
+        if wait("id:reader"):
+            shot(f"{mode}-reader-conversation")
+        # The earlier messages collapse under a bar of their own; a tap expands them.
+        if tap("id:thread-older", 5):
+            wait("id:thread-newer", 10)
             shot(f"{mode}-thread-older")
         back()
         wait("id:messages")
@@ -487,7 +498,7 @@ for mode in ("light", "dark"):
     adb("shell", "input", "swipe", str(w // 2), str(h * 7 // 10), str(w // 2), str(h * 3 // 10), "300")
     shot(f"{mode}-inbox-scrolled")
 
-    if tap("Search"):
+    if tab("Search"):
         wait("id:search")
         shot(f"{mode}-search")
         tap("id:search")  # the field, before anything is typed
@@ -517,16 +528,16 @@ for mode in ("light", "dark"):
             back()
             shot(f"{mode}-search-none")
 
-    if tap("Mailboxes"):
+    if tab("Mailboxes"):
         wait("id:mailbox-all")
         shot(f"{mode}-mailboxes")
         if tap("id:mailbox-scheduled"):
             wait("id:scheduled")
             shot(f"{mode}-scheduled")
-            if tap("Mailboxes"):
+            if tab("Mailboxes"):
                 tap("id:mailbox-all")
         # An empty folder on the phone: the one draft is deleted, and Drafts says so with its next step.
-        if tap("Mailboxes") and tap("id:mailbox-drafts"):
+        if tab("Mailboxes") and tap("id:mailbox-drafts"):
             wait("id:messages", 15)
             row = settled("id:message-.*")
             if row:
@@ -534,11 +545,11 @@ for mode in ("light", "dark"):
                 if tap("id:select-rows", 5) and tap("id:message-.*") and tap("id:picked-delete"):
                     wait("id:empty-compose", 15)
                     shot(f"{mode}-empty-folder")
-        if tap("Mailboxes") and tap("id:mailbox-all"):
+        if tab("Mailboxes") and tap("id:mailbox-all"):
             wait("id:messages", 15)
 
     # The notification inbox: the feed, a chip, a notification, its sources.
-    if tap("Notifications"):
+    if tab("Notifications"):
         wait("id:notify-list", 20)
         shot(f"{mode}-notifications")
         if tap("id:notify-more"):
@@ -561,7 +572,7 @@ for mode in ("light", "dark"):
             back()
         wait("id:notify-list", 15)
 
-    if tap("Settings"):
+    if tab("Settings"):
         wait("id:settings")
         shot(f"{mode}-settings")
         # The first account's signature, then a new message that carries it.
@@ -594,7 +605,7 @@ for mode in ("light", "dark"):
                 shot(f"{mode}-notify-rules")
                 back_to("id:settings")
 
-    if tap("Mail"):
+    if tab("Mail"):
         wait("id:messages")
         shot(f"{mode}-tab-back-to-mail")
         if tap("id:compose"):
