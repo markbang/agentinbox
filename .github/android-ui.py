@@ -258,6 +258,60 @@ def back(timeout=4):
 TABS = {"Mail": 0, "Notifications": 1, "Search": 2, "Mailboxes": 3, "Settings": 4}
 
 
+def scroll_to_end(tries=8):
+    """Swipes the page up until nothing moves: the end of its content."""
+    last = dump_xml
+    for _ in range(tries):
+        adb("shell", "input", "swipe", str(w // 2), str(h * 8 // 10), str(w // 2), str(h * 4 // 10), "300")
+        quiet(2)
+        if dump_xml == last:
+            return True
+        last = dump_xml
+    return False
+
+
+def settings_bottom(name):
+    """The settings list at its end, with the numbers the tab bar's room needs: the last row (the
+    version line, under Keyboard shortcuts) ends above the bar's top, not under it."""
+    scroll_to_end()
+    shot(name)
+    bar = tab_bar()
+    found = nodes()
+    inside_bar = lambda n: bar is not None and box(n) and box(n)[1] >= bar[1]
+    lowest = None
+    for n in found:
+        text = (n.get("text") or n.get("content-desc") or "").strip()
+        if not text or box(n) is None or inside_bar(n):
+            continue
+        if lowest is None or box(n)[3] > box(lowest)[3]:
+            lowest = n
+    if lowest is None or bar is None:
+        print("settings bottom: no row box or no tab bar to compare", flush=True)
+        return
+    last = (lowest.get("text") or lowest.get("content-desc"), box(lowest))
+    print(
+        f"settings bottom: the lowest row ({last[0]!r}) ends at {last[1][3]}, the tab bar starts at {bar[1]}"
+        f" ({bar[1] - last[1][3]} px of room)",
+        flush=True,
+    )
+    if last[1][3] > bar[1]:
+        fail(f"the last settings row goes under the tab bar by {last[1][3] - bar[1]} px")
+
+
+def loading_shot(name, trigger):
+    """Screenshots `name` while a refresh `trigger` started runs: one indicator, and it is Cupertino's."""
+    if not tap(trigger):
+        return
+    end = time.time() + 5
+    while time.time() < end:
+        if find("id:refreshing", 1) or find("id:notify-refreshing", 1):
+            screenshot(name)
+            print("shot", name, flush=True)
+            gone("id:refreshing", 10)
+            return
+    print(f"the refresh from {trigger} finished before it could be shot", flush=True)
+
+
 def tab_bar():
     """The bar's box, from its own label: the items' labels are not always their own nodes."""
     for n in nodes():
@@ -415,6 +469,9 @@ def swipe_archive(row, tries=3):
 
 
 booted()
+# A phone's own screen: 1080 x 2400 at density 3.0 (the profile's is 2.625), as the phones this ships to.
+adb("shell", "wm", "size", "1080x2400")
+adb("shell", "wm", "density", "480")
 apk = sorted(glob.glob(os.path.join(apk_dir, "*.apk")))[0]
 adb("install", "-r", "-g", apk)
 adb("shell", "settings", "put", "system", "font_scale", "1.0")
@@ -429,6 +486,8 @@ for mode in ("light", "dark"):
     adb("shell", "cmd", "uimode", "night", "yes" if mode == "dark" else "no")
     launch()
     shot(f"{mode}-inbox")
+    # The loading state: one indicator, the bar's Cupertino one (the demo's refresh waits 800 ms).
+    loading_shot(f"{mode}-refreshing", "id:refresh")
 
     # Swipe the first row right: Archive, with Undo. Swipes start mid-row: the screen's edges are the system's back gesture.
     row = settled("id:message-.*")
@@ -620,6 +679,8 @@ for mode in ("light", "dark"):
                 wait("Per source and priority", 15)
                 shot(f"{mode}-notify-rules")
                 back_to("id:account-more-0")
+        # The end of the list: the last row must clear the tab bar, not go under it.
+        settings_bottom(f"{mode}-settings-bottom")
 
     if tab("Mail"):
         wait("id:messages")
@@ -668,8 +729,8 @@ launch()
 tap("id:message-.*")
 wait("id:reader")
 shot("tablet")
-adb("shell", "wm", "size", "reset")
-adb("shell", "wm", "density", "reset")
+adb("shell", "wm", "size", "1080x2400")
+adb("shell", "wm", "density", "480")
 
 adb("logcat", "-d", "-s", "nsh:*", "AndroidRuntime:E", check=False)
 with open(os.path.join(out, "logcat.txt"), "w") as f:

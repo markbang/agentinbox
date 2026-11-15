@@ -11,6 +11,7 @@ import { ActionSheet, Icon, SwipeRow } from "cupertino";
 import { dayLabel, dayOf, relativeDate } from "../lib/format";
 import { wide } from "../layout";
 import { archiveNotifications, markNotifications, sourceById } from "../notify";
+import { PullIndicator, PULL_HEIGHT, pullValue } from "./PullIndicator";
 import { PriorityDot, SourceMark, Tags } from "./SourceMark";
 
 /** A heading for a day, or a notification under it. */
@@ -48,6 +49,8 @@ export function NotificationList(props: {
   testID?: string;
 }) {
   const oneLine = () => !wide();
+  // The pull indicator follows this; the platform's own spinner stays off.
+  const pull = pullValue();
   const actions = signal<Notification | null>(null);
   const find = (id: string) => props.items.find((n) => n.id === id);
   const archive = (id: string) => {
@@ -59,7 +62,7 @@ export function NotificationList(props: {
     if (n) void markNotifications([n.id], !n.read);
   };
   return (
-    <View class="flex-1">
+    <View class="relative flex-1">
       <List
         role="list"
         accessibilityLabel={t("notify.list")}
@@ -68,6 +71,8 @@ export function NotificationList(props: {
         estimatedItemSize={oneLine() ? 96 : 88}
         refreshing={props.refreshing ?? false}
         onRefresh={props.onRefresh}
+        pullValue={pull}
+        refreshIndicator={{ height: PULL_HEIGHT }}
         onLoadMore={props.onLoadMore}
         testID={props.testID}
         empty={props.empty}
@@ -110,6 +115,7 @@ export function NotificationList(props: {
           </If>
         )}
       </List>
+      <PullIndicator pull={pull} />
       <ActionSheet
         open={!!actions()}
         title={actions()?.title}

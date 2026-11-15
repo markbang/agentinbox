@@ -30,6 +30,7 @@ const counts = signal<Record<string, number>>({});
 const unreadTotal = signal(0);
 const more = signal(false);
 const listState = signal<"idle" | "loading" | "refreshing" | "more" | "error">("idle");
+const refreshFrom = signal<"button" | "pull">("button");
 const failure = signal<string | null>(null);
 const filter = signal<string | null>(null);
 const query = signal("");
@@ -57,6 +58,8 @@ export const sourceCounts = () => counts();
 /** Unread notifications in the feed: the tab's and the rail's badge. */
 export const unreadNotifications = () => unreadTotal();
 export const feedStatus = () => listState();
+/** Where the running refresh came from: a pull lights the list's indicator, the bar's button its own. */
+export const feedRefreshFrom = () => refreshFrom();
 /** Why the last load failed, as people read it. */
 export const feedError = () => failure();
 export const feedFilter = () => filter();
@@ -160,8 +163,9 @@ function queryFor(limit: number) {
 let loadToken = 0;
 
 /** Loads the feed again, keeping as many notifications as are shown. */
-export async function reloadFeed(state: "loading" | "refreshing" = "loading") {
+export async function reloadFeed(state: "loading" | "refreshing" = "loading", from: "button" | "pull" = "button") {
   const token = ++loadToken;
+  if (state === "refreshing") refreshFrom.set(from);
   listState.set(state);
   try {
     const page = await Mail.feed(queryFor(Math.max(PAGE, items().length)));

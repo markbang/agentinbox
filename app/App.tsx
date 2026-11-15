@@ -3,7 +3,7 @@
 // windows; the sheet the wide layout opens pages in, the toasts, the
 // shortcuts and the keys.
 import { keymap, mount, View, type InputRef } from "nsh";
-import { NavStack } from "nsh/base";
+import { NavPage, NavStack } from "nsh/base";
 import { Sheet, Theme } from "cupertino";
 import { Toasts } from "./components/Toasts";
 import { TabShell } from "./components/TabShell";
@@ -38,7 +38,17 @@ import { notificationsSection, openNotificationAt, showMail, showNotifications }
 import { shortcutsOpen } from "./lib/shortcuts";
 import type { ComposeMode } from "./lib/format";
 
+// A stack wraps each page in a screen; its header is the app's own (Page draws
+// the Cupertino bar), so the platform draws none.
 function page(route: Route) {
+  return (
+    <NavPage headerVisible={false} class="flex-1">
+      {body(route)}
+    </NavPage>
+  );
+}
+
+function body(route: Route) {
   switch (route.name) {
     case "inbox":
       return <InboxPage />;

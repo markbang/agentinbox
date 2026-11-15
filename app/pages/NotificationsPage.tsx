@@ -8,7 +8,7 @@ import { FeedEmpty } from "../components/FeedEmpty";
 import { FeedFilters, FeedSearch } from "../components/FeedFilters";
 import { NotificationList } from "../components/NotificationList";
 import { NavContext } from "../nav";
-import { feedStatus, loadMoreFeed, notifications, openNotificationAt, reloadFeed, serverInbox, setFeedFilter } from "../notify";
+import { feedRefreshFrom, feedStatus, loadMoreFeed, notifications, openNotificationAt, reloadFeed, serverInbox, setFeedFilter } from "../notify";
 
 export function NotificationsPage() {
   const nav = NavContext();
@@ -30,7 +30,7 @@ export function NotificationsPage() {
           items={notifications()}
           onOpen={open}
           refreshing={feedStatus() === "refreshing"}
-          onRefresh={() => void reloadFeed("refreshing")}
+          onRefresh={() => void reloadFeed("refreshing", "pull")}
           onLoadMore={() => void loadMoreFeed()}
           empty={
             <FeedEmpty

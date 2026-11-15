@@ -6,7 +6,7 @@ import { ActivityIndicator, Button } from "cupertino";
 import { FeedEmpty } from "./FeedEmpty";
 import { FeedFilters, FeedSearch } from "./FeedFilters";
 import { NotificationList } from "./NotificationList";
-import { feedStatus, loadMoreFeed, notifications, openNotification, openNotificationAt, reloadFeed, setFeedFilter } from "../notify";
+import { feedRefreshFrom, feedStatus, loadMoreFeed, notifications, openNotification, openNotificationAt, reloadFeed, setFeedFilter } from "../notify";
 
 export function NotificationsPane(props: { onAddSource: () => void; onAddAccount: () => void; onOpenSources: () => void; onMailboxes?: () => void; testID?: string }) {
   return (
@@ -19,7 +19,7 @@ export function NotificationsPane(props: { onAddSource: () => void; onAddAccount
           {t("notify.allTitle")}
         </Text>
         <If
-          when={feedStatus() === "refreshing"}
+          when={feedStatus() === "refreshing" && feedRefreshFrom() !== "pull"}
           else={<Button icon="arrow.clockwise" label={t("actions.refresh")} variant="plain" onPress={() => void reloadFeed("refreshing")} testID="notify-refresh" />}
         >
           <ActivityIndicator size={20} label={t("sync.running")} testID="notify-refreshing" />
@@ -34,7 +34,7 @@ export function NotificationsPane(props: { onAddSource: () => void; onAddAccount
           selectedId={openNotification()?.id ?? null}
           onOpen={openNotificationAt}
           refreshing={feedStatus() === "refreshing"}
-          onRefresh={() => void reloadFeed("refreshing")}
+          onRefresh={() => void reloadFeed("refreshing", "pull")}
           onLoadMore={() => void loadMoreFeed()}
           empty={<FeedEmpty onAddSource={props.onAddSource} onAddAccount={props.onAddAccount} onClearFilters={() => setFeedFilter(null)} />}
           testID="notify-list"

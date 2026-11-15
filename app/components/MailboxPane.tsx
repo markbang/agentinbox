@@ -20,6 +20,7 @@ import {
   beginPicking,
   picking,
   refresh,
+  refreshingFrom,
   reload,
   rows,
   SEARCH_LIMIT,
@@ -144,7 +145,7 @@ export function MailboxPane(props: MailboxPaneProps) {
           </Text>
         </If>
         <If
-          when={listStatus() === "refreshing"}
+          when={listStatus() === "refreshing" && refreshingFrom() !== "pull"}
           else={
             <Button icon="arrow.clockwise" label={t("actions.refresh")} variant="plain" onPress={() => void refresh()} testID="refresh" />
           }
@@ -198,7 +199,7 @@ export function MailboxPane(props: MailboxPaneProps) {
         selectedId={props.highlight ? selectedKey() : null}
         onOpen={open(rows)}
         refreshing={listStatus() === "refreshing"}
-        onRefresh={() => void refresh()}
+        onRefresh={() => void refresh("pull")}
         onLoadMore={() => void loadMore()}
         loadingMore={listStatus() === "more"}
         showAccount={mailbox().account === null}
