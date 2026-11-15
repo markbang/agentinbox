@@ -236,18 +236,18 @@ for (const theme of ["light", "dark"]) {
   await shot("narrow-reader", theme);
   // The settings tab, and its end: the last row must clear the tab bar.
   try {
-    await page.getByText("Settings", { exact: true }).last().click();
-    await page.getByText("Accounts").first().waitFor({ timeout: 30_000 });
+    // The bar's slots are drawn, not DOM text: the fifth of five, in the middle of the bar.
+    await page.mouse.click(412 * 0.9, 915 - 25);
+    await id("settings").waitFor({ timeout: 30_000 });
     await shot("narrow-settings", theme);
-    const scroller = page.getByTestId("settings").first();
-    for (let i = 0; i < 8; i++) {
-      await scroller.hover();
+    await page.mouse.move(206, 400);
+    for (let i = 0; i < 10; i++) {
       await page.mouse.wheel(0, 600);
       await page.waitForTimeout(150);
     }
     await shot("narrow-settings-bottom", theme);
-    await page.getByText("Mail", { exact: true }).last().click();
-    await page.getByText("Lunch tomorrow?").first().waitFor({ timeout: 30_000 });
+    await page.mouse.click(412 * 0.1, 915 - 25);
+    await id("messages").waitFor({ timeout: 30_000 });
   } catch (e) {
     log("narrow settings:", String(e).slice(0, 200));
   }
