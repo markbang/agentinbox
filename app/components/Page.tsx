@@ -23,13 +23,17 @@ export function Page(props: PageProps) {
   const nav = NavContext();
   // A sheet's first page leaves the flow with Done, as iOS's sheets do.
   const done = () => nav.modal && nav.stack.routes().length === 1;
+  // A page the list already titles (its column header) gets no bar of its own.
+  const bar = () => !!(props.title || props.back || props.trailing || done());
   return (
     <View class="flex-1 bg-system-background pt-[env(safe-area-inset-top)]">
-      <NavigationBar title={props.title} back={props.back} onBack={props.onBack}>
-        <If when={props.trailing} else={<If when={done()}><Button title={t("common.done")} variant="plain" onPress={nav.done} testID="modal-done" /></If>}>
-          {props.trailing}
-        </If>
-      </NavigationBar>
+      <If when={bar()}>
+        <NavigationBar title={props.title} back={props.back} onBack={props.onBack}>
+          <If when={props.trailing} else={<If when={done()}><Button title={t("common.done")} variant="plain" onPress={nav.done} testID="modal-done" /></If>}>
+            {props.trailing}
+          </If>
+        </NavigationBar>
+      </If>
       <If when={props.largeTitle}>
         <View class="px-4 pb-2 pt-1">
           <Text role="header" class="text-largeTitle font-bold text-label">

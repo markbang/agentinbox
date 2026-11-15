@@ -5,7 +5,7 @@ import { BackHandler } from "nsh/mobile";
 import { t } from "nsh/i18n";
 import { Button } from "cupertino";
 import { Page } from "../components/Page";
-import { MailboxPane, mailboxTitle } from "../components/MailboxPane";
+import { MailboxPane } from "../components/MailboxPane";
 import { NavContext, selectTab, TAB } from "../nav";
 import { clearPicked, mailbox, moveMessages, openRow, pickedIds, picking, refresh, rows, setFlags, setThreadFlags, type Row } from "../store";
 
@@ -61,7 +61,7 @@ export function InboxPage() {
   );
   return (
     <Page
-      title={picking() ? t("actions.selected", { count: pickedIds().length }) : mailboxTitle()}
+      title={picking() ? t("actions.selected", { count: pickedIds().length }) : undefined}
       testID="inbox"
     >
       <If when={picking()}>
