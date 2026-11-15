@@ -149,7 +149,8 @@ for (const theme of ["light", "dark"]) {
   await page.getByText("Keyboard shortcuts").first().click();
   await id("shortcuts").waitFor();
   await shot("shortcuts", theme);
-  await press("modal-done");
+  await page.keyboard.press("Escape");
+  await id("shortcuts").waitFor({ state: "detached", timeout: 10_000 }).catch(() => {});
 
   await press("account-more-0");
   await page.getByText("Signature…").click();

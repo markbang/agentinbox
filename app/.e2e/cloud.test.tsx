@@ -229,6 +229,7 @@ test("cloud mode: a webhook lands live in the feed, reads, archives, and an agen
   const hook = alices.texts().find((text) => /^https?:\/\/[^\s]+\/hooks\/\S+$/.test(text));
   expect(hook).toBeTruthy();
   await alices.press("id:source-done");
+  await alices.press("label:Back");
   await alices.press("id:modal-done");
   await alices.waitFor("id:modal", { state: "gone" });
 
