@@ -186,8 +186,8 @@ def sign_out(name, tries=2):
         launch()
         if not tab("Settings"):
             return False
-        scroll_up_to("Sign out")
-        if not tap("Sign out"):
+        scroll_up_to("id:sign-out")
+        if not tap("id:sign-out"):
             return False
         if not wait("Sign out of AgentInbox?", 15):  # the sheet's own title, whatever it says
             return False
@@ -268,6 +268,10 @@ def back(timeout=4):
 TABS = {"Mail": 0, "Notifications": 1, "Search": 2, "Mailboxes": 3, "Settings": 4}
 
 
+def tab_id(name):
+    return "id:tab-" + name.lower()
+
+
 def tab_bar():
     """The bar's box, from its own label: the items' labels are not always their own nodes."""
     for n in nodes():
@@ -277,7 +281,9 @@ def tab_bar():
 
 
 def tab(name):
-    """Taps a tab by its place in the bar, clear of the system's gesture area."""
+    """Taps a tab by its own id; by its place in the bar when the id is not there."""
+    if find(tab_id(name), 3):
+        return tap(tab_id(name))
     bar = tab_bar()
     if bar:
         x1, y1, x2, _ = bar
@@ -391,6 +397,14 @@ def launch():
             return
         print(f"start {attempt} never reached the inbox", flush=True)
     fail("the app never reached the inbox")
+
+
+def first_by(pattern):
+    """The first node whose resource-id matches `pattern`, on screen."""
+    for n in nodes():
+        if re.fullmatch(pattern, n.get("resource-id", "")) and box(n):
+            return n
+    return None
 
 
 def first_row():
@@ -511,7 +525,7 @@ for mode in ("light", "dark"):
                 shot(f"{mode}-schedule-menu")
                 scheduled = tap("Tomorrow morning")
                 if scheduled:
-                    find("id:toast-action", 5)  # seconds long: the shot follows either way
+                    wait("id:toast-action", 5)  # seconds long: the shot follows either way
                     screenshot(f"{mode}-scheduled-snackbar")
                     print("shot", f"{mode}-scheduled-snackbar", flush=True)
         # Whatever the schedule step left open (a sheet, the composer itself), the inbox comes back
@@ -554,15 +568,15 @@ for mode in ("light", "dark"):
             shot(f"{mode}-search-none")
 
     if tab("Mailboxes"):
-        wait("All inboxes")
+        wait("id:mailbox-all")
         shot(f"{mode}-mailboxes")
-        if tap("Scheduled"):
-            find("id:scheduled", 10)  # the page's own id is a container; the shot is the proof
+        if tap("id:mailbox-scheduled"):
+            wait("id:scheduled", 10)  # the page's own id is a container; the shot is the proof
             shot(f"{mode}-scheduled")
             if tab("Mailboxes"):
-                tap("All inboxes")
+                tap("id:mailbox-all")
         # An empty folder on the phone: the one draft is deleted, and Drafts says so with its next step.
-        if tab("Mailboxes") and tap("Drafts"):
+        if tab("Mailboxes") and tap("id:mailbox-drafts"):
             wait("id:messages", 15)
             row = settled("id:message-.*")
             if row:
@@ -570,7 +584,7 @@ for mode in ("light", "dark"):
                 if tap("id:select-rows", 5) and tap("id:message-.*") and tap("id:picked-delete"):
                     wait("id:empty-compose", 15)
                     shot(f"{mode}-empty-folder")
-        if tab("Mailboxes") and tap("All inboxes"):
+        if tab("Mailboxes") and tap("id:mailbox-all"):
             wait("id:messages", 15)
 
     # The notification inbox: the feed, a chip, a notification, its sources.
@@ -578,10 +592,10 @@ for mode in ("light", "dark"):
         find("Search notifications", 20)
         shot(f"{mode}-notifications")
         if tap("id:notify-more"):
-            find("Sources", 10)  # its menu, before it is screenshotted
+            wait("id:sources", 10)  # its menu, before it is screenshotted
             shot(f"{mode}-notifications-menu")
             if tap("Sources"):
-                find("Sources", 15)
+                wait("id:sources", 15)
                 shot(f"{mode}-sources")
                 if tap("id:sources-add-top"):
                     wait("id:add-source", 10)
@@ -590,16 +604,18 @@ for mode in ("light", "dark"):
                 back_to("id:notifications")
             else:
                 back()
-        # A notification opens on its own page; Back returns to the feed. The rows' titles are not
-        # always their own nodes, so the first row is tapped where the list starts.
-        adb("shell", "input", "tap", str(w // 2), str(h // 3))
-        if find("id:notify-reader", 8):
-            shot(f"{mode}-notification")
-            back()
-        find("Search notifications", 15)
+        # A notification opens on its own page; Back returns to the feed.
+        row = first_by("notify-.*")
+        if row:
+            x, y = centre(row)
+            adb("shell", "input", "tap", str(x), str(y))
+            if wait("id:notify-reader", 15):
+                shot(f"{mode}-notification")
+                back()
+        wait("id:notify-list", 15)
 
     if tab("Settings"):
-        find("Accounts", 10)
+        find("id:settings", 10)
         shot(f"{mode}-settings")
         # The first account's signature, then a new message that carries it.
         if try_tap("id:account-more-0") and tap("Signature…") and tap("id:signature-text"):
@@ -611,28 +627,31 @@ for mode in ("light", "dark"):
             shot(f"{mode}-signature")
             # The first tap may only take the focus from the field.
             for _ in range(2):
-                if tap("id:signature-save") and find("Accounts", 8) is not None:
+                if tap("id:signature-save") and find("id:settings", 8) is not None:
                     break
             else:
                 fail("the signature page never closed")
         # The notification settings: the keys agents read the feed with, and the rules.
-        if scroll_to("API keys"):
-            if tap("API keys"):
-                wait("API keys", 15)
+        if scroll_to("id:settings-keys"):
+            if tap("id:settings-keys"):
+                wait("id:api-keys", 15)
                 shot(f"{mode}-api-keys")
                 if tap("id:keys-add-top"):
-                    wait("New API key", 10)
+                    wait("id:new-key", 10)
                     shot(f"{mode}-new-key")
-                    back_to("API keys")
-                back_to("id:account-more-0")
-        if scroll_to("Per source and priority"):
-            if tap("Per source and priority"):
-                wait("Per source and priority", 15)
+                    back_to("id:api-keys")
+                back_to("id:settings")
+        if scroll_to("id:settings-rules"):
+            if tap("id:settings-rules"):
+                wait("id:notify-rules", 15)
                 shot(f"{mode}-notify-rules")
-                back_to("id:account-more-0")
+                back_to("id:settings")
 
     if tab("Mail"):
-        find("id:messages", 15)
+        # The Mail tab keeps the search it was left on: clearing it brings the mailbox back.
+        if find("id:search-clear", 2):
+            tap("id:search-clear")
+        wait("id:messages", 15)
         shot(f"{mode}-tab-back-to-mail")
         if try_tap("id:compose"):
             wait("id:compose-to")
