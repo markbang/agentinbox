@@ -198,7 +198,7 @@ export function MailboxPane(props: MailboxPaneProps) {
         items={rows()}
         selectedId={props.highlight ? selectedKey() : null}
         onOpen={open(rows)}
-        refreshing={listStatus() === "refreshing"}
+        refreshing={listStatus() === "refreshing" && refreshingFrom() === "pull"}
         onRefresh={() => void refresh("pull")}
         onLoadMore={() => void loadMore()}
         loadingMore={listStatus() === "more"}

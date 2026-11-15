@@ -33,7 +33,7 @@ export function NotificationsPane(props: { onAddSource: () => void; onAddAccount
           items={notifications()}
           selectedId={openNotification()?.id ?? null}
           onOpen={openNotificationAt}
-          refreshing={feedStatus() === "refreshing"}
+          refreshing={feedStatus() === "refreshing" && feedRefreshFrom() === "pull"}
           onRefresh={() => void reloadFeed("refreshing", "pull")}
           onLoadMore={() => void loadMoreFeed()}
           empty={<FeedEmpty onAddSource={props.onAddSource} onAddAccount={props.onAddAccount} onClearFilters={() => setFeedFilter(null)} />}

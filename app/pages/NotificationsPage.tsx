@@ -29,7 +29,7 @@ export function NotificationsPage() {
         <NotificationList
           items={notifications()}
           onOpen={open}
-          refreshing={feedStatus() === "refreshing"}
+          refreshing={feedStatus() === "refreshing" && feedRefreshFrom() === "pull"}
           onRefresh={() => void reloadFeed("refreshing", "pull")}
           onLoadMore={() => void loadMoreFeed()}
           empty={
