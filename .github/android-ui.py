@@ -299,25 +299,31 @@ def settings_bottom(name):
 
 
 def loading_shot(name, trigger):
-    """Screenshots `name` while a refresh `trigger` started runs: one indicator, and it is Cupertino's."""
+    """Screenshots `name` while a refresh `trigger` started runs: one indicator, and it is Cupertino's.
+    The demo's refresh waits 800 ms, too short for a dump: the frame comes straight off the screen."""
     if not tap(trigger):
         return
-    end = time.time() + 5
-    while time.time() < end:
-        if find("id:refreshing", 1) or find("id:notify-refreshing", 1):
-            screenshot(name)
-            print("shot", name, flush=True)
-            gone("id:refreshing", 10)
-            return
-    print(f"the refresh from {trigger} finished before it could be shot", flush=True)
+    time.sleep(0.25)
+    screenshot(name)
+    print("shot", name, flush=True)
+    gone("id:refreshing", 10) or gone("id:notify-refreshing", 10)
 
 
 def tab_bar():
-    """The bar's box, from its own label: the items' labels are not always their own nodes."""
-    for n in nodes():
+    """The bar's box, from its own label or, when the dump carries no such node, from the top of its
+    items' buttons: the bar is 49 pt over the safe area, and its items fill it from that top."""
+    found = nodes()
+    for n in found:
         if (n.get("content-desc") or n.get("text")) == "Tabs" and box(n):
             return box(n)
-    return None
+    labels = {"Mail", "Notifications", "Search", "Mailboxes", "Settings"}
+    items = [box(n) for n in found if n.get("clickable") == "true" and (n.get("text") in labels or n.get("content-desc") in labels) and box(n)]
+    if not items:
+        return None
+    left = min(b[0] for b in items)
+    right = max(b[2] for b in items)
+    top = min(b[1] for b in items)
+    return (left, top, right, h)
 
 
 def tab(name):
@@ -469,9 +475,14 @@ def swipe_archive(row, tries=3):
 
 
 booted()
-# A phone's own screen: 1080 x 2400 at density 3.0 (the profile's is 2.625), as the phones this ships to.
-adb("shell", "wm", "size", "1080x2400")
+# A phone's own screen: 1440 x 3120 at density 3.0 (the profile's is 1080 x 2400 at 2.625), as the
+# phones this ships to draw it.
+adb("shell", "wm", "size", "1440x3120")
 adb("shell", "wm", "density", "480")
+print("screen", adb("shell", "wm", "size").strip(), adb("shell", "wm", "density").strip(), flush=True)
+for line in adb("shell", "dumpsys", "window", "displays", check=False).splitlines():
+    if re.search(r"mStableInsets|insetsSource|navigationBars|statusBars", line, re.I):
+        print("insets:", line.strip(), flush=True)
 apk = sorted(glob.glob(os.path.join(apk_dir, "*.apk")))[0]
 adb("install", "-r", "-g", apk)
 adb("shell", "settings", "put", "system", "font_scale", "1.0")
@@ -729,7 +740,7 @@ launch()
 tap("id:message-.*")
 wait("id:reader")
 shot("tablet")
-adb("shell", "wm", "size", "1080x2400")
+adb("shell", "wm", "size", "1440x3120")
 adb("shell", "wm", "density", "480")
 
 adb("logcat", "-d", "-s", "nsh:*", "AndroidRuntime:E", check=False)
