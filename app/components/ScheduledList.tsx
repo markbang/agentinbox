@@ -1,10 +1,12 @@
 // The Scheduled mailbox: messages waiting in the outbox for their time, and
-// those that could not be sent. A row opens the message to edit (closing the
-// composer puts it back); Cancel send takes it out, with Undo.
-import { Scroll, Text, View } from "nsh";
+// those that could not be sent. A row opens the message to edit; cancel takes
+// it out, with Undo.
+import { Text, View } from "nsh";
 import { t } from "nsh/i18n";
+import { Button, Icon, ScrollView } from "cupertino";
 import { Mail, type Outgoing } from "agentinbox/native";
-import { AccountMark, Empty, Icon, IconButton, LoadingIndicator, Row, touch } from "../ui";
+import { Empty, Loading } from "./Empty";
+import { AccountMark } from "./Marks";
 import { displayName, sendDate } from "../lib/format";
 import { wide } from "../layout";
 import { show } from "../nav";
@@ -28,39 +30,34 @@ function ScheduledRow(props: { outgoing: Outgoing; showAccount: boolean }) {
   const preview = () => o().draft.text.replace(/\s+/g, " ").trim();
   const when = () => sendDate(o().sendAt);
   return (
-    <Row
-      onPress={() => void edit(o())}
+    <View
+      role="button"
       accessibilityLabel={[to(), subject(), o().error ? t("outbox.notSent", { detail: o().error!.message }) : t("outbox.sends", { when: when() })].join(", ")}
-      class={`mb-0.5 flex-row items-center pe-2 ${touch ? "py-2" : "py-2.5"}`}
+      onPress={() => void edit(o())}
+      class="flex-row items-center gap-2 border-b border-separator py-2.5 pl-3 pr-2 active:bg-fill"
       testID="scheduled-row"
     >
       <If when={props.showAccount}>
         <AccountMark index={accountIndex(o().draft.accountId)} shape="bar" />
       </If>
-      <View class="w-6 items-center self-start pt-1">
-        <If when={o().error}>
-          <Icon name="alert" size="sm" tone="error" />
-        </If>
-      </View>
       <View class="min-w-0 flex-1 gap-0.5">
-        <View class="flex-row items-center gap-1.5">
-          <Text class="line-clamp-1 flex-1 text-body-large tracking-body-large text-on-surface">{to()}</Text>
-          <Text class={`text-label-medium tracking-label-medium tabular-nums ${o().error ? "text-error" : "text-primary"}`}>{when()}</Text>
+        <View class="flex-row items-center gap-2">
+          <If when={o().error}>
+            <Icon name="exclamationmark.triangle" size={14} tint="system-red" />
+          </If>
+          <Text class="line-clamp-1 flex-1 text-body text-label">{to()}</Text>
+          <Text class={`shrink-0 text-footnote tabular-nums ${o().error ? "text-system-red" : "text-secondary-label"}`}>{when()}</Text>
         </View>
-        <Text class="line-clamp-1 text-body-medium tracking-body-medium text-on-surface">{subject()}</Text>
+        <Text class="line-clamp-1 text-subheadline text-label">{subject()}</Text>
         <If
           when={o().error}
-          else={
-            <If when={preview()}>
-              <Text class="line-clamp-1 text-body-medium tracking-body-medium text-on-surface-variant">{preview()}</Text>
-            </If>
-          }
+          else={<If when={preview()}><Text class="line-clamp-1 text-subheadline text-secondary-label">{preview()}</Text></If>}
         >
-          {(e) => <Text class="line-clamp-2 text-body-medium tracking-body-medium text-error">{t("outbox.notSent", { detail: e().message })}</Text>}
+          {(e) => <Text class="line-clamp-2 text-subheadline text-system-red">{t("outbox.notSent", { detail: e().message })}</Text>}
         </If>
       </View>
-      <IconButton icon="close" label={t("outbox.cancel")} onPress={() => void cancelScheduled(o().id)} testID="scheduled-cancel" />
-    </Row>
+      <Button icon="xmark" label={t("outbox.cancel")} variant="plain" onPress={() => void cancelScheduled(o().id)} testID="scheduled-cancel" />
+    </View>
   );
 }
 
@@ -71,26 +68,25 @@ export function ScheduledList() {
     <If
       when={items().length}
       else={
-        <If
-          when={outboxLoaded()}
-          else={
-            <View class="flex-1 items-center justify-center p-8">
-              <LoadingIndicator label={t("reader.loading")} contained />
-            </View>
-          }
-        >
-          <Empty icon="clock" title={t("outbox.empty")} description={mailStatus().mode === "local" ? t("outbox.localHint") : t("outbox.emptyHint")} />
+        <If when={outboxLoaded()} else={<Loading label={t("reader.loading")} />}>
+          <Empty
+            icon="clock"
+            title={t("outbox.empty")}
+            description={mailStatus().mode === "local" ? t("outbox.localHint") : t("outbox.emptyHint")}
+          />
         </If>
       }
     >
-      <Scroll class="flex-1" contentClass={`gap-0.5 ${touch ? "pb-24" : "px-2 pb-2"}`} testID="scheduled">
-        <Each of={items()} key={(o) => o.id}>
-          {(o) => <ScheduledRow outgoing={o()} showAccount={mailbox().account === null} />}
-        </Each>
-        <If when={mailStatus().mode === "local"}>
-          <Text class="px-4 py-3 text-body-small tracking-body-small text-on-surface-variant">{t("outbox.localHint")}</Text>
-        </If>
-      </Scroll>
+      <ScrollView class="flex-1" testID="scheduled">
+        <View class="pb-6">
+          <Each of={items()} key={(o) => o.id}>
+            {(o) => <ScheduledRow outgoing={o()} showAccount={mailbox().account === null} />}
+          </Each>
+          <If when={mailStatus().mode === "local"}>
+            <Text class="px-4 py-3 text-footnote text-secondary-label">{t("outbox.localHint")}</Text>
+          </If>
+        </View>
+      </ScrollView>
     </If>
   );
 }

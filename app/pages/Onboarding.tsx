@@ -1,9 +1,9 @@
 // The first screen: where mail comes from. A browser cannot reach mail
 // servers, so on the web only a server (cloud mode) is offered.
-import { Notifications, platform, Scroll, signal, Text, UrlScheme, View } from "nsh";
+import { Notifications, platform, signal, Text, UrlScheme, View } from "nsh";
 import { t } from "nsh/i18n";
 import { Mail } from "agentinbox/native";
-import { Button, Choice, Icon, Row, TextField, type IconName } from "../ui";
+import { ActivityIndicator, Button, Icon, List, ListTile, ScrollView, Section, SegmentedControl, TextField } from "cupertino";
 import { errorText, sessionChanged } from "../store";
 
 const web = platform.os === "web";
@@ -18,23 +18,6 @@ function pageOrigin() {
   } catch {
     return "";
   }
-}
-
-function Mode(props: { icon: IconName; title: string; detail: string; selected: boolean; onPress: () => void; testID: string }) {
-  return (
-    <Row
-      selected={props.selected}
-      onPress={props.onPress}
-      testID={props.testID}
-      class={`flex-row items-start gap-4 !rounded-large p-4 ${props.selected ? "" : "border border-outline-variant"}`}
-    >
-      <Icon name={props.icon} tone={props.selected ? "on-secondary-container" : "on-surface-variant"} />
-      <View class="flex-1 gap-1">
-        <Text class={`text-title-medium font-medium tracking-title-medium ${props.selected ? "text-on-secondary-container" : "text-on-surface"}`}>{props.title}</Text>
-        <Text class={`text-body-medium tracking-body-medium ${props.selected ? "text-on-secondary-container" : "text-on-surface-variant"}`}>{props.detail}</Text>
-      </View>
-    </Row>
-  );
 }
 
 export function Onboarding() {
@@ -66,72 +49,95 @@ export function Onboarding() {
   };
 
   return (
-    <Scroll class="flex-1 bg-surface" contentClass="grow items-center justify-center p-6 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
-      <View class="w-full max-w-[420px] gap-6 py-8" testID="onboarding">
-        <View class="gap-2">
-          <View class="mb-2 size-16 items-center justify-center rounded-extra-large bg-primary-container">
-            <Icon name="inboxes" size="lg" tone="on-primary-container" />
+    <ScrollView class="flex-1" testID="onboarding">
+      <View class="items-center px-6 pb-10 pt-12">
+        <View class="w-full max-w-[440px] gap-6">
+          <View class="items-center gap-3">
+            <View class="size-[72px] items-center justify-center rounded-[18px] bg-system-blue/15">
+              <Icon name="tray" size={38} tint="system-blue" />
+            </View>
+            <Text role="header" class="text-center text-largeTitle font-bold text-label">
+              {t("onboarding.title")}
+            </Text>
+            <Text class="text-center text-body text-secondary-label">{web ? t("onboarding.subtitleWeb") : t("onboarding.subtitle")}</Text>
           </View>
-          <Text role="header" class="text-headline-medium font-medium text-on-surface">
-            {t("onboarding.title")}
-          </Text>
-          <Text class="text-body-large tracking-body-large text-on-surface-variant">{web ? t("onboarding.subtitleWeb") : t("onboarding.subtitle")}</Text>
+
+          <If when={!web} else={<Text class="text-center text-subheadline text-secondary-label">{t("onboarding.webOnlyCloud")}</Text>}>
+            <List scroll={false} background="system-background">
+              <Section>
+                <ListTile
+                  title={t("onboarding.local")}
+                  subtitle={t("onboarding.localDetail")}
+                  leading="circle.lefthalf.filled"
+                  accessory="checkmark"
+                  checked={mode() === "local"}
+                  onPress={() => mode.set("local")}
+                  testID="mode-local"
+                />
+                <ListTile
+                  title={t("onboarding.cloud")}
+                  subtitle={t("onboarding.cloudDetail")}
+                  leading="cloud"
+                  accessory="checkmark"
+                  checked={mode() === "cloud"}
+                  separator={false}
+                  onPress={() => mode.set("cloud")}
+                  testID="mode-cloud"
+                />
+              </Section>
+            </List>
+          </If>
+
+          <If when={mode() === "cloud"}>
+            <View class="gap-2.5">
+              <SegmentedControl
+                items={[
+                  { value: "in", title: t("onboarding.signIn") },
+                  { value: "up", title: t("onboarding.signUp") },
+                ]}
+                value={signUp() ? "up" : "in"}
+                onChange={({ value }: { value: string }) => signUp.set(value === "up")}
+                label={t("onboarding.signIn")}
+              />
+              <TextField value={server()} onChange={({ value: v }: { value: string }) => server.set(v)} keyboard="url" placeholder="https://mail.example.com" label={t("onboarding.server")} testID="server" />
+              <Text class="px-1 text-footnote text-secondary-label">{t("onboarding.serverHint")}</Text>
+              <TextField value={email()} onChange={({ value: v }: { value: string }) => email.set(v)} keyboard="email" placeholder={t("onboarding.email")} label={t("onboarding.email")} testID="cloud-email" />
+              <TextField
+                value={password()}
+                onChange={({ value: v }: { value: string }) => password.set(v)}
+                secure
+                placeholder={t("onboarding.password")}
+                label={t("onboarding.password")}
+                returnKey="go"
+                onSubmit={() => void go()}
+                testID="cloud-password"
+              />
+              <If when={signUp()}>
+                <Text class="px-1 text-footnote text-secondary-label">{t("onboarding.passwordHint")}</Text>
+              </If>
+            </View>
+          </If>
+
+          <If when={error()}>
+            <Text role="alert" class="text-center text-subheadline text-system-red" testID="onboarding-error">
+              {error() ?? ""}
+            </Text>
+          </If>
+
+          <View class="items-center gap-3">
+            <Button
+              title={mode() === "local" ? t("onboarding.useLocal") : signUp() ? t("onboarding.createAccount") : t("onboarding.signIn")}
+              disabled={busy()}
+              onPress={() => void go()}
+              class="w-full"
+              testID="onboarding-go"
+            />
+            <If when={busy()}>
+              <ActivityIndicator label={t("onboarding.signIn")} />
+            </If>
+          </View>
         </View>
-
-        <If when={!web} else={<Text class="text-body-medium tracking-body-medium text-on-surface-variant">{t("onboarding.webOnlyCloud")}</Text>}>
-          <View class="gap-2">
-            <Mode
-              icon="device"
-              title={t("onboarding.local")}
-              detail={t("onboarding.localDetail")}
-              selected={mode() === "local"}
-              onPress={() => mode.set("local")}
-              testID="mode-local"
-            />
-            <Mode
-              icon="cloud"
-              title={t("onboarding.cloud")}
-              detail={t("onboarding.cloudDetail")}
-              selected={mode() === "cloud"}
-              onPress={() => mode.set("cloud")}
-              testID="mode-cloud"
-            />
-          </View>
-        </If>
-
-        <If when={mode() === "cloud"}>
-          <View class="gap-4">
-            <Choice
-              label={t("onboarding.signIn")}
-              fullWidth
-              value={signUp() ? "up" : "in"}
-              options={[
-                { value: "in", label: t("onboarding.signIn") },
-                { value: "up", label: t("onboarding.signUp") },
-              ]}
-              onChange={(v) => signUp.set(v === "up")}
-            />
-            <TextField value={server()} onChange={(v) => server.set(v)} kind="url" placeholder="https://mail.example.com" label={t("onboarding.server")} testID="server" supporting={t("onboarding.serverHint")} />
-            <TextField value={email()} onChange={(v) => email.set(v)} kind="email" label={t("onboarding.email")} testID="cloud-email" />
-            <TextField value={password()} onChange={(v) => password.set(v)} masked label={t("onboarding.password")} onSubmit={() => void go()} returnKey="go" testID="cloud-password" supporting={signUp() ? t("onboarding.passwordHint") : undefined} />
-          </View>
-        </If>
-
-        <If when={error()}>
-          <Text class="text-body-medium tracking-body-medium text-error" testID="onboarding-error">
-            {error()}
-          </Text>
-        </If>
-
-        <Button
-          size="md"
-          fullWidth
-          label={mode() === "local" ? t("onboarding.useLocal") : signUp() ? t("onboarding.createAccount") : t("onboarding.signIn")}
-          loading={busy()}
-          onPress={() => void go()}
-          testID="onboarding-go"
-        />
       </View>
-    </Scroll>
+    </ScrollView>
   );
 }

@@ -4,6 +4,13 @@ English | [简体中文](next.zh-CN.md)
 
 ## Improved
 
+- AgentInbox now looks like iOS on every platform: the shell, lists, reader,
+  composer, search, settings and the notification inbox are drawn with the shared
+  [Cupertino design system](https://github.com/markbang/nsh-cupertino) (`nsh-cupertino`
+  0.2.1) — the Material 3 Expressive layer is gone.
+- Wide windows are an iPad Mail split view (sidebar, list, reader); narrow windows
+  and phones are a tab bar over pushed pages with sheets for compose and settings.
+
 ## Fixed
 
 - Sources: `POST /v1/sources` and `PATCH /v1/sources/{id}` take `preset` at the top level as well as in `config`, and refuse a field or preset name they do not know with `400` instead of storing a source that maps nothing.

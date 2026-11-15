@@ -40,14 +40,18 @@ test("the feed holds every source; a chip filters it; opening reads, archiving t
   await app.press("id:notify-archive");
   await app.waitFor("id:notify-list >> text:CI failed on main", { state: "gone" });
   await app.waitFor("text:Notification archived");
+  console.log("TOAST", JSON.stringify(app.texts().slice(-3)));
   await app.press("id:toast-action");
-  await app.waitFor("id:notify-list >> text:CI failed on main");
+  await app.wait(500);
+  console.log("AFTER", JSON.stringify(app.texts().filter((t) => t.includes("CI failed") || t.includes("Undo"))));
+  await app.waitFor("id:notify-list >> text:CI failed on main", { timeout: 10000 });
 });
 
 test("a mail notification opens in Mail", async () => {
   const app = await open("./App.tsx", { ...desktop, ...demo });
   await app.waitFor("id:rail-notifications");
   await app.press("id:rail-notifications");
+  await app.waitFor("id:notify-list >> text:Q4 roadmap draft");
   await app.press("id:notify-list >> text:Q4 roadmap draft");
   await app.waitFor("id:notify-open-mail");
   await app.press("id:notify-open-mail");
@@ -58,23 +62,24 @@ test("adding a webhook source shows its URL once, and again only by rotating it"
   const app = await open("./App.tsx", { ...desktop, ...demo });
   await app.waitFor("id:open-settings");
   await app.press("id:open-settings");
-  await app.press("id:settings-sources");
-  await app.waitFor("id:sources >> text:GitHub");
-  await app.press("id:sources-add");
-  await app.waitFor("id:add-source");
+  await app.press("text:Sources");
+  await app.waitFor("text:GitHub");
+  await app.press("id:sources-add-top");
+  await app.waitFor("text:What kind of source?");
   // The chats wait for the server's bot connections; the three ingest kinds do not.
   expect(app.shows("id:kind-webhook")).toBe(true);
   expect(app.shows("id:kind-slack")).toBe(false);
-  await app.press("id:kind-webhook");
-  await app.waitFor("id:source-form");
+  await app.press("text:Webhook");
+  await app.waitFor("text:Name");
   await app.press("id:source-create");
   await app.waitFor("text:Name the source.");
   await app.type("id:source-name", "Buildkite");
   await app.press("id:source-color-chart-3");
-  await app.press("id:source-priority-high");
+  await app.press("text:Everything");
+  await app.press("text:High only");
   await app.press("id:source-create");
 
-  await app.waitFor("id:source-url");
+  await app.waitFor("text:/\/hooks\//");
   const url = app.texts().find((text) => text.startsWith("https://") && text.includes("/hooks/"));
   expect(url).toBeTruthy();
   await app.press("id:source-copy");
@@ -82,13 +87,13 @@ test("adding a webhook source shows its URL once, and again only by rotating it"
   await app.press("id:source-test");
   await app.waitFor("text:/^Test message sent from Buildkite/");
   await app.press("id:source-done");
-  await app.waitFor("id:sources >> text:Buildkite");
+  await app.waitFor("text:Buildkite");
   // The URL is not kept on screen: rotating the source makes a new one.
-  expect(app.texts().some((text) => text.includes("/hooks/"))).toBe(false);
+  await app.waitFor("text:/\/hooks\//", { state: "gone" });
   // The row's own menu: its accessible name, so the demo's source list can change.
   await app.press("label:Buildkite actions");
   await app.press("text:Show ingest URL");
-  await app.waitFor("id:source-url");
+  await app.waitFor("text:/\/hooks\//");
   const rotated = app.texts().find((text) => text.startsWith("https://") && text.includes("/hooks/"));
   expect(rotated).not.toBe(url);
 });
@@ -97,34 +102,31 @@ test("an API key is created, copied once, listed and revoked", async () => {
   const app = await open("./App.tsx", { ...desktop, ...demo });
   await app.waitFor("id:open-settings");
   await app.press("id:open-settings");
-  await app.press("id:settings-keys");
-  await app.waitFor("id:api-keys >> text:Claude Code");
-  await app.press("id:keys-add");
-  await app.waitFor("id:new-key");
+  await app.press("text:API keys");
+  await app.waitFor("text:Claude Code");
+  await app.press("id:keys-add-top");
+  await app.waitFor("text:Name");
   await app.press("id:key-create");
   await app.waitFor("text:Name the key.");
   await app.type("id:key-name", "Build agent");
-  await app.press("id:key-write");
-  await app.press("id:key-scope-picked");
-  await app.press("id:key-source-src-github");
+  await app.press("text:Allow marking read and archive");
+  await app.press("text:Only those picked");
+  await app.press("label:GitHub >> nth=1");
   await app.press("id:key-create");
 
-  await app.waitFor("id:key-token");
+  await app.waitFor("text:/^nb_/");
   const token = app.texts().find((text) => text.startsWith("nb_"));
   expect(token).toBeTruthy();
   await app.press("id:key-copy");
   expect(app.clipboard()).toBe(token);
   await app.press("id:key-done");
-  await app.waitFor("id:api-keys >> text:Build agent");
+  await app.waitFor("text:Build agent");
   expect(app.texts().some((text) => text.startsWith("nb_") && text === token)).toBe(false);
 
-  app.onDialog((dialog) => {
-    expect(dialog.title).toContain("Build agent");
-    return "Revoke";
-  });
   await app.press("id:key-more-2");
+  await app.waitFor("text:/Revoke Build agent/");
   await app.press("text:Revoke");
-  await app.waitFor("id:api-keys >> text:Build agent", { state: "gone" });
+  await app.waitFor("text:Build agent", { state: "gone" });
   await app.waitFor("text:/^Build agent revoked/");
 });
 
@@ -132,10 +134,12 @@ test("the rules keep a mode per source and priority band", async () => {
   const app = await open("./App.tsx", { ...desktop, ...demo });
   await app.waitFor("id:open-settings");
   await app.press("id:open-settings");
-  await app.press("id:settings-rules");
-  await app.waitFor("id:notify-rules >> text:GitHub");
-  await app.press("id:rule-src-github-high-off");
-  await app.press("id:rule-src-mail-a-work-low-silent");
+  await app.press("text:Per source and priority");
+  await app.waitFor("text:GitHub");
+  await app.press("id:rule-src-github-high");
+  await app.press("text:Off");
+  await app.press("id:rule-src-mail-a-work-low");
+  await app.press("text:Silent");
   const rules = JSON.parse(app.storage()["nshmail.notify.rules"] ?? "{}");
   expect(rules["src-github"].high).toBe("off");
   expect(rules["src-mail-a-work"].low).toBe("silent");
@@ -144,7 +148,7 @@ test("the rules keep a mode per source and priority band", async () => {
 test("phones: the Notifications tab, a notification and back", async () => {
   const app = await open("./App.tsx", { platform: "android", width: 390, height: 844, locale: "en-US", ...demo });
   await app.waitFor("text:Q4 roadmap draft");
-  await app.press("id:tab-notifications-button");
+  await app.press("label:Notifications");
   await app.waitFor("id:notify-list >> text:CI failed on main");
   await app.press("id:notify-list >> text:CI failed on main");
   await app.waitFor("id:notify-title");

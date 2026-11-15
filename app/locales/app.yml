@@ -82,9 +82,6 @@ mailbox.allInboxes:
 mailbox.folders:
   en: Folders
   zh-CN: 文件夹
-mailbox.choose:
-  en: Mailboxes
-  zh-CN: 邮箱列表
 
 folder.inbox:
   en: Inbox
@@ -237,12 +234,6 @@ list.me:
 list.messages:
   en: "%{count} messages"
   zh-CN: "%{count} 封邮件"
-list.refreshing:
-  en: Checking for mail
-  zh-CN: 正在检查新邮件
-list.loadingMore:
-  en: Loading more
-  zh-CN: 正在加载更多
 list.conversations:
   en: Conversations
   zh-CN: 会话列表
@@ -667,6 +658,9 @@ accounts.addTitle:
 accounts.addHint:
   en: Gmail and Outlook sign in on their own page. Other providers need an app password.
   zh-CN: Gmail 和 Outlook 在官方页面登录，其他邮箱需要应用专用密码。
+accounts.otherHint:
+  en: Any IMAP and SMTP server, with an app password.
+  zh-CN: 任意 IMAP 与 SMTP 服务器，使用应用专用密码。
 accounts.google:
   en: Continue with Google
   zh-CN: 使用 Google 登录
@@ -849,9 +843,6 @@ errors.generic:
   en: "Something went wrong: %{detail}"
   zh-CN: 出错了：%{detail}
 
-layout.resize:
-  en: Resize panes
-  zh-CN: 调整窗格大小
 
 tray.open:
   en: Open AgentInbox
@@ -1342,9 +1333,6 @@ keys.loadFailedHint:
   en: Check the connection, then try again.
   zh-CN: 请检查网络后重试。
 
-settings.inbox:
-  en: Notification inbox
-  zh-CN: 通知收件箱
 settings.sourcesDetail:
   en: "%{count} sources, mail included"
   zh-CN: "%{count} 个来源，包含邮件"

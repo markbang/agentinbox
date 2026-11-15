@@ -4,6 +4,11 @@
 
 ## 改进
 
+- AgentInbox 在所有平台上都变成 iOS 的样子：外壳、列表、阅读器、写信页、搜索、设置和通知收件箱都由共享的
+  [Cupertino 设计系统](https://github.com/markbang/nsh-cupertino)（`nsh-cupertino` 0.2.1）绘制，
+  Material 3 Expressive 层已删除。
+- 宽窗口是 iPad 邮件那样的分栏（侧边栏、列表、阅读器）；窄窗口和手机是标签栏加压栈页面，写信与设置以面板打开。
+
 ## 修复
 
 - 通知来源：`POST /v1/sources` 和 `PATCH /v1/sources/{id}` 的顶层也接受 `preset`；不认识的字段或预设名返回 `400`，不再默默建出一个没有映射的来源。

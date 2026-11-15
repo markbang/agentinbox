@@ -3,8 +3,9 @@
 import { openUrl, signal, Text, View } from "nsh";
 import { t } from "nsh/i18n";
 import { Mail, type Endpoint, type Security, type ServerSettings } from "agentinbox/native";
-import { Button, Icon, Page, SectionLabel, SelectField, TextField, touch } from "../ui";
-import { PageHeader, PageScroll } from "../components/PageHeader";
+import { ActionSheet, Button, Icon, List, ListTile, Section } from "cupertino";
+import { Page } from "../components/Page";
+import { FieldRow } from "../components/Fields";
 import { NavContext } from "../nav";
 import { isAddress, providerName } from "../lib/format";
 import { errorText, showToast } from "../store";
@@ -29,16 +30,12 @@ export function ImapPage() {
   const settings = signal<ServerSettings>(guess(""));
   const known = signal(false);
   const busy = signal(false);
+  const securityFor = signal<"imap" | "smtp" | null>(null);
   // The failure, with its code: a refused sign-in also explains app passwords.
   const error = signal<{ text: string; code?: string } | null>(null);
 
-  const set = (server: "imap" | "smtp", change: Partial<Endpoint>) =>
-    settings.update((s) => ({ ...s, [server]: { ...s[server], ...change } }));
+  const set = (server: "imap" | "smtp", change: Partial<Endpoint>) => settings.update((s) => ({ ...s, [server]: { ...s[server], ...change } }));
   const port = (text: string) => Number.parseInt(text.replace(/\D/g, ""), 10) || 0;
-  const security = [
-    { value: "tls", title: t("imap.tls") },
-    { value: "starttls", title: t("imap.starttls") },
-  ];
 
   const fail = (e: unknown) => error.set({ text: errorText(e), code: (e as { code?: string })?.code });
   const detect = async () => {
@@ -82,102 +79,124 @@ export function ImapPage() {
     }
   };
 
-  const note = "text-body-medium tracking-body-medium";
   const provider = () => providerName(settings().provider, settings().displayName ?? "");
+  const applySecurity = ({ id: value }: { id: string }) => {
+    const which = securityFor();
+    securityFor.set(null);
+    if (which) set(which, { security: value as Security });
+  };
   return (
-    <Page title={t("accounts.other")} header={<PageHeader title={t("accounts.other")} />}>
-      <PageScroll contentClass={touch ? "gap-4 p-4" : "gap-4 p-6"} testID="imap">
-        <TextField
-            value={email()}
-            onChange={(v) => {
-              email.set(v);
-              if (step() === "servers") step.set("address");
-            }}
-            onSubmit={() => void detect()}
-            kind="email"
-            placeholder="you@example.com"
-            label={t("imap.email")}
-            returnKey="next"
-            autoFocus
-            testID="imap-email" />
-        <TextField value={name()} onChange={(v) => name.set(v)} label={t("imap.name")} testID="imap-name" supporting={t("imap.nameHint")} />
+    <Page title={t("accounts.other")} back={t("common.back")} onBack={nav.close} testID="imap">
+      <List>
+        <Section footer={t("imap.nameHint")}>
+          <FieldRow label={t("imap.email")} value={email()} onChange={(v) => (email.set(v), step.set("address"))} placeholder="you@example.com" keyboard="email" returnKey="next" onSubmit={() => void detect()} autoFocus testID="imap-email" />
+          <FieldRow label={t("imap.name")} value={name()} onChange={(v) => name.set(v)} testID="imap-name" />
+        </Section>
 
         <If when={step() === "servers"}>
-          <View class="gap-4">
-            <Text class={`text-on-surface-variant ${note}`} testID="imap-detected">
-              {known() ? t("imap.found", { provider: provider() }) : t("imap.notFound")}
+          <Section
+            header={t("imap.incoming")}
+            footer={known() ? t("imap.found", { provider: provider() }) : t("imap.notFound")}
+          >
+            <FieldRow label={t("imap.imapHost")} value={settings().imap.host} onChange={(v) => set("imap", { host: v.trim() })} keyboard="url" testID="imap-host" />
+            <FieldRow label={t("imap.port")} value={String(settings().imap.port || "")} onChange={(v) => set("imap", { port: port(v) })} keyboard="number" testID="imap-port" />
+            <ListTile
+              title={t("imap.security")}
+              subtitle={settings().imap.security === "tls" ? t("imap.tls") : t("imap.starttls")}
+              accessory="chevron"
+              separator={false}
+              onPress={() => securityFor.set("imap")}
+              testID="imap-security"
+            />
+          </Section>
+          <Section header={t("imap.outgoing")}>
+            <FieldRow label={t("imap.smtpHost")} value={settings().smtp.host} onChange={(v) => set("smtp", { host: v.trim() })} keyboard="url" testID="smtp-host" />
+            <FieldRow label={t("imap.port")} value={String(settings().smtp.port || "")} onChange={(v) => set("smtp", { port: port(v) })} keyboard="number" testID="smtp-port" />
+            <ListTile
+              title={t("imap.security")}
+              subtitle={settings().smtp.security === "tls" ? t("imap.tls") : t("imap.starttls")}
+              accessory="chevron"
+              separator={false}
+              onPress={() => securityFor.set("smtp")}
+              testID="smtp-security"
+            />
+          </Section>
+          <Section header={t("imap.password")} footer={t("imap.appPasswordHint")}>
+            <FieldRow label={t("imap.username")} value={settings().username} onChange={(v) => settings.update((s) => ({ ...s, username: v.trim() }))} keyboard="email" />
+            <FieldRow label={t("imap.password")} value={password()} onChange={(v) => password.set(v)} secure returnKey="done" onSubmit={() => void add()} testID="imap-password" />
+          </Section>
+          <If when={settings().auth.kind === "oauth"}>
+            <Text class="px-4 pt-2 text-footnote text-secondary-label" testID="imap-oauth">
+              {t("imap.useOAuth", { provider: provider() })}
             </Text>
-            <If when={settings().auth.kind === "oauth"}>
-              <Text class={`text-on-surface ${note}`} testID="imap-oauth">
-                {t("imap.useOAuth", { provider: provider() })}
-              </Text>
-            </If>
-            <SectionLabel label={t("imap.incoming")} class="px-0 pb-0" />
-            <View class="flex-row gap-2">
-              <TextField class="flex-1" value={settings().imap.host} onChange={(v) => set("imap", { host: v.trim() })} kind="url" label={t("imap.imapHost")} testID="imap-host" />
-              <TextField class="w-20" value={String(settings().imap.port || "")} onChange={(v) => set("imap", { port: port(v) })} kind="number" label={t("imap.port")} testID="imap-port" />
-            </View>
-            <SelectField value={settings().imap.security} items={security} onChange={(v) => set("imap", { security: v as Security })} label={t("imap.security")} />
-            <SectionLabel label={t("imap.outgoing")} class="px-0 pb-0" />
-            <View class="flex-row gap-2">
-              <TextField class="flex-1" value={settings().smtp.host} onChange={(v) => set("smtp", { host: v.trim() })} kind="url" label={t("imap.smtpHost")} testID="smtp-host" />
-              <TextField class="w-20" value={String(settings().smtp.port || "")} onChange={(v) => set("smtp", { port: port(v) })} kind="number" label={t("imap.port")} testID="smtp-port" />
-            </View>
-            <SelectField value={settings().smtp.security} items={security} onChange={(v) => set("smtp", { security: v as Security })} label={t("imap.security")} />
-            <TextField value={settings().username} onChange={(v) => settings.update((s) => ({ ...s, username: v.trim() }))} kind="email" label={t("imap.username")} />
-            <TextField value={password()} onChange={(v) => password.set(v)} masked label={t("imap.password")} onSubmit={() => void add()} returnKey="done" testID="imap-password" />
-            <View class="flex-row items-start gap-3 rounded-large bg-surface-container-high p-4">
-              <Icon name="key" size="sm" tone="on-surface-variant" />
-              <View class="flex-1 gap-2">
-                <Text class={`text-on-surface-variant ${note}`}>{t("imap.appPasswordHint")}</Text>
-                <If when={settings().helpUrl}>
-                  {(url) => (
-                    <Button
-                      size="xs"
-                      variant="tonal"
-                      icon="external"
-                      label={t("imap.appPasswordLink", { provider: provider() })}
-                      onPress={() => void openUrl(url())}
-                      class="self-start"
-                    />
-                  )}
-                </If>
+          </If>
+          <If when={settings().helpUrl}>
+            {(url) => (
+              <View class="px-4 pt-2">
+                <Button
+                  title={t("imap.appPasswordLink", { provider: provider() })}
+                  variant="plain"
+                  icon="arrow.up.right"
+                  onPress={() => void openUrl(url())}
+                  testID="imap-app-password"
+                />
               </View>
-            </View>
-          </View>
+            )}
+          </If>
         </If>
 
         <If when={error()}>
           {(failure) => (
-            <View role="alert" class="gap-2 rounded-large bg-error-container p-4" testID="imap-error">
-              <Text class={`text-on-error-container ${note}`}>{failure().text}</Text>
-              <If when={failure().code === "ERR_AUTH"}>
-                <Text class={`text-on-error-container ${note}`}>{t("imap.authFailed")}</Text>
-                <If when={settings().helpUrl}>
-                  {(url) => (
-                    <Button
-                      size="xs"
-                      variant="tonal"
-                      icon="external"
-                      label={t("imap.appPasswordLink", { provider: provider() })}
-                      onPress={() => void openUrl(url())}
-                      class="self-start"
-                      testID="imap-auth-help"
-                    />
-                  )}
+            <Section>
+              <View role="alert" class="gap-1 px-4 py-3" testID="imap-error">
+                <View class="flex-row items-start gap-2">
+                  <Icon name="exclamationmark.triangle" size={16} tint="system-red" />
+                  <Text class="flex-1 text-subheadline text-system-red">{failure().text}</Text>
+                </View>
+                <If when={failure().code === "ERR_AUTH"}>
+                  <Text class="text-subheadline text-system-red">{t("imap.authFailed")}</Text>
+                  <If when={settings().helpUrl}>
+                    {(url) => (
+                      <Button
+                        title={t("imap.appPasswordLink", { provider: provider() })}
+                        variant="plain"
+                        size="small"
+                        onPress={() => void openUrl(url())}
+                        testID="imap-auth-help"
+                      />
+                    )}
+                  </If>
                 </If>
-              </If>
-            </View>
+              </View>
+            </Section>
           )}
         </If>
 
-        <If
-          when={step() === "servers"}
-          else={<Button label={t("imap.continue")} loading={busy()} onPress={() => void detect()} class="self-start" testID="imap-continue" />}
-        >
-          <Button label={busy() ? t("imap.connecting") : t("imap.add")} loading={busy()} onPress={() => void add()} class="self-start" testID="imap-add" />
-        </If>
-      </PageScroll>
+        <Section>
+          <View class="px-4 py-3">
+            <Button
+              title={step() === "servers" ? (busy() ? t("imap.connecting") : t("imap.add")) : t("imap.continue")}
+              disabled={busy()}
+              onPress={() => void (step() === "servers" ? add() : detect())}
+              class="w-full"
+              testID={step() === "servers" ? "imap-add" : "imap-continue"}
+            />
+          </View>
+        </Section>
+      </List>
+      <ActionSheet
+        open={!!securityFor()}
+        title={t("imap.security")}
+        actions={[
+          { id: "tls", title: t("imap.tls") },
+          { id: "starttls", title: t("imap.starttls") },
+        ]}
+        cancel={t("common.cancel")}
+        onOpenChange={({ open }: { open: boolean }) => {
+          if (!open) securityFor.set(null);
+        }}
+        onAction={applySecurity}
+      />
     </Page>
   );
 }

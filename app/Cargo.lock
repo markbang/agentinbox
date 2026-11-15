@@ -3067,6 +3067,7 @@ dependencies = [
  "mail-core",
  "nsh-base",
  "nsh-core",
+ "nsh-cupertino",
  "nsh-engine",
  "nsh-testing",
  "serde",
@@ -3170,6 +3171,15 @@ dependencies = [
  "webpki-roots 1.0.12",
  "windows-sys 0.61.2",
  "wuff",
+]
+
+[[package]]
+name = "nsh-cupertino"
+version = "0.2.1"
+dependencies = [
+ "chrono",
+ "nsh-base",
+ "nsh-core",
 ]
 
 [[package]]

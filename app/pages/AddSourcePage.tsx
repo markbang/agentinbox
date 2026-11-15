@@ -1,10 +1,9 @@
 // Settings → Sources → Add: what kind of source. Mail accounts come from Add
 // account; the chat bots arrive with the server's bot connections.
-import { Text, View } from "nsh";
 import { t } from "nsh/i18n";
 import type { SourceKind } from "agentinbox/native";
-import { AppBar, Card, Icon, ListItem, Page } from "../ui";
-import { PageHeader, PageScroll } from "../components/PageHeader";
+import { List, ListTile, Section } from "cupertino";
+import { Page } from "../components/Page";
 import { kindIcon } from "../components/SourceMark";
 import { NavContext } from "../nav";
 
@@ -24,46 +23,25 @@ const kinds: { kind: SourceKind; enabled: boolean }[] = [
 export function AddSourcePage() {
   const nav = NavContext();
   return (
-    <Page
-      title={t("sources.add")}
-      header={<PageHeader title={t("sources.add")} />}
-      appBar={<AppBar title={t("sources.add")} />}
-    >
-      <PageScroll contentClass="gap-4 p-4" testID="add-source">
-        <Text class="px-1 text-body-medium tracking-body-medium text-on-surface-variant">{t("sources.chooseKind")}</Text>
-        <Card>
+    <Page title={t("sources.add")} back={t("common.back")} onBack={nav.close} testID="add-source">
+      <List>
+        <Section footer={t("sources.chooseKind")}>
           <Each of={kinds} key={(k) => k.kind}>
             {(entry, index) => (
-              <If
-                when={entry().enabled}
-                else={
-                  <View class="min-h-16 flex-row items-center gap-4 px-4 py-2 opacity-38">
-                    <Icon name={kindIcon(entry().kind)} tone="on-surface-variant" />
-                    <View class="flex-1">
-                      <Text class="text-body-large tracking-body-large text-on-surface">{t(`source.kind.${entry().kind}`)}</Text>
-                      <Text class="text-body-medium tracking-body-medium text-on-surface-variant">{t("sources.comingSoon")}</Text>
-                    </View>
-                  </View>
-                }
-              >
-                <>
-                  <If when={index() > 0}>
-                    <View class="mx-4 h-px bg-outline-variant" />
-                  </If>
-                  <ListItem
-                    icon={kindIcon(entry().kind)}
-                    headline={t(`source.kind.${entry().kind}`)}
-                    supporting={t(`source.hint.${entry().kind}`)}
-                    onPress={() => nav.stack.push({ name: "sourceForm", kind: entry().kind })}
-                    trailing={<Icon name="chevronRight" tone="on-surface-variant" />}
-                    testID={`kind-${entry().kind}`}
-                  />
-                </>
-              </If>
+              <ListTile
+                title={t(`source.kind.${entry().kind}`)}
+                subtitle={entry().enabled ? t(`source.hint.${entry().kind}`) : t("sources.comingSoon")}
+                leading={kindIcon(entry().kind)}
+                accessory={entry().enabled ? "chevron" : "none"}
+                disabled={!entry().enabled}
+                separator={index() < kinds.length - 1}
+                onPress={entry().enabled ? () => nav.stack.push({ name: "sourceForm", kind: entry().kind }) : undefined}
+                testID={entry().enabled ? `kind-${entry().kind}` : undefined}
+              />
             )}
           </Each>
-        </Card>
-      </PageScroll>
+        </Section>
+      </List>
     </Page>
   );
 }

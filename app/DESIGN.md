@@ -1,168 +1,130 @@
 # AgentInbox client design
 
-Calm, dense and quiet: a mail app people keep open all day. Content (senders, subjects, the message) carries the
-screen; color is spent on unread, flags, the account a message belongs to, and the one primary action.
+Calm, dense and quiet: a mail app people keep open all day. Content carries the
+screen; colour is spent on unread, flags, the account a message belongs to, and
+the one action that matters.
+
+The client is **Cupertino** on every platform — one design system, the shared
+[`nsh-cupertino`](https://github.com/markbang/nsh-cupertino) library (pinned as
+the `vendor/nsh-cupertino` submodule). The app does not restyle anything the
+library draws: it composes the library's components and tokens, and keeps its own
+compositions to mail-specific parts (a conversation row, an account mark) built
+from the same tokens.
 
 ## Targets
 
-One design language everywhere: Material 3 Expressive. Layouts follow M3's window classes.
+One look everywhere; only the shell changes with the window.
 
-| Family | Layout | Sizes |
-| --- | --- | --- |
-| Linux, Windows, web from 840pt (expanded, large) | Navigation rail (collapsed 96pt; expanded 256pt from 1200pt, with sections and counts) and two panes on surface-container, 12pt apart with M3's drag handle: the list (fixed, 320–560pt) and the reader (flexible). The rail's first destination is Notifications, above the Mail section. The reader's actions float in a toolbar at its bottom. Compose, settings and adding an account open in a dialog with its own stack | M3 sizes: 40pt buttons and icon buttons, 56pt fields and search bar, list rows about 80pt |
-| Android phones | Material 3 Expressive (below): a `NavStack` per tab (Mail with the unread count, Notifications with its own, Search, Mailboxes, Settings) over M3E's short navigation bar; tab roots draw their own top app bar (search bar + emphasized headline), pushed pages the system toolbar and cover the bar; the FAB menu (New message, Add account) over Mail; the reader's floating toolbar | Controls 40dp with 48dp targets, body 16sp |
-| iOS phones | The same tabs on the system tab bar (`nsh/mobile` `TabBar`), a reply bar under the message | Controls 44pt+, body 16pt |
-| Web below 840pt (compact, medium) | M3's navigation bar (Mail with the unread count, Notifications with its own, Search, Mailboxes, Settings) over a `NavStack` per section; the FAB menu (compose, add an account) over Mail; pushed pages cover the bar, the reader keeps its floating toolbar | 48pt targets |
+| Width | Shell |
+| --- | --- |
+| 1080 pt and up | **Split view**, as Mail on an iPad: the sidebar (286 pt: notifications, mailboxes, folders, sync status), the list column (380 pt: the mailbox's rows or the feed, with the search field) and the reader (the rest). Columns are separated by hairlines on `system-grouped-background`. |
+| 840–1080 pt | Split view without the sidebar: the list column and the reader; the mailboxes open in a large sheet from the tray button in the list's bar. |
+| Below 840 pt (phones and narrow windows) | **Tab bar** (Mail, Notifications, Search, Mailboxes, Settings) over a navigation stack per tab. Pages push from the right with a back button, cover the bar, and keep the reader's toolbar at the foot. |
 
-## The notification inbox
+Pages that are tasks rather than places — compose, settings, adding an account,
+sources, keys, rules, shortcuts — open as a **sheet** with a stack of their own:
+Done at the root, back inside. On a phone they push instead.
 
-The feed is the mail list's sibling, not a second design: the same `List`, rows and swipe gestures, the same type
-roles and state layers.
+Android keeps the platform's back gesture and hardware button: the app registers
+no back handler, so a page never swallows them; the tabs' Mail tab is the first
+stop. Nothing Material remains: no ripples, no M3 shapes, no floating action
+button.
 
-- **Rows** lead with the source's mark — its icon on a 15% tint of its chart role, in a 40pt rounded square (32pt
-  in dense rows). Then the sender and the source's name in label-large, the relative time and the unread dot;
-  the title in body-large (bold until read) with the high priority's error dot before it; one line of the body; the
-  tags as outlined pills in label-small. A link's notification ends with an external-link icon. A day's heading
-  (Today, Yesterday, the weekday, the date) sits between groups, in label-large on-surface-variant.
-- **Filter chips** are one horizontally scrolling row above the search bar: All first, then each source with its
-  unread count as a quiet count (`Badge quiet`). Selected chips fill with secondary-container, as everywhere.
-- **The reader** is the notification whole: source mark and name, the full date, the title in headline-small, the
-  sender, the priority, the tags, the actions (Open link as a tonal button, Open in Mail as text, then mark
-  read/unread and archive as icon buttons) and the body in body-large, selectable.
-- **Settings** reuse `Card` + `ListItem` rows: Sources, API keys and the rules. A source's row shows its mark, name
-  and kind (and "Paused"); its menu holds Send a test message, Show ingest URL, Pause/Resume and Delete. The ingest
-  URL and a key's token appear on their own page, in a selectable box on surface-container-highest, with the copy
-  button and the "shown only once" card in tertiary-container.
-- Sources take their colour from the chart roles only, so light and dark come from the same token; a new source
-  picks one of the five swatches.
+## The list
+
+Rows are iOS Mail's: an unread dot in a lane of its own, the sender (semibold
+while unread), the conversation's message count, the date at the trailing edge,
+the subject with its attachment and flag marks, and a preview. Wide windows show
+one preview line, phones two. The account is a 3 pt bar in its colour on the
+leading edge of a unified row. A selected row takes `fill`; a press flashes it.
+Swiping right reveals Archive (teal), left Delete (red), a full swipe fires the
+first; long-press selects, and the bar turns into the selection's actions.
+
+The list is virtualized (`nsh`'s `List`): a 10,000-message mailbox keeps the rows
+on screen bounded (the large-mailbox test holds it to 300 texts). That is the one
+place the app keeps its own scroll container instead of the library's `List`,
+which is for settings pages; its rows are drawn with the library's tokens.
+
+## The reader
+
+The subject in title 2, the sender with a monogram, the recipients, the date and
+account, then the body: HTML in a web view on a white card (mail is designed on
+white and its colours are not inverted in dark mode), or plain text. Remote
+images stay blocked until the reader asks. A conversation lists its older
+messages above the open one and its newer ones below, a page at a time. Attachments
+are 160 pt tiles with an icon or a thumbnail. The actions sit in the bar at the
+foot: reply, forward, flag, read, archive, delete.
+
+## The composer
+
+A sheet (a pushed page on a phone) with Close, the title, the clock and Send in
+its bar: From, To, Cc/Bcc, Subject as labelled lines, the body as the page, the
+attachments as tiles at the foot. Closing keeps the draft; Discard asks. The clock
+offers Tomorrow morning, Monday morning, or a day and a time of its own in a
+sheet with the calendar and two wheels. Send waits out the undo delay with Undo.
 
 ## Tokens
 
-One design language on every platform: Material 3 Expressive (M3E). The values come from Material's own sources
-(androidx Compose Material3 tokens, m3.material.io, material-color-utilities); one set serves web, desktop and Android.
+The library's, unmodified, generated from its `src/tokens.rs` into
+`theme/theme.json`:
 
-- Colors, `theme.json`, light and dark: every M3 color role (`primary`, `on-primary`, `primary-container`, …,
-  `surface`, `surface-dim`, `surface-bright`, `surface-container-lowest` … `-highest`, `on-surface`,
-  `on-surface-variant`, `outline`, `outline-variant`, `inverse-*`, `error*`, the `*-fixed` roles, `scrim`), generated
-  from the seed `#2f62d0` (the icon's blue) by `scripts/m3e` (material-color-utilities 0.4.0, Fidelity scheme):
-  `cd scripts/m3e && npm ci && npm run gen`. Never edit the colors by hand.
-- Mail roles on that palette: `unread` = primary, `flag` = tertiary; accounts take `chart-1` … `chart-5`, M3 custom
-  colors (purple, orange, green, pink, teal) harmonized to the seed. The shadcn names nsh/base draws with (`card`,
-  `popover`, `muted`, `border`, `ring`, …) are aliases of M3 roles.
-- `nsh.json` `tailwind`: the corner scale `rounded-extra-small` 4, `-small` 8, `-medium` 12, `-large` 16,
-  `-large-increased` 20, `-extra-large` 28, `-extra-large-increased` 32, `-extra-extra-large` 48 (plus `rounded-none`,
-  `rounded-full`); the type scale `text-display-large` … `text-label-small` with `tracking-<role>` (and
-  `-emphasized` where it differs), weights by `font-normal|medium|bold` (`tokens.type(role, emphasized)` gives all three);
-  elevation `shadow-elevation-1` … `-5`; easings `ease-spatial-fast|default|slow`, `ease-effects-fast|default|slow`
-  (Material's web curves for the springs, with `duration-350|500|650` and `150|200|300`).
-- Springs (expressive scheme): spatial fast 800/0.6, default 380/0.8, slow 200/0.8; effects fast 3800/1,
-  default 1600/1, slow 800/1 (stiffness / damping ratio). `tokens.springTo(kind, speed)` gives NSH's
-  `spring()` options. State layers: hover 8%, focus 10%, pressed 10%, dragged 16%. Disabled: container 10%,
-  content 38%. Focus: a 3pt `secondary` outline 2pt off the edge (`tokens.focusRing`).
-- Typed values for code: `ui/tokens.ts`. `scripts/contrast.py` checks every on-X over X pair and the inks drawn on
-  surfaces in both appearances.
+- **Colour**: Apple's semantic roles. The app's own `app/theme.json` is that file
+  with exactly three light-appearance overrides, as the library's
+  [issue #3](https://github.com/markbang/nsh-cupertino/issues/3) records:
+  `system-blue` `#0062d6`, `system-red` `#d70015`, `secondary-label` at 72 %
+  alpha. `scripts/theme-check.py` keeps the copy honest and `scripts/contrast.py`
+  gates what the app draws (4.5:1 for text, 3:1 for marks) in both appearances.
+- **Type**: largeTitle 34, title1 28, title2 22, title3 20, headline 17, body 17,
+  callout 16, subheadline 15, footnote 13, caption1 12, caption2 11 — as classes
+  from `nsh.json`'s `fontSize` (`text-title2` …), never raw sizes.
+- **Layout**: `space-1…6`, `row-height` 44, the 0.33 pt hairline, `rounded-row`
+  10, `rounded-sheet` 14, `rounded-button` 12, `rounded-search` 9.
+- **Motion**: the library's springs and durations (push 500 ms 0.86/300, sheet
+  0.8/400, pressed opacity 0.4, quick 150, base 300); reduce motion is honoured by
+  the library.
+- **Materials**: `regular` for the tab bar and the toasts, `chrome` for the
+  reader's toolbar.
 
-## The `ui` layer
+## The app's own parts
 
-`ui/` is the only place that styles `nsh/base`. Sizes and colors come from Compose Material3's component tokens.
+`app/components/` holds only compositions of library components and tokens:
+`MessageList` (the virtualized rows), `MailboxPane` (bar, search, list), `Reader`,
+`Sidebar`, `Toolbar`, `Marks` (account tones, unread dot, count, monogram),
+`SourceMark` (a source's tone and icon), `Empty` / `Loading`, `Toasts`, `Fields`
+(labelled rows and a choice row that opens an action sheet), `Page` (a navigation
+bar and its content), `ScheduleDialog`, `ShortcutsDialog`. Identity tones are
+system roles (`system-indigo`, `-purple`, `-pink`, `-blue`, `-red`), each at least
+3:1 on the surfaces a mark sits on.
 
-- Actions: `Button` (filled, tonal, outlined, elevated, text; xs/sm/md; round or square; toggle via `selected`; `tone="error"`), `IconButton` (standard, filled, tonal, outlined; xs/sm/md; narrow/default/wide), `ButtonGroup` (standard or connected), `Choice` (a connected group choosing one option), `SplitButton`, `Fab` (sm/md/lg, extended), `FabMenu`.
-- Containers and navigation: `NavigationRail` (collapsed or expanded), `NavBar`, `FloatingToolbar` with `ToolbarButton`, `AppBar`, `Row` and `ListItem` (expressive shapes), `SectionLabel`, `Card` (filled, outlined, elevated), `Dialog` / `DialogBody` / `DialogFooter`, `Menu`, `Popover`, `Sheet`, `Panes` / `Pane`.
-- Inputs: `TextField` / `Textarea` (filled, outlined, search, plain; floating label, supporting text, error), `SelectField` (exposed dropdown), `Field`, `Chip` (assist, filter, input, suggestion), `Switch`, `Checkbox`, `DateCalendar` (the docked date picker's month of days), `TimeInput` (a time field drawn as an outlined field).
-- Feedback: `LoadingIndicator` (M3E's morphing shape, a shader, or a turning cookie where there are no shaders), `LinearProgress`, `CircularProgress`, `Snackbar`, `Tooltip` (plain), `Badge`, `Avatar`, `AccountMark`, `Divider`, `Empty`, `FileTile`, `Icon` (Lucide geometry, tinted with `tint-*`).
-
-Every pressable draws M3's state layer (the content color at 8% hovered, 10% pressed or focused) and morphs its corners while pressed. Features pass variants, sizes and states, never raw colors or radii. `ui/Gallery.tsx` shows every component; `ui/gallery.test.tsx` drives it.
+Nothing outside `app/components/` and `app/pages/` draws a colour, a size or a
+radius: features pass variants and states.
 
 ## States
 
-Every list, the reader and a form show what they are doing, rather than an empty frame:
+Every list, the reader and a form say what they are doing:
 
 | Where | Empty | Loading | Failed |
 | --- | --- | --- | --- |
-| The list | `Empty` names the folder and what lands in it (`empty.<folder>.title/hint`); Inbox, Sent and Drafts add New message, Archive and Trash don't. No accounts adds Add account | The M3E loading indicator in the list's middle, never an empty frame before the first page | `Empty` with the hint and Try again (`components/Mailbox.tsx`) |
-| Search | Before typing: the hint. Nothing found: the words, a hint and Clear search | The loading indicator while it runs | The reason from the engine and Try again (`components/SearchEmpty.tsx`) |
-| Sync | — | The rail's footnote instead of the status | `components/SyncBanner.tsx` over the list, an `alert` with the reason and a retry, until a sync succeeds |
-| The reader | No message selected, with how to reach one | The indicator in place of the message | `Empty` with the hint and Try again, on the wide reader and on the phone's page |
-| The feed | No sources: how to add the first; no notifications: what lands here and the test message; a filter or search that found nothing: Clear filters | The loading indicator in the list's middle | `Empty` with the hint and Try again |
-| Signing in, adding an IMAP account, saving | — | The button's loading indicator | A red text by the form's action; a refused IMAP sign-in (`ERR_AUTH`) also explains app passwords with the provider's link |
+| A mailbox | the folder's icon, what it is, the one action that fills it (compose / add account) | `ActivityIndicator` with the task's name | the error, and Retry |
+| The reader | "No message selected" | spinner | the error, and Retry |
+| Search | the hint before typing, "Nothing found" after | spinner | the error, and Retry |
+| The feed | no sources / no accounts / filter found nothing, each with its next step | spinner | the error, and Retry |
+| Sync | — | the spinner and progress in the sidebar's foot | a red strip under the bar with Retry |
 
-Failures that answer a press (sending, archiving, attachments) are the snackbar, with Undo or the reason; failures that leave a screen without content are that screen's own state with a retry. Copy comes from `errors.*` by the engine's code (`errorInfoText`), never a raw code.
+## Accessibility
 
-## Keyboard and screen readers
+- Every row is a button whose name carries its state ("Unread, Jonas Weber,
+  Q4 roadmap draft, 12:33 AM"); lists and groups are labelled; headers are
+  headers.
+- Icon-only controls always have a name (archive, delete, flag, mark read); the
+  marks are hidden from screen readers.
+- Tab reaches every control with the library's focus ring; Escape and the Android
+  back gesture go back through the stacks.
+- Text follows the user's text size; the library's components lay out at large
+  sizes.
 
-Every pressable is a Tab stop with M3's focus ring (`tokens.focusRing`, inset inside rows) and Return or Space presses it; Escape closes the top dialog, menu or sheet. The message list, the rail and the toolbars carry names for screen readers, rows read as "unread, sender, count, subject, date, flag", the snackbar is an `alert` for failures and a status region for confirmations, and result counts are status regions too. `?` lists the shortcuts (`components/ShortcutsDialog.tsx`, also in Settings → Help); the same list shows each key as the platform labels it (`keymap.label`).
+## Keys
 
-## Motion tokens
-
-| Token | Value | For |
-| --- | --- | --- |
-| spatial fast | spring 800 / 0.6; web curve `ease-spatial-fast` 350ms | presses, switch thumb, popups growing from their trigger |
-| spatial default | spring 380 / 0.8; `ease-spatial-default` 500ms | sheets, dialogs, panes |
-| spatial slow | spring 200 / 0.8; `ease-spatial-slow` 650ms | full-screen changes |
-| effects fast / default / slow | critically damped 3800 / 1600 / 800; 150 / 200 / 300ms | colors and opacity |
-
-Reduced motion: transitions off (`motion-reduce:`), motions not started (`reduceMotion()`), indicators rest.
-
-## Motion inventory
-
-| Screen | Change | Motion |
-| --- | --- | --- |
-| All | Button / icon button / FAB press | Corners morph to the pressed shape (small for 32–40pt, medium for 56pt): spatial fast (350ms `ease-spatial-fast`). The state layer fades in: effects fast (150ms) |
-| All | Toggle button selected | Round → square (square → round), with the selected colors: spatial fast |
-| All | List row hover / press / select | Extra-small → medium (hover) → large (pressed, selected), fill secondary-container: spatial fast |
-| Rail, nav bar | Destination changes | The active indicator pill grows from the icon (scale-x 0.5 → 1) and fills: spatial fast |
-| List | Rows arrive, unread → read | No motion: rows are recycled data |
-| List | Refresh, load more | M3E loading indicator in the list header / footer, morphing through soft burst → cookie 9 → pentagon → pill → sunny → cookie 4 → oval while it turns |
-| Reader | Another message opens | The reader fades in (150ms) |
-| Reader | A collapsed message of the conversation is tapped | Its row shows a small loading indicator until the message loads, then the reader fades in with it expanded (150ms); the conversation stays on screen meanwhile |
-| Reader | "N more" between collapsed messages | The hidden rows appear in place: no motion, the list only grows |
-| Reader | Floating toolbar | Stays at the bottom center; its buttons square up while pressed |
-| Inbox (narrow) | FAB menu opens | The FAB morphs to a round primary close button; the items rise one after another on the fast spatial spring (40ms apart) |
-| Fields | Focus, typing | The label floats up and shrinks to body-small, the indicator thickens to 2pt primary: spatial fast / effects fast |
-| Menus, popovers | Open / close | Grow from 0.8 at the trigger (spatial fast); leave at 0.96 (effects fast) |
-| Tooltips | Show / hide | Fade, effects fast |
-| Dialogs | Open / close | Scrim and container fade (platform `fade`) |
-| Settings | Switch | Handle grows 16 → 24pt and slides; 28pt while pressed: spatial fast. Track recolors: effects fast |
-| Panes | Drag handle | Appears under the pointer, grows while dragged: spatial fast |
-| All | Snackbar | Rises from the bottom edge (`slideInUp`, 300ms), leaves after 3.2s; with Undo after 8s, or after the undo delay for Sending… |
-| Composer | Send's menu opens | The menu button's chevron turns 180° and its inner corners go round (spatial fast); the menu grows from it |
-| Schedule send | A day is picked | The day fills with primary, the last one empties: effects fast (150ms) |
-| Scheduled | A message is cancelled / put back | No motion: the list follows the outbox; the snackbar carries the Undo |
-| Signature | Typing | The preview follows each keystroke and appears with the first character: no motion, it is the text itself |
-| Composer | From changes | The signature in the body is swapped in place: no motion |
-
-Reduced motion: transitions off (`motion-reduce:`), motions and springs not started (`reduceMotion()`), indicators rest.
-
-Checked on still screenshots of the web build in light and dark (`nsh test --target web` on the demo backend, and the
-PR screenshot workflow on a real server). The motions have not been watched frame by frame, and the Linux and Windows
-desktops have not been seen (no GTK in the sandbox).
-
-## Android
-
-Sources: m3.material.io ("Start building with M3 Expressive", motion physics "How it works" and "Specs", shape
-"Corner radius scale", type scale tokens, component specs: FAB menu, toolbars, loading indicator, navigation bar) and
-Compose Material3's tokens (`ExpressiveMotionTokens`, `TypeScaleTokens`, `FabMenuBaselineTokens`,
-`FloatingToolbarTokens`, `LoadingIndicatorTokens`, `NavigationBarTokens`, `ButtonSmallTokens`).
-
-The tokens and components are the shared M3E ones (Tokens and the `ui` layer above). Where `material` is set
-(`ui/material.ts`), Android phones lay a few screens out their own way: tab roots draw M3E's top app bar with the
-search bar, the message list swipes and picks rows.
-NSH 0.5 gives apps no access to the system's dynamic (wallpaper) palette, so the seed stands in for it.
-
-- Shape: message rows are `large` cards, `extra-large` while swiped; a picked row's avatar morphs from a circle to
-  a `medium` square; the FAB (`large`) becomes a circle when its menu opens.
-- Type: emphasized styles for the tab roots' headlines (headline medium, 500), the reader's subject (headline
-  small, 500) and unread rows (bold).
-- Motion: `springs` (ExpressiveMotionTokens via `tokens.springTo`) for gestures and the FAB menu; their web curves
-  for class transitions.
-
-| Screen | Change | Tool, token |
-| --- | --- | --- |
-| Inbox | Pull to refresh: the contained loading indicator grows and turns with the pull, morphs through the shape library while refreshing | `pullValue` → shader uniform; `nsh.time` |
-| Inbox | FAB menu opens: FAB → circle, items rise one by one | radius + color transition, fast spatial; item springs, fast spatial, 40 ms stagger |
-| Inbox | Row swiped: the row rounds to `extra-large`, the action's icon grows, snaps back or flies out | fast spatial transition; pan; spatial spring back |
-| Inbox | Row picked: avatar circle → checked square, row fills with the secondary container | fast spatial transition |
-| Nav bar | Tab chosen: the indicator grows from the icon, icon recolors | fast spatial (scale), fast effects (color) |
-| Buttons | Pressed: round → `small` | fast spatial transition |
-| Snackbar | Undo appears; the FAB rises over it | slide-in; spatial transition |
-
+`c` compose, `r` reply, `/` search, `j`/`k` next/previous message, `e` archive,
+`shift+3` delete, `?` the shortcut sheet, `mod+enter` send, `escape` close. Bound
+through `nsh`'s `keymap`, never while typing or with a sheet open.

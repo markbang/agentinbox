@@ -1,7 +1,6 @@
-// Navigation. iOS and Android phones have a tab bar with a stack per tab;
-// narrow browser windows push every screen on one stack; wide windows keep
-// the three panes and open compose, settings and adding an account in a
-// dialog with a stack of its own.
+// Navigation. Wide windows keep a split view (sidebar, list, reader) and open
+// compose, settings and the rest in a sheet with a stack of its own; phones
+// and narrow windows push every screen on its tab's stack.
 import { context, signal } from "nsh";
 import { createNavStack, type NavStackState } from "nsh/base";
 import type { ApiKey, Source, SourceKind } from "agentinbox/native";
@@ -30,30 +29,20 @@ export type Route =
 
 /** The phone's stack: the only one in a narrow browser, the Mail tab's on iOS and Android. */
 export const phoneStack = createNavStack<Route>([{ name: "inbox" }]);
+/** The wide layout's sheet: compose, settings and the pages they open. */
 export const modalStack = createNavStack<Route>([{ name: "settings" }]);
 
 const modalOpen = signal(false);
 export const isModalOpen = () => modalOpen();
 
-// The heights the dialog's pages measured, by their place in its stack.
-const fits = signal<(number | undefined)[]>([]);
-/** The height the dialog's top page needs: until it has measured, the page under it's; none for the composer, which takes the dialog's own. */
-export const modalFit = () => {
-  const heights = fits();
-  for (let i = modalStack.routes().length - 1; i >= 0; i--) if (heights[i] !== undefined) return heights[i];
-  return undefined;
-};
-
 export interface Navigator {
   stack: NavStackState<Route>;
-  /** Leaves the screen: pops it, or closes the dialog at its root. */
+  /** Leaves the screen: pops it, or closes the sheet at its root. */
   close: () => void;
-  /** Leaves the whole flow: back to the inbox, or the dialog closed. */
+  /** Leaves the whole flow: back to the inbox, or the sheet closed. */
   done: () => void;
-  /** Screens in a dialog draw a close button instead of back at their root. */
+  /** Screens in a sheet draw a close button instead of back at their root. */
   modal: boolean;
-  /** A dialog's page reports the height it needs (`undefined` when it leaves); the dialog follows, up to the window. */
-  fit?: (index: number, height: number | undefined) => void;
 }
 
 export const NavContext = context<Navigator>({
@@ -75,12 +64,6 @@ export const modalNavigator: Navigator = {
   close: () => (modalStack.routes().length > 1 ? modalStack.pop() : modalOpen.set(false)),
   done: () => modalOpen.set(false),
   modal: true,
-  fit: (index, height) =>
-    fits.update((heights) => {
-      const next = [...heights];
-      next[index] = height;
-      return next;
-    }),
 };
 
 function stackNavigator(stack: NavStackState<Route>): Navigator {
@@ -102,14 +85,13 @@ export function selectTab(index: number) {
   tabIndex.set(index);
 }
 
-/** Opens `route` as the wide layout or the phone layout shows it. */
+/** Opens `route` as the wide layout or the narrow layout shows it. */
 export function show(route: Route, wide: boolean) {
   if (!wide) {
     tabIndex.set(0);
     phoneStack.push(route);
     return;
   }
-  fits.set([]);
   modalStack.setRoutes([route]);
   modalOpen.set(true);
 }

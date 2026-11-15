@@ -28,6 +28,8 @@ jobs:
           - 3465:3465
     steps:
       - uses: actions/checkout@v7
+        with:
+          submodules: recursive
       - uses: actions/download-artifact@v8
         with:
           name: web

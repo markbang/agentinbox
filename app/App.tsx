@@ -1,16 +1,16 @@
-// The shell: onboarding until a mode is chosen, then the navigation rail and
-// two panes on wide windows, the system's tab bar on iOS and Android phones,
-// or the navigation bar in a narrow browser; the snackbar, keys and the tray.
+// The shell: onboarding until a mode is chosen, then the split view on wide
+// windows, or the tab bar over a stack per section on phones and narrow
+// windows; the sheet the wide layout opens pages in, the toasts, the
+// shortcuts and the keys.
 import { keymap, mount, View, type InputRef } from "nsh";
 import { NavStack } from "nsh/base";
-import { Dialog, systemHeader } from "./ui";
+import { Sheet, Theme } from "cupertino";
 import { Toasts } from "./components/Toasts";
-import { PhoneTabs } from "./components/PhoneTabs";
+import { TabShell } from "./components/TabShell";
 import { ShortcutsDialog } from "./components/ShortcutsDialog";
-import { WebTabs } from "./components/WebTabs";
 import { Workspace } from "./components/Workspace";
 import { wide } from "./layout";
-import { closeModal, isModalOpen, modalFit, modalNavigator, modalStack, NavContext, phoneStack, selectTab, show, tabs, TAB, type Route } from "./nav";
+import { closeModal, isModalOpen, modalNavigator, modalStack, NavContext, phoneStack, selectTab, show, tabs, TAB, type Route } from "./nav";
 import { AddAccountPage } from "./pages/AddAccountPage";
 import { AddSourcePage } from "./pages/AddSourcePage";
 import { ApiKeysPage } from "./pages/ApiKeysPage";
@@ -106,7 +106,7 @@ function Main() {
   };
   stayResident(openFromNotification, openNotification);
 
-  // Single keys, as mail apps have them; never while typing or in a dialog.
+  // Single keys, as mail apps have them; never while typing or in a sheet.
   const key = (run: () => unknown) => () => {
     if (!isModalOpen()) run();
   };
@@ -128,33 +128,24 @@ function Main() {
   return (
     <If
       when={wide()}
-      else={
-        <If
-          when={systemHeader}
-          else={<WebTabs page={page} onCompose={() => compose("new")} onAddAccount={() => show({ name: "addAccount" }, false)} />}
-        >
-          <PhoneTabs page={page} onCompose={() => compose("new")} onAddAccount={() => phoneStack.push({ name: "addAccount" })} />
-        </If>
-      }
+      else={<TabShell page={page} />}
     >
-      {/* Tablets draw edge to edge: the panes stay clear of the status bar and the taskbar. */}
-      <View class="flex-1 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
-        <Workspace
-          onCompose={compose}
-          onSettings={() => show({ name: "settings" }, true)}
-          onAddAccount={() => show({ name: "addAccount" }, true)}
-          onAddSource={() => show({ name: "addSource" }, true)}
-          onSources={() => show({ name: "sources" }, true)}
-          searchRef={(ref) => (search = ref)}
-        />
-      </View>
-      <Dialog open={isModalOpen()} onClose={closeModal} label="AgentInbox" size="3xl" height={modalFit()} bare testID="modal">
+      <Workspace
+        onCompose={compose}
+        onSettings={() => show({ name: "settings" }, true)}
+        onAddAccount={() => show({ name: "addAccount" }, true)}
+        onAddSource={() => show({ name: "addSource" }, true)}
+        onSources={() => show({ name: "sources" }, true)}
+        searchRef={(ref) => (search = ref)}
+      />
+      {/* The wide layout opens pages in a sheet with a stack of its own. */}
+      <Sheet open={isModalOpen()} detent="large" testID="modal" onOpenChange={({ open }: { open: boolean }) => (open ? undefined : closeModal())}>
         <NavContext.Provider value={modalNavigator}>
           <NavStack state={modalStack} class="flex-1">
             {page}
           </NavStack>
         </NavContext.Provider>
-      </Dialog>
+      </Sheet>
     </If>
   );
 }
@@ -162,22 +153,22 @@ function Main() {
 function App() {
   void start();
   return (
-    <View class="flex-1 bg-surface">
-      <If when={isStarted()}>
-        <If when={mailStatus().mode !== "none"} else={<Onboarding />}>
-          <Main />
+    <Theme contrast="normal">
+      <View class="flex-1 bg-system-background">
+        <If when={isStarted()}>
+          <If when={mailStatus().mode !== "none"} else={<Onboarding />}>
+            <Main />
+          </If>
         </If>
-      </If>
-      {/* Over every layout: ? opens it from the wide window and from a narrow one. */}
-      <If when={isStarted() && mailStatus().mode !== "none"}>
-        <ShortcutsDialog open={shortcutsOpen()} onClose={() => shortcutsOpen.set(false)} />
-      </If>
-      {/* Phones show it over the tab's content (PhoneTabs). */}
-      <If when={!(systemHeader && !wide() && isStarted() && mailStatus().mode !== "none")}>
-        {/* Above the reader's floating toolbar (wide) and the navigation bar (narrow web), never over them. */}
-        <Toasts class={`pb-[env(safe-area-inset-bottom)] ${!wide() && systemHeader ? "bottom-6" : "bottom-24"}`} />
-      </If>
-    </View>
+        <If when={isStarted() && mailStatus().mode !== "none"}>
+          <ShortcutsDialog open={shortcutsOpen()} onClose={() => shortcutsOpen.set(false)} />
+        </If>
+        {/* Under the tab bar on phones, over the reader's toolbar on wide windows. */}
+        <If when={wide()}>
+          <Toasts class="bottom-4" />
+        </If>
+      </View>
+    </Theme>
   );
 }
 

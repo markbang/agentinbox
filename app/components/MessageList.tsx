@@ -1,16 +1,15 @@
-// A virtualized list of conversations or messages: unread by weight and a dot,
-// flagged by an icon in its own lane, the account by a bar of its color in the
-// unified view, a conversation by who wrote and how many messages it holds.
-// Pointer devices and wide windows get dense rows with a one-line preview.
-// Touch screens swipe a row right to archive it, left to delete it, and
-// long-press to select.
-import { createAnimatedValue, List, Text, View, type JSX } from "nsh";
+// The list of conversations or messages, as Mail draws it on iOS: unread by
+// weight and a blue dot, the sender and time, the subject with its
+// attachments and flag, and a preview. Pointer devices and wide windows get
+// one preview line, phones two. Touch screens swipe a row right to archive
+// it, left to delete it, and long-press it to select.
+import { List, Text, View, type JSX } from "nsh";
 import { Haptics } from "nsh/mobile";
 import { t } from "nsh/i18n";
-import { AccountMark, Icon, initials, LoadingIndicator, material, Row, touch, transition } from "../ui";
-import { Swipe } from "./Swipe";
+import { Icon, SwipeRow } from "cupertino";
 import { displayName, listDate, participantNames } from "../lib/format";
 import { wide } from "../layout";
+import { AccountMark, Count } from "./Marks";
 import { accountIndex, accounts, ownAddresses, type Row as ListRow } from "../store";
 
 export interface MessageListProps {
@@ -40,110 +39,70 @@ export interface MessageListProps {
   onPick?: (id: string) => void;
 }
 
-/** Android's pull to refresh: Material's contained loading indicator, growing with the pull. */
-const PULL = 80;
-
 export function MessageList(props: MessageListProps) {
-  const dense = () => !touch || wide();
+  const oneLine = () => !wide();
   const terms = () => (props.highlight ?? "").split(/\s+/).filter(Boolean);
-  const m3 = () => material && !wide();
-  const pull = createAnimatedValue(0);
+  const swiping = () => !props.picking && !!(props.onArchive || props.onDelete);
+  const pick = (id: string) => {
+    Haptics.impact("medium");
+    props.onPick?.(id);
+  };
   return (
-    <View class="flex-1">
     <List
       role="list"
       accessibilityLabel={props.label}
-      refreshIndicator={m3() && props.onRefresh ? { height: PULL } : undefined}
-      pullValue={m3() ? pull : undefined}
-      contentStyle={m3() ? { paddingTop: 4, paddingBottom: 96 } : undefined}
       each={props.items}
       keyExtractor={(m) => m.key}
-      estimatedItemSize={dense() ? (touch ? 84 : 80) : 106}
+      estimatedItemSize={oneLine() ? 86 : 76}
       refreshing={props.refreshing ?? false}
       onRefresh={props.onRefresh}
       onLoadMore={props.onLoadMore}
       testID={props.testID}
       empty={props.empty}
-      footer={
-        <If when={props.loadingMore}>
-          <View class="items-center py-3">
-            <LoadingIndicator label={t("list.loadingMore")} size={40} />
-          </View>
-        </If>
-      }
       class="flex-1"
-      contentClass={m3() ? undefined : "px-2 pb-2"}
+      contentClass="pb-[env(safe-area-inset-bottom)]"
     >
       {(m) => (
-        <Swipe id={m().key} onArchive={props.picking ? undefined : props.onArchive} onDelete={props.picking ? undefined : props.onDelete}>
-          <If when={m3()} else={<MessageRow
-            message={m()}
-            selected={props.selectedId === m().key || !!props.picked?.(m().key)}
-            picking={!!props.picking}
-            onPress={() => (props.picking ? props.onPick?.(m().key) : props.onOpen(m().key))}
-            onLongPress={
-              props.onPick
-                ? () => {
-                    Haptics.impact("medium");
-                    props.onPick?.(m().key);
-                  }
-                : undefined
-            }
-            showAccount={!!props.showAccount && accounts().length > 1}
-            showRecipients={!!props.showRecipients}
-            dense={dense()}
-            terms={terms()}
-          />}>
-            <MaterialRow
+        <If
+          when={swiping()}
+          else={
+            <Row
               message={m()}
               selected={props.selectedId === m().key || !!props.picked?.(m().key)}
-              picked={!!props.picked?.(m().key)}
               onPress={() => (props.picking ? props.onPick?.(m().key) : props.onOpen(m().key))}
-              onPick={
-                props.onPick
-                  ? () => {
-                      Haptics.impact("medium");
-                      props.onPick?.(m().key);
-                    }
-                  : undefined
-              }
+              onLongPress={props.onPick ? () => pick(m().key) : undefined}
               showAccount={!!props.showAccount && accounts().length > 1}
               showRecipients={!!props.showRecipients}
+              oneLine={oneLine()}
               terms={terms()}
             />
-          </If>
-        </Swipe>
+          }
+        >
+          <SwipeRow
+            leading={props.onArchive ? [{ id: "archive", title: t("actions.archive"), icon: "archivebox", tint: "system-teal" }] : []}
+            trailing={props.onDelete ? [{ id: "delete", title: t("actions.delete"), icon: "trash", destructive: true }] : []}
+            fullSwipe={props.onArchive ? "archive" : props.onDelete ? "delete" : undefined}
+            onAction={({ id }: { id: string }) => {
+              if (id === "archive") props.onArchive?.(m().key);
+              else if (id === "delete") props.onDelete?.(m().key);
+            }}
+          >
+            <Row
+              message={m()}
+              selected={props.selectedId === m().key || !!props.picked?.(m().key)}
+              onPress={() => (props.picking ? props.onPick?.(m().key) : props.onOpen(m().key))}
+              onLongPress={props.onPick ? () => pick(m().key) : undefined}
+              showAccount={!!props.showAccount && accounts().length > 1}
+              showRecipients={!!props.showRecipients}
+              oneLine={oneLine()}
+              terms={terms()}
+            />
+          </SwipeRow>
+        </If>
       )}
     </List>
-    <If when={m3() && props.onRefresh}>
-      <View
-        class="absolute inset-x-0 top-0 items-center justify-center"
-        style={{
-          height: PULL,
-          pointerEvents: "none",
-          opacity: pull.interpolate({ inputRange: [0, 24], outputRange: [0, 1] }),
-          transform: [{ translateY: pull.interpolate({ inputRange: [0, PULL], outputRange: [-PULL / 2, 0] }) }],
-        }}
-      >
-        <LoadingIndicator
-          label={t("list.refreshing")}
-          contained
-          progress={props.refreshing ? -1 : pull.interpolate({ inputRange: [0, PULL], outputRange: [0, 1] })}
-          testID="pull-indicator"
-        />
-      </View>
-    </If>
-    </View>
   );
 }
-
-const tones = [
-  "bg-primary-container text-on-primary-container",
-  "bg-secondary-container text-on-secondary-container",
-  "bg-tertiary-container text-on-tertiary-container",
-];
-// FNV-1a: one sender, one tone.
-const toneOf = (key: string) => tones[[...key].reduce((h, c) => Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0, 2166136261) % tones.length];
 
 /** Who a row names: the recipients (Sent, Drafts), a conversation's writers, or the sender. */
 const writers = (r: ListRow, recipients: boolean) =>
@@ -165,87 +124,72 @@ const rowLabel = (r: ListRow, who: string) =>
     .filter(Boolean)
     .join(", ");
 
-/** A conversation's message count beside who wrote, as Gmail shows it. */
-function Count(props: { row: ListRow }) {
-  return (
-    <If when={props.row.count > 1}>
-      <Text class={`text-label-medium tabular-nums ${props.row.unread ? "font-bold text-on-surface" : "text-on-surface-variant"}`} testID="thread-count">
-        {props.row.count}
-      </Text>
-    </If>
-  );
-}
-
-/** Android's row: the sender's initials in a tonal circle that morphs into a checked rounded square when
- * picked (a tap on it picks, as in Gmail), unread in emphasized type, a picked row in the secondary container. */
-function MaterialRow(props: {
+function Row(props: {
   message: ListRow;
   selected: boolean;
-  picked: boolean;
   onPress: () => void;
-  onPick?: () => void;
+  onLongPress?: () => void;
   showAccount: boolean;
   showRecipients: boolean;
+  oneLine: boolean;
   terms: string[];
 }) {
   const m = () => props.message;
-  const seen = () => m().unread === 0;
+  const unread = () => m().unread > 0;
   const who = () => writers(m(), props.showRecipients);
-  const avatar = () => (props.showRecipients ? who() : displayName(m().latest.from));
   return (
-    <Row
-      selected={props.selected}
-      onPress={props.onPress}
-      onLongPress={props.onPick}
+    <View
+      role="button"
       accessibilityLabel={rowLabel(m(), who())}
+      accessibilityState={{ selected: props.selected }}
+      onPress={() => props.onPress()}
+      onLongPress={props.onLongPress}
       testID={`message-${m().key}`}
-      class={`flex-row gap-3 rounded-large py-3 ps-3 pe-4 ${transition.fastSpatial}`}
+      class={`w-full flex-row items-center bg-system-background active:bg-fill ${props.selected ? "bg-fill" : ""}`}
     >
-      <View
-        role="checkbox"
-        accessibilityLabel={t("actions.select")}
-        accessibilityState={{ checked: props.picked }}
-        onPress={props.onPick ? () => props.onPick?.() : undefined}
-        hitSlop={4}
-        class={`size-10 items-center justify-center ${transition.fastSpatial} ${props.picked ? "rounded-medium bg-primary" : `rounded-full ${toneOf(avatar())}`}`}
-      >
-        <If when={props.picked} else={<Text class="text-title-small font-medium">{initials(avatar())}</Text>}>
-          <Icon name="check" class="tint-on-primary" />
-        </If>
-      </View>
-      <View class="min-w-0 flex-1">
-        <View class="flex-row items-center gap-1.5">
-          <If when={props.showAccount}>
-            <AccountMark index={accountIndex(m().latest.accountId)} />
+      <If when={props.showAccount}>
+        <View class="h-full items-center pl-1.5">
+          <AccountMark index={accountIndex(m().latest.accountId)} shape="bar" />
+        </View>
+      </If>
+      <View class="min-w-0 flex-1 flex-row gap-2.5 pl-3 pr-4">
+        <View class="w-2 pt-6">
+          <If when={unread()}>
+            <View accessibilityElementsHidden class="size-2 rounded-full bg-system-blue" />
           </If>
-          <View class="min-w-0 flex-1 flex-row items-center gap-1.5">
-            <Text class={`line-clamp-1 shrink text-body-large ${seen() ? "text-on-surface-variant" : "font-bold text-on-surface"}`}>{who()}</Text>
-            <Count row={m()} />
+        </View>
+        <View class={`min-w-0 flex-1 gap-0.5 border-b border-separator py-2.5 ${unread() ? "" : ""}`}>
+          <View class="flex-row items-baseline gap-1.5">
+            <Text class={`line-clamp-1 shrink text-body ${unread() ? "font-semibold text-label" : "text-label"}`}>{who()}</Text>
+            <Count value={m().count} bold={unread()} />
+            <View class="flex-1" />
+            <Text class={`shrink-0 text-footnote tabular-nums ${unread() ? "font-semibold text-label" : "text-secondary-label"}`}>
+              {listDate(m().latest.date)}
+            </Text>
           </View>
-          <Text class={`text-label-medium tabular-nums ${seen() ? "font-medium text-on-surface-variant" : "font-bold text-primary"}`}>{listDate(m().latest.date)}</Text>
-        </View>
-        <View class="flex-row items-center gap-1.5">
+          <View class="flex-row items-center gap-1.5">
+            <Marked text={m().subject || t("reader.noSubject")} terms={props.terms} class="line-clamp-1 flex-1 text-subheadline text-label" />
+            <If when={m().hasAttachments}>
+              <Icon name="paperclip" size={14} tint="secondary-label" />
+            </If>
+            <If when={m().flagged}>
+              <Icon name="flag.fill" size={14} tint="system-orange" label={t("list.flagged")} />
+            </If>
+          </View>
           <Marked
-            text={m().subject || t("reader.noSubject")}
+            text={m().latest.snippet}
             terms={props.terms}
-            class={`line-clamp-1 flex-1 text-body-medium ${seen() ? "text-on-surface" : "font-bold text-on-surface"}`}
+            class={`${props.oneLine ? "line-clamp-2" : "line-clamp-1"} text-subheadline text-secondary-label`}
           />
-          <If when={m().hasAttachments}>
-            <Icon name="paperclip" size="sm" class="tint-on-surface-variant" />
-          </If>
-          <If when={m().flagged}>
-            <Icon name="flagFilled" size="sm" tone="flag" />
-          </If>
         </View>
-        <Marked text={m().latest.snippet} terms={props.terms} class="line-clamp-1 text-body-medium text-on-surface-variant" />
       </View>
-    </Row>
+    </View>
   );
 }
 
 const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-/** `text` with each occurrence of `terms` marked; plain text without terms. */
+/** `text` with each occurrence of `terms` marked, as a search result shows them. */
 function Marked(props: { text: string; terms: string[]; class: string }) {
   const parts = () => {
     const pattern = new RegExp(`(${props.terms.map(escapeRegExp).join("|")})`, "giu");
@@ -258,90 +202,9 @@ function Marked(props: { text: string; terms: string[]; class: string }) {
     <If when={props.terms.length} else={<Text class={props.class}>{props.text}</Text>}>
       <Text class={props.class}>
         <Each of={parts()} key={(p) => p.key}>
-          {(p) => <Text class={p().hit ? "bg-tertiary-container font-bold text-on-tertiary-container" : ""}>{p().text}</Text>}
+          {(p) => <Text class={p().hit ? "rounded-[3px] bg-system-yellow/40 font-semibold text-label" : ""}>{p().text}</Text>}
         </Each>
       </Text>
     </If>
-  );
-}
-
-function MessageRow(props: {
-  message: ListRow;
-  selected: boolean;
-  picking: boolean;
-  onPress: () => void;
-  onLongPress?: () => void;
-  showAccount: boolean;
-  showRecipients: boolean;
-  dense: boolean;
-  terms: string[];
-}) {
-  const m = () => props.message;
-  const seen = () => m().unread === 0;
-  const who = () => writers(m(), props.showRecipients);
-  return (
-    <Row
-      selected={props.selected}
-      onPress={props.onPress}
-      onLongPress={props.onLongPress}
-      accessibilityLabel={rowLabel(m(), who())}
-      testID={`message-${m().key}`}
-      class={`mb-0.5 flex-row pe-4 ${props.dense ? (touch ? "py-2" : "py-2.5") : "py-3"}`}
-    >
-      <If when={props.showAccount}>
-        <AccountMark index={accountIndex(m().latest.accountId)} shape="bar" />
-      </If>
-      <If
-        when={props.picking}
-        else={
-          <View class="w-6 items-center pt-1.5">
-            <If when={!seen()}>
-              <View class="size-2 rounded-full bg-unread" />
-            </If>
-          </View>
-        }
-      >
-        <View class="w-10 items-center pt-0.5">
-          <View class={`size-5 items-center justify-center rounded-full border-2 ${props.selected ? "border-primary bg-primary" : "border-outline"}`}>
-            <If when={props.selected}>
-              <Icon name="check" size="sm" tone="on-primary" />
-            </If>
-          </View>
-        </View>
-      </If>
-      <View class={`min-w-0 flex-1 ${touch && props.dense ? "" : "gap-0.5"}`}>
-        <View class="flex-row items-center gap-1.5">
-          <View class="min-w-0 flex-1 flex-row items-center gap-1.5">
-            <Text class={`line-clamp-1 shrink text-on-surface ${seen() ? "text-body-large tracking-body-large" : "text-body-large font-bold tracking-body-large-emphasized"}`}>
-              {who()}
-            </Text>
-            <Count row={m()} />
-          </View>
-          <Text class={`text-label-medium tabular-nums tracking-label-medium ${seen() ? "text-on-surface-variant" : "font-bold text-primary"}`}>
-            {listDate(m().latest.date)}
-          </Text>
-        </View>
-        <View class="flex-row items-center gap-1.5">
-          <Marked
-            text={m().subject || t("reader.noSubject")}
-            terms={props.terms}
-            class={`line-clamp-1 flex-1 text-body-medium text-on-surface ${seen() ? "tracking-body-medium" : "font-medium tracking-body-medium-emphasized"}`}
-          />
-          <If when={m().hasAttachments}>
-            <Icon name="paperclip" size="sm" tone="on-surface-variant" />
-          </If>
-          <View class="w-4 items-center">
-            <If when={m().flagged}>
-              <Icon name="flagFilled" size="sm" tone="flag" />
-            </If>
-          </View>
-        </View>
-        <Marked
-          text={m().latest.snippet}
-          terms={props.terms}
-          class={`${props.dense ? "line-clamp-1" : "line-clamp-2"} text-body-medium tracking-body-medium text-on-surface-variant`}
-        />
-      </View>
-    </Row>
   );
 }

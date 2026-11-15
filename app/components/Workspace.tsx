@@ -1,17 +1,19 @@
-// The wide layout (M3's expanded and large window classes): the navigation
-// rail, then the message list and the reader as two panes on the surface
-// container, the list fixed and the reader flexible. The rail expands from
-// 1200pt wide.
-import { Text, View, windowSize, type InputRef } from "nsh";
+// The split view, as Mail draws it on an iPad: the sidebar, the list column
+// and the reader. Windows narrower than the sidebar's breakpoint keep the
+// list and the reader and open the mailboxes in a sheet.
+import { signal, View, type InputRef } from "nsh";
 import { t } from "nsh/i18n";
-import { Button, Empty, Fab, IconButton, LoadingIndicator, Pane, Panes } from "../ui";
-import { MailboxList, mailboxTitle, resultCount } from "./Mailbox";
-import { MailboxRail } from "./Mailboxes";
-import { NotificationsView } from "./NotificationsView";
+import { Button, Sheet } from "cupertino";
+import { Empty, Loading } from "./Empty";
+import { MailboxPane } from "./MailboxPane";
+import { NotificationsPane } from "./NotificationsView";
+import { NotificationReader } from "./NotificationReader";
 import { Reader } from "./Reader";
-import { notificationsSection } from "../notify";
-import { SearchField } from "./SearchField";
-import { conversation, current, listStatus, openRow, refresh, searchActive, searchQuery, searchResults, selectedId, shownMessage } from "../store";
+import { Sidebar } from "./Sidebar";
+import { sidebar } from "../layout";
+import { notificationsSection, openNotification, showMail, sourceById } from "../notify";
+import { archiveNotifications, markNotifications } from "../notify";
+import { conversation, current, selectedId, shownMessage, openMessage } from "../store";
 import type { ComposeMode } from "../lib/format";
 
 export interface WorkspaceProps {
@@ -23,95 +25,86 @@ export interface WorkspaceProps {
   searchRef: (ref: InputRef) => void;
 }
 
-export const RAIL_EXPANDED = 1200;
-
 export function Workspace(props: WorkspaceProps) {
+  const sheet = signal(false);
   const open = () => shownMessage();
-  const expanded = () => windowSize().width >= RAIL_EXPANDED;
-  const fab = () => (
-    <If when={expanded()} else={<Fab icon="compose" label={t("actions.compose")} onPress={() => props.onCompose("new")} testID="compose" />}>
-      <Fab icon="compose" label={t("actions.compose")} extended onPress={() => props.onCompose("new")} class="self-start" testID="compose" />
-    </If>
-  );
+  const mailboxes = () => (sidebar() ? undefined : () => sheet.set(true));
   return (
-    <View class="flex-1 flex-row bg-surface-container">
-      <View class={expanded() ? "w-[256px]" : "w-24"}>
-        <MailboxRail expanded={expanded()} fab={fab()} onSettings={props.onSettings} />
-      </View>
-      <If when={notificationsSection()} else={mailPanes()}>
-        <NotificationsView onAddSource={props.onAddSource} onAddAccount={props.onAddAccount} onOpenSources={props.onSources} />
+    <View class="flex-1 flex-row bg-system-grouped-background pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+      <If when={sidebar()}>
+        <View class="w-[286px]">
+          <Sidebar onSettings={props.onSettings} />
+        </View>
       </If>
+      <View class={`flex-row bg-system-background ${sidebar() ? "flex-1 rounded-l-[10px] overflow-hidden" : "flex-1"}`}>
+        <View class="w-[380px] border-r border-separator">
+          <If
+            when={notificationsSection()}
+            else={<MailboxPane onOpen={(row) => openMessage(row.latest.id)} onAddAccount={props.onAddAccount} onCompose={() => props.onCompose("new")} searchRef={props.searchRef} highlight onMailboxes={mailboxes()} testID="mail-list-pane" />}
+          >
+            <NotificationsPane onAddSource={props.onAddSource} onAddAccount={props.onAddAccount} onOpenSources={props.onSources} onMailboxes={mailboxes()} />
+          </If>
+        </View>
+        <View class="min-w-0 flex-1">
+          <If when={notificationsSection()} else={mailDetail()}>
+            {notificationDetail()}
+          </If>
+        </View>
+      </View>
+      <Sheet open={sheet()} detent="large" title={t("tabs.folders")} onOpenChange={({ open }: { open: boolean }) => sheet.set(open)}>
+        <Sidebar onSettings={() => (sheet.set(false), props.onSettings())} />
+      </Sheet>
     </View>
   );
 
-  function mailPanes() {
+  function mailDetail() {
     return (
-      <Panes label={t("layout.resize")} class="py-3 pe-3">
-        <Pane size={400} minSize={320} maxSize={560} fixed first>
-          <View class="flex-1 overflow-hidden rounded-large bg-surface">
-            <View class="h-16 flex-row items-center gap-2 pe-2 ps-5">
-              <If
-                when={searchActive()}
-                else={
-                  <Text role="header" class="line-clamp-1 flex-1 text-title-large tracking-title-large text-on-surface">
-                    {mailboxTitle()}
-                  </Text>
-                }
-              >
-                <Text role="header" class="line-clamp-1 flex-1 text-title-large tracking-title-large text-on-surface" testID="results-title">
-                  {t("search.title", { query: searchQuery().trim() })}
-                </Text>
-                <If when={searchResults()?.length}>
-                  {(count) => (
-                    <Text role="summary" class="text-label-large tabular-nums text-on-surface-variant" testID="result-count">
-                      {resultCount(count())}
-                    </Text>
-                  )}
-                </If>
+      <If
+        when={open()}
+        else={
+          <If
+            when={current.error()}
+            else={
+              <If when={selectedId()} else={<Empty icon="envelope.open" title={t("reader.none")} description={t("reader.noneHint")} />}>
+                <Loading label={t("reader.loading")} />
               </If>
-              <If when={listStatus() === "refreshing"} else={<IconButton icon="refresh" label={t("actions.refresh")} onPress={() => void refresh()} testID="refresh" />}>
-                <LoadingIndicator label={t("sync.running")} size={40} testID="refreshing" />
-              </If>
-            </View>
-            <View class="px-3 pb-2">
-              <SearchField ref={props.searchRef} />
-            </View>
-            <MailboxList onOpen={openRow} onAddAccount={props.onAddAccount} onCompose={() => props.onCompose("new")} highlight />
-          </View>
-        </Pane>
-        <Pane minSize={360} last>
-          <View class="flex-1 overflow-hidden rounded-large bg-surface">
-            <If
-              when={open()}
-              else={
-                <If
-                  when={current.error()}
-                  else={
-                    <If when={selectedId()} else={<Empty icon="mailOpen" title={t("reader.none")} description={t("reader.noneHint")} />}>
-                      <View class="flex-1 items-center justify-center">
-                        <LoadingIndicator label={t("reader.loading")} contained />
-                      </View>
-                    </If>
-                  }
-                >
-                  <Empty
-                    icon="alert"
-                    title={t("reader.failed")}
-                    description={t("reader.failedHint")}
-                    action={<Button variant="tonal" icon="refresh" label={t("actions.retry")} onPress={() => current.refetch()} testID="reader-retry" />}
-                  />
-                </If>
-              }
-            >
-              {(m) => (
-                <Each of={[m()]} key={(x) => x.id}>
-                  {(message) => <Reader message={message()} conversation={conversation()} onCompose={props.onCompose} toolbar />}
-                </Each>
-              )}
-            </If>
-          </View>
-        </Pane>
-      </Panes>
+            }
+          >
+            <Empty
+              icon="exclamationmark.triangle"
+              title={t("reader.failed")}
+              description={t("reader.failedHint")}
+              action={<Button title={t("actions.retry")} variant="tinted" icon="arrow.clockwise" onPress={() => current.refetch()} testID="reader-retry" />}
+            />
+          </If>
+        }
+      >
+        {(m) => (
+          <Each of={[m()]} key={(x) => x.id}>
+            {(message) => <Reader message={message()} conversation={conversation()} onCompose={props.onCompose} toolbar />}
+          </Each>
+        )}
+      </If>
+    );
+  }
+
+  function notificationDetail() {
+    return (
+      <If when={openNotification()} else={<Empty icon="bell" title={t("notify.noSelection")} description={t("notify.noSelectionHint")} />}>
+        {(n) => (
+          <Each of={[n()]} key={(x) => x.id}>
+            {(note) => (
+              <NotificationReader
+                note={note()}
+                source={sourceById(note().sourceId)}
+                onToggleRead={() => void markNotifications([note().id], !note().read)}
+                onArchive={() => archiveNotifications([note().id])}
+                onOpenMail={note().threadId ? () => (showMail(), openMessage(note().id)) : undefined}
+              />
+            )}
+          </Each>
+        )}
+      </If>
     );
   }
 }

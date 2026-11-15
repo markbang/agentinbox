@@ -2,8 +2,9 @@
 // a filter or search that found nothing, or a load that failed.
 import { View } from "nsh";
 import { t } from "nsh/i18n";
-import { Button, Empty, LoadingIndicator } from "../ui";
-import { feedError, feedFilter, feedQuery, feedStatus, clearFeedQuery, reloadFeed, serverInbox, sources } from "../notify";
+import { Button } from "cupertino";
+import { Empty, Loading } from "./Empty";
+import { clearFeedQuery, feedError, feedFilter, feedQuery, feedStatus, reloadFeed, serverInbox, sources } from "../notify";
 
 export function FeedEmpty(props: { onAddSource: () => void; onAddAccount: () => void; onClearFilters: () => void }) {
   const filtered = () => !!feedQuery().trim() || !!feedFilter();
@@ -12,14 +13,7 @@ export function FeedEmpty(props: { onAddSource: () => void; onAddAccount: () => 
     props.onClearFilters();
   };
   return (
-    <If
-      when={feedStatus() !== "loading"}
-      else={
-        <View class="flex-1 items-center justify-center p-8">
-          <LoadingIndicator label={t("notify.loading")} contained />
-        </View>
-      }
-    >
+    <If when={feedStatus() !== "loading"} else={<Loading label={t("notify.loading")} />}>
       <If
         when={feedStatus() === "error"}
         else={
@@ -32,8 +26,8 @@ export function FeedEmpty(props: { onAddSource: () => void; onAddAccount: () => 
                 description={serverInbox() ? t("notify.noSourcesHint") : t("notify.noAccountsHint")}
                 action={
                   <Button
+                    title={serverInbox() ? t("sources.add") : t("accounts.add")}
                     icon="plus"
-                    label={serverInbox() ? t("sources.add") : t("accounts.add")}
                     onPress={serverInbox() ? props.onAddSource : props.onAddAccount}
                     testID="empty-add-source"
                   />
@@ -48,25 +42,25 @@ export function FeedEmpty(props: { onAddSource: () => void; onAddAccount: () => 
                   icon="bell"
                   title={t("notify.empty")}
                   description={t("notify.emptyHint")}
-                  action={<Button icon="plus" label={t("sources.add")} onPress={props.onAddSource} testID="empty-add-source" />}
+                  action={<Button title={t("sources.add")} icon="plus" onPress={props.onAddSource} testID="empty-add-source" />}
                 />
               }
             >
               <Empty
-                icon="filter"
+                icon="line.3.horizontal.decrease"
                 title={t("notify.nothing")}
                 description={t("notify.nothingHint")}
-                action={<Button variant="tonal" icon="close" label={t("notify.clearFilters")} onPress={clear} testID="empty-clear-filters" />}
+                action={<Button title={t("notify.clearFilters")} variant="tinted" icon="xmark" onPress={clear} testID="empty-clear-filters" />}
               />
             </If>
           </If>
         }
       >
         <Empty
-          icon="alert"
+          icon="exclamationmark.triangle"
           title={t("notify.failed")}
           description={feedError() ?? t("notify.failedHint")}
-          action={<Button variant="tonal" icon="refresh" label={t("actions.retry")} onPress={() => void reloadFeed()} testID="feed-retry" />}
+          action={<Button title={t("actions.retry")} variant="tinted" icon="arrow.clockwise" onPress={() => void reloadFeed()} testID="feed-retry" />}
         />
       </If>
     </If>
