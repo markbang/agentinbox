@@ -176,8 +176,8 @@ def sign_out(name, tries=2):
         launch()
         if not tab("Settings"):
             return False
-        scroll_up_to("id:sign-out")
-        if not tap("id:sign-out"):
+        scroll_up_to("Sign out")
+        if not tap("Sign out"):
             return False
         if not wait("Sign out of AgentInbox?", 15):  # the sheet's own title, whatever it says
             return False
@@ -530,15 +530,15 @@ for mode in ("light", "dark"):
             shot(f"{mode}-search-none")
 
     if tab("Mailboxes"):
-        wait("id:mailbox-all")
+        wait("All inboxes")
         shot(f"{mode}-mailboxes")
-        if tap("id:mailbox-scheduled"):
+        if tap("Scheduled"):
             wait("id:scheduled")
             shot(f"{mode}-scheduled")
             if tab("Mailboxes"):
-                tap("id:mailbox-all")
+                tap("All inboxes")
         # An empty folder on the phone: the one draft is deleted, and Drafts says so with its next step.
-        if tab("Mailboxes") and tap("id:mailbox-drafts"):
+        if tab("Mailboxes") and tap("Drafts"):
             wait("id:messages", 15)
             row = settled("id:message-.*")
             if row:
@@ -546,38 +546,38 @@ for mode in ("light", "dark"):
                 if tap("id:select-rows", 5) and tap("id:message-.*") and tap("id:picked-delete"):
                     wait("id:empty-compose", 15)
                     shot(f"{mode}-empty-folder")
-        if tab("Mailboxes") and tap("id:mailbox-all"):
+        if tab("Mailboxes") and tap("All inboxes"):
             wait("id:messages", 15)
 
     # The notification inbox: the feed, a chip, a notification, its sources.
     if tab("Notifications"):
-        wait("id:notify-list", 20)
+        wait("Search notifications", 20)
         shot(f"{mode}-notifications")
         if tap("id:notify-more"):
             wait("Sources", 10)  # its menu, before it is screenshotted
             shot(f"{mode}-notifications-menu")
             if tap("Sources"):
-                wait("id:sources", 15)
+                wait("Sources", 15)
                 shot(f"{mode}-sources")
                 if tap("id:sources-add-top"):
                     wait("id:add-source", 10)
                     shot(f"{mode}-source-kinds")
-                    back_to("id:sources")
+                    back_to("Sources")
                 back_to("id:notifications")
             else:
                 back()
         # A notification opens on its own page; Back returns to the feed.
-        if tap("id:notify-[nm][0-9]+"):
+        if tap("Lunch tomorrow?"):
             wait("id:notify-reader", 15)
             shot(f"{mode}-notification")
             back()
-        wait("id:notify-list", 15)
+        wait("Search notifications", 15)
 
     if tab("Settings"):
-        wait("id:settings")
+        wait("Accounts")
         shot(f"{mode}-settings")
         # The first account's signature, then a new message that carries it.
-        if tap("id:account-more-0") and tap("Signature…") and tap("id:signature-text"):
+        if tap("Actions for lin.chen@northwind.dev", 10) and tap("Signature…") and tap("id:signature-text"):
             adb("shell", "input", "text", "'**Lin%sChen**'")
             adb("shell", "input", "keyevent", "66")
             adb("shell", "input", "text", "'Northwind%s-%s[northwind.dev](https://northwind.dev)'")
@@ -586,25 +586,25 @@ for mode in ("light", "dark"):
             shot(f"{mode}-signature")
             # The first tap may only take the focus from the field.
             for _ in range(2):
-                if tap("id:signature-save") and find("id:settings", 8) is not None:
+                if tap("id:signature-save") and find("Accounts", 8) is not None:
                     break
             else:
                 fail("the signature page never closed")
         # The notification settings: the keys agents read the feed with, and the rules.
-        if scroll_to("id:settings-keys"):
-            if tap("id:settings-keys"):
-                wait("id:api-keys", 15)
+        if scroll_to("API keys"):
+            if tap("API keys"):
+                wait("API keys", 15)
                 shot(f"{mode}-api-keys")
                 if tap("id:keys-add-top"):
-                    wait("id:new-key", 10)
+                    wait("New API key", 10)
                     shot(f"{mode}-new-key")
-                    back_to("id:api-keys")
-                back_to("id:settings")
-        if scroll_to("id:settings-rules"):
-            if tap("id:settings-rules"):
-                wait("id:notify-rules", 15)
+                    back_to("API keys")
+                back_to("Accounts")
+        if scroll_to("Per source and priority"):
+            if tap("Per source and priority"):
+                wait("Per source and priority", 15)
                 shot(f"{mode}-notify-rules")
-                back_to("id:settings")
+                back_to("Accounts")
 
     if tab("Mail"):
         wait("id:messages")
