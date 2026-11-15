@@ -107,7 +107,7 @@ await page.getByText("Signature…").click();
 await fill("signature-text", "**Lin Chen**\nNorthwind · [northwind.dev](https://northwind.dev)");
 await press("signature-save");
 await page.getByText("Signature saved").waitFor();
-await page.getByLabel("Done").first().click();
+await press("modal-done");
 log("signature set");
 
 for (const theme of ["light", "dark"]) {
@@ -160,7 +160,7 @@ for (const theme of ["light", "dark"]) {
   await page.getByText("Signature…").click();
   await id("signature-preview").waitFor();
   await shot("signature", theme);
-  await page.getByLabel("Done").first().click();
+  await press("modal-done");
 
   await page.getByText("Add account").last().click();
   await id("add-imap").waitFor();
