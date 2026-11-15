@@ -260,7 +260,7 @@ export function Reader(props: ReaderProps) {
           >
             {(source) => (
               // The mail card stays white in both appearances on purpose: mail is designed on white and its colors are not inverted.
-              <View class="mx-3 h-[560px] overflow-hidden rounded-row border border-separator bg-white">
+              <View class="h-[560px] overflow-hidden border-y border-separator bg-white">
                 <MailView html={source()} remote={showImages()} onUnavailable={() => webViewAvailable.set(false)} class="flex-1" />
               </View>
             )}
@@ -274,6 +274,7 @@ export function Reader(props: ReaderProps) {
         open={menu()}
         title={t("thread.messageActions")}
         actions={[
+          { id: "flag", title: m().flagged ? t("actions.unflag") : t("actions.flag") },
           { id: "reply", title: t("actions.reply") },
           { id: "forward", title: t("actions.forward") },
           { id: "seen", title: m().seen ? t("actions.markUnread") : t("actions.markRead") },
@@ -283,6 +284,7 @@ export function Reader(props: ReaderProps) {
         onOpenChange={({ open }: { open: boolean }) => menu.set(open)}
         onAction={({ id }: { id: string }) => {
           menu.set(false);
+          if (id === "flag") void setFlags(m().id, { flagged: !m().flagged });
           if (id === "reply") props.onCompose("reply");
           if (id === "forward") props.onCompose("forward");
           if (id === "seen") void setFlags(m().id, { seen: !m().seen });
@@ -328,7 +330,7 @@ function AttachmentTile(props: { messageId: string; attachment: Attachment }) {
       accessibilityLabel={`${a().filename ?? t("reader.untitledAttachment")}, ${fileSize(a().size)}`}
       onPress={() => void open()}
       testID={`attachment-${a().index}`}
-      class="w-40 flex-row items-center gap-2 rounded-row border border-separator bg-secondary-system-background px-2 py-2 active:bg-fill"
+      class="w-48 flex-row items-center gap-2 rounded-row border border-separator bg-secondary-system-background px-2 py-2 active:bg-fill"
     >
       <If when={thumbnail()} else={<Icon name={a().mimeType.startsWith("image/") ? "photo" : "doc"} size={22} tint="system-blue" />}>
         <Image src={thumbnail() ?? ""} class="size-8 rounded-[6px]" />
