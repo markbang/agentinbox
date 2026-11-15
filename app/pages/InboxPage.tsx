@@ -1,6 +1,6 @@
 // The Mail tab's first page: the chosen mailbox, its rows swiped and
 // long-pressed as iOS Mail does, and the selection's actions in the bar.
-import { Text, View } from "nsh";
+import { platform, Text, View } from "nsh";
 import { BackHandler } from "nsh/mobile";
 import { t } from "nsh/i18n";
 import { Button } from "cupertino";
@@ -15,12 +15,14 @@ export function InboxPage() {
     openRow(row);
     nav.stack.push({ name: "message", id: row.latest.id });
   };
-  // Android back ends a selection.
-  BackHandler.on("press", () => {
-    if (!picking()) return false;
-    clearPicked();
-    return true;
-  });
+  // Android back ends a selection; a browser has no back button to hear.
+  if (platform.os === "ios" || platform.os === "android") {
+    BackHandler.on("press", () => {
+      if (!picking()) return false;
+      clearPicked();
+      return true;
+    });
+  }
   const picked = () => rows().filter((r) => pickedIds().includes(r.key));
   const move = (folder: "archive" | "trash") => {
     const chosen = picked();

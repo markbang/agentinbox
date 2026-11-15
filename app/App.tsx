@@ -139,7 +139,7 @@ function Main() {
         searchRef={(ref) => (search = ref)}
       />
       {/* The wide layout opens pages in a sheet with a stack of its own. */}
-      <Sheet open={isModalOpen()} detent="large" testID="modal" onOpenChange={({ open }: { open: boolean }) => (open ? undefined : closeModal())}>
+      <Sheet open={isModalOpen()} detent="large" scroll={false} testID="modal" onOpenChange={({ open }: { open: boolean }) => (open ? undefined : closeModal())}>
         <NavContext.Provider value={modalNavigator}>
           <NavStack state={modalStack} class="flex-1">
             {page}

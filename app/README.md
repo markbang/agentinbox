@@ -1,16 +1,16 @@
 # AgentInbox app
 
 The client: TSX screens over a Rust crate that exports `agentinbox/native` (the `Mail` module of
-[docs/design.md](../docs/design.md) §3). Design system and motion: [DESIGN.md](DESIGN.md).
+[docs/design.md](../docs/design.md) §3). Design system and motion: [DESIGN.md](DESIGN.md) — Cupertino, from the
+[`nsh-cupertino`](https://github.com/markbang/nsh-cupertino) library vendored as `vendor/nsh-cupertino`.
 
 ```
-App.tsx          shell: onboarding, rail + list + reader (wide), tabs (phones, narrow web), keys, snackbar
+App.tsx          shell: onboarding, split view (wide) or tab bar (phones, narrow web), the sheet, keys, toasts
 store.ts         TSX state: mirrors of Rust's status, accounts and messages; mailbox, selection, search
-nav.ts           the phone stack and the wide layout's dialog stack
+nav.ts           the tab stacks and the wide layout's sheet stack
 resident.ts      tray, close-to-tray, new-mail notifications
-pages/           one NavPage each
-components/      what pages share (message list, reader, mailboxes)
-ui/              the styled layer over nsh/base
+pages/           one Page each
+components/      what pages share (message list, reader, sidebar), built from `cupertino`
 locales/app.yml  en and zh-CN
 src/             the crate: Mail, the Backend trait, LocalBackend, CloudBackend, DemoBackend (debug builds)
 tests/           local mode end to end against GreenMail

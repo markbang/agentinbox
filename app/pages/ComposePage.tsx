@@ -177,7 +177,7 @@ export function ComposePage(props: { init: ComposeInit }) {
   // What the user writes goes above the quote and the signature.
   const caretAtTop = replying || !draft.edited();
   return (
-    <Page title={title()} back={t("common.close")} onBack={close} trailing={actions()} testID="compose">
+    <Page title={title()} back={t("common.close")} onBack={close} trailing={actions()} testID="compose-page">
       <View
         class="min-h-0 flex-1 bg-system-background"
         onFileDragEnter={() => dragging.set(true)}
@@ -243,7 +243,7 @@ export function ComposePage(props: { init: ComposeInit }) {
         </View>
         <AttachmentChips files={files} error={files.error()} />
         <View class="flex-row items-center gap-2 border-t border-separator px-4 py-2 pb-[env(safe-area-inset-bottom)]">
-          <Button icon="paperclip" label={t("compose.attach")} variant="tinted" size="small" onPress={() => void pick()} testID="compose-attach" />
+          <Button icon="paperclip" label={t("compose.attach")} variant="plain" size="small" onPress={() => void pick()} testID="compose-attach" />
           <Button title={t("compose.discard")} variant="plain" size="small" onPress={askDiscard} testID="compose-discard" />
           <View class="flex-1" />
           <Text class="text-caption1 text-secondary-label">{t("compose.sendHint", { keys: keymap.label("mod+enter") })}</Text>
