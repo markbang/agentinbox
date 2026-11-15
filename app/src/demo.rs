@@ -4,8 +4,9 @@
 //! message, and so does a timer while the app runs.
 
 use std::{
-    cell::RefCell,
+    cell::{RefCell, RefMut},
     collections::{HashMap, HashSet},
+    ops::{Deref, DerefMut},
     rc::Rc,
     time::Duration,
 };
@@ -37,6 +38,8 @@ struct Data {
     next_key: u64,
     arrivals: usize,
     events: Option<Events>,
+    /// What the app hears once the borrow that made it ends ([`Updating`]).
+    pending: Vec<MailEvent>,
     outbox: Vec<(Outgoing, Vec<(String, Rc<File>)>)>,
 }
 
@@ -46,10 +49,9 @@ impl Data {
         format!("m{}", self.next_id)
     }
 
-    fn emit(&self, event: MailEvent) {
-        if let Some(events) = &self.events {
-            events(event);
-        }
+    /// Queues `event` for the app: see [`Updating`] for why it does not reach it here.
+    fn emit(&mut self, event: MailEvent) {
+        self.pending.push(event);
     }
 
     fn account(&self, id: &str) -> Result<&Account> {
@@ -344,6 +346,50 @@ impl DemoBackend {
             staged: Staged::default(),
         }
     }
+
+    /// A mutable borrow of the data; see [`Updating`].
+    fn update(&self) -> Updating<'_> {
+        Updating::new(&self.data)
+    }
+}
+
+/// A mutable borrow of the demo's data whose events reach the app once it ends. The shell answers
+/// an event by reading the backend (it reloads the mailbox), and a listener that read it while it
+/// was borrowed would panic — in the arrival task, which would then never deliver again.
+struct Updating<'a>(Option<RefMut<'a, Data>>);
+
+impl<'a> Updating<'a> {
+    fn new(data: &'a Rc<RefCell<Data>>) -> Self {
+        Self(Some(data.borrow_mut()))
+    }
+}
+
+impl Deref for Updating<'_> {
+    type Target = Data;
+
+    fn deref(&self) -> &Data {
+        self.0.as_deref().expect("borrowed until dropped")
+    }
+}
+
+impl DerefMut for Updating<'_> {
+    fn deref_mut(&mut self) -> &mut Data {
+        self.0.as_deref_mut().expect("borrowed until dropped")
+    }
+}
+
+impl Drop for Updating<'_> {
+    fn drop(&mut self) {
+        let Some(mut data) = self.0.take() else { return };
+        let (events, pending) = (data.events.clone(), std::mem::take(&mut data.pending));
+        // Emitted with the data free: a listener may read it again.
+        drop(data);
+        if let Some(events) = events {
+            for event in pending {
+                events(event);
+            }
+        }
+    }
 }
 
 fn not_found(what: &str) -> Error {
@@ -415,7 +461,7 @@ fn oauth(provider: OAuthProvider) -> Auth {
 
 impl Backend for DemoBackend {
     fn start(&self, events: Events) -> MailFuture<'_, ()> {
-        self.data.borrow_mut().events = Some(events);
+        self.update().events = Some(events);
         // The arrivals outlive this call: they stop when the backend goes.
         let data = Rc::downgrade(&self.data);
         Owner::detached().run(|| {
@@ -423,17 +469,23 @@ impl Backend for DemoBackend {
                 loop {
                     timer(ARRIVAL).await;
                     let Some(data) = data.upgrade() else { return };
-                    let mut data = data.borrow_mut();
-                    if let Some(summary) = data.deliver() {
-                        let account_id = summary.account_id.clone();
-                        data.emit(MailEvent::NewMail { summary });
-                        data.emit(MailEvent::Changed {
-                            account_id,
-                            folder: FolderKind::Inbox,
-                        });
-                    }
-                    if data.deliver_notification().is_some() {
-                        data.emit(notification_event());
+                    // A delivery that panics must not end the arrivals: the next one still comes.
+                    let delivered = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                        let mut data = Updating::new(&data);
+                        if let Some(summary) = data.deliver() {
+                            let account_id = summary.account_id.clone();
+                            data.emit(MailEvent::NewMail { summary });
+                            data.emit(MailEvent::Changed {
+                                account_id,
+                                folder: FolderKind::Inbox,
+                            });
+                        }
+                        if data.deliver_notification().is_some() {
+                            data.emit(notification_event());
+                        }
+                    }));
+                    if delivered.is_err() {
+                        log::error!("a demo delivery panicked");
                     }
                 }
             })
@@ -442,7 +494,7 @@ impl Backend for DemoBackend {
     }
 
     fn sign_out(&self) -> MailFuture<'_, ()> {
-        *self.data.borrow_mut() = Data::default();
+        *self.update() = Data::default();
         ok(Ok(()))
     }
 
@@ -485,7 +537,7 @@ impl Backend for DemoBackend {
                 .clone()
                 .filter(|u| !u.trim().is_empty())
                 .unwrap_or_else(|| input.email.clone());
-            self.data.borrow_mut().add_account(Account {
+            self.update().add_account(Account {
                 email: input.email,
                 name: input.name.filter(|n| !n.trim().is_empty()),
                 provider: input.provider,
@@ -508,7 +560,7 @@ impl Backend for DemoBackend {
             };
             let settings = preset(email.rsplit_once('@').map_or("", |(_, d)| d))
                 .ok_or_else(|| not_found("preset"))?;
-            self.data.borrow_mut().add_account(Account {
+            self.update().add_account(Account {
                 id: String::new(),
                 email: email.to_owned(),
                 name: Some("Demo Reader".to_owned()),
@@ -523,7 +575,7 @@ impl Backend for DemoBackend {
     }
 
     fn remove_account(&self, id: String) -> MailFuture<'_, ()> {
-        let mut data = self.data.borrow_mut();
+        let mut data = self.update();
         let result = data.account(&id).map(|_| ());
         if result.is_ok() {
             data.accounts.retain(|a| a.id != id);
@@ -533,7 +585,7 @@ impl Backend for DemoBackend {
     }
 
     fn set_signature(&self, id: String, signature: Signature) -> MailFuture<'_, Account> {
-        let mut data = self.data.borrow_mut();
+        let mut data = self.update();
         let found = data.accounts.iter_mut().find(|a| a.id == id);
         ok(found.ok_or_else(|| not_found("account")).map(|a| {
             a.signature = signature;
@@ -604,7 +656,7 @@ impl Backend for DemoBackend {
     }
 
     fn set_thread_flags(&self, id: String, flags: Flags) -> MailFuture<'_, ()> {
-        let mut data = self.data.borrow_mut();
+        let mut data = self.update();
         let latest = data
             .messages
             .iter()
@@ -636,7 +688,7 @@ impl Backend for DemoBackend {
     }
 
     fn move_thread(&self, id: String, folder: FolderKind) -> MailFuture<'_, ()> {
-        let mut data = self.data.borrow_mut();
+        let mut data = self.update();
         let moves = |m: &Message| {
             m.summary.thread_id == id
                 && match folder {
@@ -689,7 +741,7 @@ impl Backend for DemoBackend {
     }
 
     fn set_flags(&self, id: String, flags: Flags) -> MailFuture<'_, ()> {
-        let mut data = self.data.borrow_mut();
+        let mut data = self.update();
         let result = match data.messages.iter_mut().find(|m| m.summary.id == id) {
             Some(Message { summary: m, .. }) => {
                 m.seen = flags.seen.unwrap_or(m.seen);
@@ -704,7 +756,7 @@ impl Backend for DemoBackend {
     }
 
     fn move_to(&self, id: String, folder: FolderKind) -> MailFuture<'_, ()> {
-        let mut data = self.data.borrow_mut();
+        let mut data = self.update();
         let result = match data.messages.iter_mut().find(|m| m.summary.id == id) {
             Some(Message { summary: m, .. }) => Ok((
                 m.account_id.clone(),
@@ -726,7 +778,7 @@ impl Backend for DemoBackend {
             check_recipients(&draft)?;
             let staged = self.staged.of(&draft)?;
             latency(600).await;
-            post(&mut self.data.borrow_mut(), &draft, &staged)?;
+            post(&mut self.update(), &draft, &staged)?;
             self.staged.sent(&draft);
             Ok(())
         })
@@ -744,7 +796,7 @@ impl Backend for DemoBackend {
                 (None, Some(_)) => return Err(invalid("pick a time in the future")),
                 _ => return Err(invalid("give either a delay or a time to send at")),
             };
-            let mut data = self.data.borrow_mut();
+            let mut data = self.update();
             // As the engine does: forwarded files are copied, every file becomes an upload.
             let mut files = Vec::new();
             for a in &draft.attachments {
@@ -805,7 +857,7 @@ impl Backend for DemoBackend {
                 spawn(async move {
                     timer(wait).await;
                     let Some(data) = weak.upgrade() else { return };
-                    let mut data = data.borrow_mut();
+                    let mut data = Updating::new(&data);
                     let Some(at) = data.outbox.iter().position(|(o, _)| o.id == id) else {
                         return;
                     };
@@ -848,7 +900,7 @@ impl Backend for DemoBackend {
     }
 
     fn cancel(&self, id: String) -> MailFuture<'_, Outgoing> {
-        let mut data = self.data.borrow_mut();
+        let mut data = self.update();
         let Some(at) = data.outbox.iter().position(|(o, _)| o.id == id) else {
             return ok(Err(Error::new(
                 ErrorCode::NotFound,
@@ -951,10 +1003,10 @@ impl Backend for DemoBackend {
                 error: None,
             };
             for id in &ids {
-                self.data.borrow().emit(state(id, true));
+                self.update().emit(state(id, true));
             }
             latency(800).await;
-            let mut data = self.data.borrow_mut();
+            let mut data = self.update();
             if let Some(summary) = data.deliver() {
                 data.emit(MailEvent::NewMail { summary });
             }
@@ -990,7 +1042,7 @@ impl Backend for DemoBackend {
     }
 
     fn mark_read(&self, ids: Vec<String>, read: bool) -> MailFuture<'_, ()> {
-        let mut data = self.data.borrow_mut();
+        let mut data = self.update();
         for n in data.feed.iter_mut().filter(|n| ids.contains(&n.id)) {
             n.read = read;
         }
@@ -1006,7 +1058,7 @@ impl Backend for DemoBackend {
     }
 
     fn archive(&self, ids: Vec<String>) -> MailFuture<'_, ()> {
-        let mut data = self.data.borrow_mut();
+        let mut data = self.update();
         for n in data.feed.iter_mut().filter(|n| ids.contains(&n.id)) {
             n.archived = true;
             n.read = true;
@@ -1029,7 +1081,7 @@ impl Backend for DemoBackend {
                 return Err(invalid("name the source"));
             }
             latency(300).await;
-            let mut data = self.data.borrow_mut();
+            let mut data = self.update();
             data.next_source += 1;
             let source = Source {
                 id: format!("src-new-{}", data.next_source),
@@ -1053,7 +1105,7 @@ impl Backend for DemoBackend {
     }
 
     fn update_source(&self, source: Source) -> MailFuture<'_, Source> {
-        let mut data = self.data.borrow_mut();
+        let mut data = self.update();
         let found = data.sources.iter_mut().find(|s| s.id == source.id);
         ok(found.ok_or_else(|| not_found("source")).map(|s| {
             *s = source;
@@ -1062,7 +1114,7 @@ impl Backend for DemoBackend {
     }
 
     fn delete_source(&self, id: String) -> MailFuture<'_, ()> {
-        let mut data = self.data.borrow_mut();
+        let mut data = self.update();
         let before = data.sources.len();
         data.sources.retain(|s| s.id != id);
         data.feed.retain(|n| n.source_id != id);
@@ -1074,7 +1126,7 @@ impl Backend for DemoBackend {
     }
 
     fn rotate_source_token(&self, id: String) -> MailFuture<'_, CreatedSource> {
-        let mut data = self.data.borrow_mut();
+        let mut data = self.update();
         let Some(source) = data.sources.iter().find(|s| s.id == id).cloned() else {
             return ok(Err(not_found("source")));
         };
@@ -1090,7 +1142,7 @@ impl Backend for DemoBackend {
     }
 
     fn test_source(&self, id: String) -> MailFuture<'_, ()> {
-        let mut data = self.data.borrow_mut();
+        let mut data = self.update();
         let Some(source) = data.sources.iter().find(|s| s.id == id).cloned() else {
             return ok(Err(not_found("source")));
         };
@@ -1126,7 +1178,7 @@ impl Backend for DemoBackend {
                 return Err(invalid("name the key"));
             }
             latency(200).await;
-            let mut data = self.data.borrow_mut();
+            let mut data = self.update();
             data.next_key += 1;
             let raw = format!("nb_{:032x}", data.next_key as u128 * 0x9e3779b97f4a7c15u128);
             let now = unix_ms() as i64;
@@ -1149,7 +1201,7 @@ impl Backend for DemoBackend {
     }
 
     fn revoke_api_key(&self, id: String) -> MailFuture<'_, ()> {
-        let mut data = self.data.borrow_mut();
+        let mut data = self.update();
         let before = data.keys.len();
         data.keys.retain(|k| k.id != id);
         ok(if data.keys.len() == before {
@@ -2525,6 +2577,54 @@ const SUBJECT_BODY: [&str; 8] = [
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::{
+        cell::Cell,
+        panic::AssertUnwindSafe,
+        pin::Pin,
+        task::{Context, Poll, Waker},
+    };
+
+    /// Polls a call that answers at once, as the engine's task does.
+    fn ready<T>(mut call: MailFuture<'_, T>) -> Result<T> {
+        match Pin::new(&mut call).poll(&mut Context::from_waker(Waker::noop())) {
+            Poll::Ready(value) => value,
+            Poll::Pending => panic!("the demo answered nothing"),
+        }
+    }
+
+    fn seen() -> Flags {
+        Flags {
+            seen: Some(true),
+            flagged: None,
+        }
+    }
+
+    #[test]
+    fn events_reach_a_listener_that_reads_the_backend() {
+        let backend = DemoBackend::default();
+        let id = backend.data.borrow().messages[0].summary.id.clone();
+        let reads = Rc::new(Cell::new(0));
+        let (data, count) = (backend.data.clone(), reads.clone());
+        backend.update().events = Some(Rc::new(move |_| {
+            // What the shell does with an event: it reads the backend to reload the mailbox.
+            assert!(!data.borrow().accounts.is_empty());
+            count.set(count.get() + 1);
+        }));
+        ready(backend.set_flags(id, seen())).unwrap();
+        assert_eq!(reads.get(), 1);
+    }
+
+    #[test]
+    fn a_listener_that_panics_leaves_the_backend_usable() {
+        let backend = DemoBackend::default();
+        let id = backend.data.borrow().messages[0].summary.id.clone();
+        backend.update().events = Some(Rc::new(|_| panic!("a listener with a bug")));
+        let answered = std::panic::catch_unwind(AssertUnwindSafe(|| {
+            let _ = ready(backend.set_flags(id, seen()));
+        }));
+        assert!(answered.is_err());
+        assert!(ready(backend.accounts()).is_ok());
+    }
 
     #[test]
     fn addresses_parse_with_and_without_names() {

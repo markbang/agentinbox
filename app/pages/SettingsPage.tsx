@@ -56,13 +56,17 @@ export function SettingsPage() {
       ],
     });
     if (action !== "out") return;
+    // The screen changes whatever the backend ends up saying: it has ended the session on this
+    // device already, and a teardown that fails must not leave Settings up with no way back.
+    let failure: unknown;
     try {
       await Mail.signOut();
-      nav.done();
-      await sessionChanged();
     } catch (e) {
-      showToast(errorText(e), "error");
+      failure = e;
     }
+    nav.done();
+    await sessionChanged();
+    if (failure) showToast(errorText(failure), "error");
   };
 
   const toggleNotifications = async (on: boolean) => {
