@@ -9,6 +9,7 @@ import { t } from "nsh/i18n";
 import { Icon, SwipeRow } from "cupertino";
 import { displayName, listDate, participantNames } from "../lib/format";
 import { wide } from "../layout";
+import { PullIndicator, PULL_HEIGHT, pullValue } from "./PullIndicator";
 import { AccountMark, Count } from "./Marks";
 import { accountIndex, accounts, ownAddresses, type Row as ListRow } from "../store";
 
@@ -41,6 +42,8 @@ export interface MessageListProps {
 
 export function MessageList(props: MessageListProps) {
   const oneLine = () => !wide();
+  // The pull to refresh indicator follows this, and the platform's spinner stays off.
+  const pull = pullValue();
   const terms = () => (props.highlight ?? "").split(/\s+/).filter(Boolean);
   const swiping = () => !props.picking && !!(props.onArchive || props.onDelete);
   const pick = (id: string) => {
@@ -48,59 +51,64 @@ export function MessageList(props: MessageListProps) {
     props.onPick?.(id);
   };
   return (
-    <List
-      role="list"
-      accessibilityLabel={props.label}
-      each={props.items}
-      keyExtractor={(m) => m.key}
-      estimatedItemSize={oneLine() ? 86 : 76}
-      refreshing={props.refreshing ?? false}
-      onRefresh={props.onRefresh}
-      onLoadMore={props.onLoadMore}
-      testID={props.testID}
-      empty={props.empty}
-      class="flex-1"
-      contentClass="pb-[env(safe-area-inset-bottom)]"
-    >
-      {(m) => (
-        <If
-          when={swiping()}
-          else={
-            <Row
-              message={m()}
-              selected={props.selectedId === m().key || !!props.picked?.(m().key)}
-              onPress={() => (props.picking ? props.onPick?.(m().key) : props.onOpen(m().key))}
-              onLongPress={props.onPick ? () => pick(m().key) : undefined}
-              showAccount={!!props.showAccount && accounts().length > 1}
-              showRecipients={!!props.showRecipients}
-              oneLine={oneLine()}
-              terms={terms()}
-            />
-          }
-        >
-          <SwipeRow
-            leading={props.onArchive ? [{ id: "archive", title: t("actions.archive"), icon: "archivebox", tint: "system-teal" }] : []}
-            trailing={props.onDelete ? [{ id: "delete", title: t("actions.delete"), icon: "trash", destructive: true }] : []}
-            fullSwipe={props.onArchive ? "archive" : props.onDelete ? "delete" : undefined}
-            onAction={({ id }: { id: string }) => {
-              if (id === "archive") props.onArchive?.(m().key);
-              else if (id === "delete") props.onDelete?.(m().key);
-            }}
+    <View class="relative flex-1">
+      <List
+        role="list"
+        accessibilityLabel={props.label}
+        each={props.items}
+        keyExtractor={(m) => m.key}
+        estimatedItemSize={oneLine() ? 86 : 76}
+        refreshing={props.refreshing ?? false}
+        onRefresh={props.onRefresh}
+        pullValue={pull}
+        refreshIndicator={{ height: PULL_HEIGHT }}
+        onLoadMore={props.onLoadMore}
+        testID={props.testID}
+        empty={props.empty}
+        class="flex-1"
+        contentClass="pb-[env(safe-area-inset-bottom)]"
+      >
+        {(m) => (
+          <If
+            when={swiping()}
+            else={
+              <Row
+                message={m()}
+                selected={props.selectedId === m().key || !!props.picked?.(m().key)}
+                onPress={() => (props.picking ? props.onPick?.(m().key) : props.onOpen(m().key))}
+                onLongPress={props.onPick ? () => pick(m().key) : undefined}
+                showAccount={!!props.showAccount && accounts().length > 1}
+                showRecipients={!!props.showRecipients}
+                oneLine={oneLine()}
+                terms={terms()}
+              />
+            }
           >
-            <Row
-              message={m()}
-              selected={props.selectedId === m().key || !!props.picked?.(m().key)}
-              onPress={() => (props.picking ? props.onPick?.(m().key) : props.onOpen(m().key))}
-              onLongPress={props.onPick ? () => pick(m().key) : undefined}
-              showAccount={!!props.showAccount && accounts().length > 1}
-              showRecipients={!!props.showRecipients}
-              oneLine={oneLine()}
-              terms={terms()}
-            />
-          </SwipeRow>
-        </If>
-      )}
-    </List>
+            <SwipeRow
+              leading={props.onArchive ? [{ id: "archive", title: t("actions.archive"), icon: "archivebox", tint: "system-teal" }] : []}
+              trailing={props.onDelete ? [{ id: "delete", title: t("actions.delete"), icon: "trash", destructive: true }] : []}
+              fullSwipe={props.onArchive ? "archive" : props.onDelete ? "delete" : undefined}
+              onAction={({ id }: { id: string }) => {
+                if (id === "archive") props.onArchive?.(m().key);
+                else if (id === "delete") props.onDelete?.(m().key);
+              }}
+            >
+              <Row
+                message={m()}
+                selected={props.selectedId === m().key || !!props.picked?.(m().key)}
+                onPress={() => (props.picking ? props.onPick?.(m().key) : props.onOpen(m().key))}
+                onLongPress={props.onPick ? () => pick(m().key) : undefined}
+                showAccount={!!props.showAccount && accounts().length > 1}
+                showRecipients={!!props.showRecipients}
+                oneLine={oneLine()}
+                terms={terms()}
+              />
+            </SwipeRow>
+          </If>
+        )}
+      </List>
+      <PullIndicator pull={pull} />
+    </View>
   );
 }
 

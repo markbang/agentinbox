@@ -1,4 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.NshMail" parent="android:Theme.Material.Light.NoActionBar" />
+    <!-- The window behind the app's first frame: agentinbox's light system background, so a cold start
+         shows the app's colour and not the platform's grey before the bundle paints. -->
+    <style name="Theme.NshMail" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
+    </style>
 </resources>

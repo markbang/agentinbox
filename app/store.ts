@@ -69,6 +69,8 @@ const accountList = signal<Account[]>([]);
 const box = signal<Mailbox>({ account: null, folder: "inbox" });
 const items = signal<Row[]>([]);
 const listState = signal<"idle" | "loading" | "refreshing" | "more" | "error">("idle");
+// How the running refresh started: the bar's button (its own indicator turns) or a pull (the list's).
+const refreshFrom = signal<"button" | "pull">("button");
 const more = signal(true);
 const selected = signal<string | null>(null);
 // The open conversation, as soon as it is chosen (its messages load after).
@@ -116,6 +118,8 @@ export const rows = () => {
   return items().filter((r) => shown(r, gone));
 };
 export const listStatus = () => listState();
+/** Where the running refresh came from, so one indicator shows, not two. */
+export const refreshingFrom = () => refreshFrom();
 export const hasMore = () => more();
 /** The message the reader shows (in a conversation, the one expanded). */
 export const selectedId = () => selected();
@@ -558,7 +562,8 @@ export async function loadMore() {
 }
 
 /** Syncs now (pull to refresh, the toolbar's Refresh). */
-export async function refresh() {
+export async function refresh(from: "button" | "pull" = "button") {
+  refreshFrom.set(from);
   listState.set("refreshing");
   try {
     await Mail.refresh();

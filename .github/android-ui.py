@@ -176,8 +176,8 @@ def sign_out(name, tries=2):
         launch()
         if not tab("Settings"):
             return False
-        scroll_up_to("id:sign-out")
-        if not tap("id:sign-out"):
+        scroll_up_to("Sign out")
+        if not tap("Sign out"):
             return False
         if not wait("Sign out of AgentInbox?", 15):  # the sheet's own title, whatever it says
             return False
@@ -258,11 +258,86 @@ def back(timeout=4):
 TABS = {"Mail": 0, "Notifications": 1, "Search": 2, "Mailboxes": 3, "Settings": 4}
 
 
-def tab(name, wait_for=None, timeout=20):
-    """Taps a tab by its place in the bar: uiautomator does not always give the items their labels."""
-    x = w * (2 * TABS[name] + 1) // 10
-    adb("shell", "input", "tap", str(x), str(h - 40))
-    return wait(wait_for, timeout) if wait_for else True
+def scroll_to_end(tries=8):
+    """Swipes the page up until nothing moves: the end of its content."""
+    last = dump_xml
+    for _ in range(tries):
+        adb("shell", "input", "swipe", str(w // 2), str(h * 8 // 10), str(w // 2), str(h * 4 // 10), "300")
+        quiet(2)
+        if dump_xml == last:
+            return True
+        last = dump_xml
+    return False
+
+
+def settings_bottom(name):
+    """The settings list at its end, with the numbers the tab bar's room needs: the last row (the
+    version line, under Keyboard shortcuts) ends above the bar's top, not under it."""
+    scroll_to_end()
+    shot(name)
+    bar = tab_bar()
+    found = nodes()
+    inside_bar = lambda n: bar is not None and box(n) and box(n)[1] >= bar[1]
+    lowest = None
+    for n in found:
+        text = (n.get("text") or n.get("content-desc") or "").strip()
+        if not text or box(n) is None or inside_bar(n):
+            continue
+        if lowest is None or box(n)[3] > box(lowest)[3]:
+            lowest = n
+    if lowest is None or bar is None:
+        print("settings bottom: no row box or no tab bar to compare", flush=True)
+        return
+    last = (lowest.get("text") or lowest.get("content-desc"), box(lowest))
+    print(
+        f"settings bottom: the lowest row ({last[0]!r}) ends at {last[1][3]}, the tab bar starts at {bar[1]}"
+        f" ({bar[1] - last[1][3]} px of room)",
+        flush=True,
+    )
+    if last[1][3] > bar[1]:
+        fail(f"the last settings row goes under the tab bar by {last[1][3] - bar[1]} px")
+
+
+def loading_shot(name, trigger):
+    """Screenshots `name` while a refresh `trigger` started runs: one indicator, and it is Cupertino's.
+    The demo's refresh waits 800 ms, too short for a dump: the frame comes straight off the screen."""
+    if not tap(trigger):
+        return
+    time.sleep(0.25)
+    screenshot(name)
+    print("shot", name, flush=True)
+    gone("id:refreshing", 10) or gone("id:notify-refreshing", 10)
+
+
+def tab_bar():
+    """The bar's box, from its own label or, when the dump carries no such node, from the top of its
+    items' buttons: the bar is 49 pt over the safe area, and its items fill it from that top."""
+    found = nodes()
+    for n in found:
+        if (n.get("content-desc") or n.get("text")) == "Tabs" and box(n):
+            return box(n)
+    labels = {"Mail", "Notifications", "Search", "Mailboxes", "Settings"}
+    items = [box(n) for n in found if n.get("clickable") == "true" and (n.get("text") in labels or n.get("content-desc") in labels) and box(n)]
+    if not items:
+        return None
+    left = min(b[0] for b in items)
+    right = max(b[2] for b in items)
+    top = min(b[1] for b in items)
+    return (left, top, right, h)
+
+
+def tab(name):
+    """Taps a tab by its place in the bar, clear of the system's gesture area."""
+    bar = tab_bar()
+    if bar:
+        x1, y1, x2, _ = bar
+        x, y = x1 + (2 * TABS[name] + 1) * (x2 - x1) // 10, (y1 + bar[3]) // 2
+    else:
+        x, y = w * (2 * TABS[name] + 1) // 10, h - 100
+    adb("shell", "input", "tap", str(x), str(y))
+    quiet(1)
+    return True
+
 
 
 def long_press(x, y, tries=2):
@@ -400,6 +475,14 @@ def swipe_archive(row, tries=3):
 
 
 booted()
+# A phone's own screen: 1440 x 3120 at density 3.0 (the profile's is 1080 x 2400 at 2.625), as the
+# phones this ships to draw it.
+adb("shell", "wm", "size", "1440x3120")
+adb("shell", "wm", "density", "480")
+print("screen", adb("shell", "wm", "size").strip(), adb("shell", "wm", "density").strip(), flush=True)
+for line in adb("shell", "dumpsys", "window", "displays", check=False).splitlines():
+    if re.search(r"mStableInsets|insetsSource|navigationBars|statusBars", line, re.I):
+        print("insets:", line.strip(), flush=True)
 apk = sorted(glob.glob(os.path.join(apk_dir, "*.apk")))[0]
 adb("install", "-r", "-g", apk)
 adb("shell", "settings", "put", "system", "font_scale", "1.0")
@@ -414,6 +497,8 @@ for mode in ("light", "dark"):
     adb("shell", "cmd", "uimode", "night", "yes" if mode == "dark" else "no")
     launch()
     shot(f"{mode}-inbox")
+    # The loading state: one indicator, the bar's Cupertino one (the demo's refresh waits 800 ms).
+    loading_shot(f"{mode}-refreshing", "id:refresh")
 
     # Swipe the first row right: Archive, with Undo. Swipes start mid-row: the screen's edges are the system's back gesture.
     row = settled("id:message-.*")
@@ -486,7 +571,7 @@ for mode in ("light", "dark"):
                 shot(f"{mode}-schedule-menu")
                 scheduled = tap("Tomorrow morning")
                 if scheduled:
-                    wait("id:toast-action", 5)
+                    find("id:toast-action", 5)  # seconds long: the shot follows either way
                     screenshot(f"{mode}-scheduled-snackbar")
                     print("shot", f"{mode}-scheduled-snackbar", flush=True)
         # Whatever the schedule step left open (a sheet, the composer itself), the inbox comes back
@@ -499,8 +584,7 @@ for mode in ("light", "dark"):
     adb("shell", "input", "swipe", str(w // 2), str(h * 7 // 10), str(w // 2), str(h * 3 // 10), "300")
     shot(f"{mode}-inbox-scrolled")
 
-    if tab("Search"):
-        wait("id:search")
+    if tab("Search") and wait("id:search"):
         shot(f"{mode}-search")
         tap("id:search")  # the field, before anything is typed
         adb("shell", "input", "text", "roadmap")
@@ -530,15 +614,15 @@ for mode in ("light", "dark"):
             shot(f"{mode}-search-none")
 
     if tab("Mailboxes"):
-        wait("id:mailbox-all")
+        wait("All inboxes")
         shot(f"{mode}-mailboxes")
-        if tap("id:mailbox-scheduled"):
-            wait("id:scheduled")
+        if tap("Scheduled"):
+            find("id:scheduled", 10)  # the page's own id is a container; the shot is the proof
             shot(f"{mode}-scheduled")
             if tab("Mailboxes"):
-                tap("id:mailbox-all")
+                tap("All inboxes")
         # An empty folder on the phone: the one draft is deleted, and Drafts says so with its next step.
-        if tab("Mailboxes") and tap("id:mailbox-drafts"):
+        if tab("Mailboxes") and tap("Drafts"):
             wait("id:messages", 15)
             row = settled("id:message-.*")
             if row:
@@ -546,38 +630,39 @@ for mode in ("light", "dark"):
                 if tap("id:select-rows", 5) and tap("id:message-.*") and tap("id:picked-delete"):
                     wait("id:empty-compose", 15)
                     shot(f"{mode}-empty-folder")
-        if tab("Mailboxes") and tap("id:mailbox-all"):
+        if tab("Mailboxes") and tap("All inboxes"):
             wait("id:messages", 15)
 
     # The notification inbox: the feed, a chip, a notification, its sources.
     if tab("Notifications"):
-        wait("id:notify-list", 20)
+        find("Search notifications", 20)
         shot(f"{mode}-notifications")
         if tap("id:notify-more"):
-            wait("Sources", 10)  # its menu, before it is screenshotted
+            find("Sources", 10)  # its menu, before it is screenshotted
             shot(f"{mode}-notifications-menu")
             if tap("Sources"):
-                wait("id:sources", 15)
+                wait("Sources", 15)
                 shot(f"{mode}-sources")
                 if tap("id:sources-add-top"):
                     wait("id:add-source", 10)
                     shot(f"{mode}-source-kinds")
-                    back_to("id:sources")
+                    back_to("Sources")
                 back_to("id:notifications")
             else:
                 back()
-        # A notification opens on its own page; Back returns to the feed.
-        if tap("id:notify-[nm][0-9]+"):
-            wait("id:notify-reader", 15)
+        # A notification opens on its own page; Back returns to the feed. The rows' titles are not
+        # always their own nodes, so the first row is tapped where the list starts.
+        adb("shell", "input", "tap", str(w // 2), str(h // 3))
+        if find("id:notify-reader", 8):
             shot(f"{mode}-notification")
             back()
-        wait("id:notify-list", 15)
+        find("Search notifications", 15)
 
     if tab("Settings"):
-        wait("id:settings")
+        find("Accounts", 10)
         shot(f"{mode}-settings")
         # The first account's signature, then a new message that carries it.
-        if tap("id:account-more-0") and tap("Signature…") and tap("id:signature-text"):
+        if tap("id:account-more-0", 10) and tap("Signature…") and tap("id:signature-text"):
             adb("shell", "input", "text", "'**Lin%sChen**'")
             adb("shell", "input", "keyevent", "66")
             adb("shell", "input", "text", "'Northwind%s-%s[northwind.dev](https://northwind.dev)'")
@@ -586,25 +671,27 @@ for mode in ("light", "dark"):
             shot(f"{mode}-signature")
             # The first tap may only take the focus from the field.
             for _ in range(2):
-                if tap("id:signature-save") and find("id:settings", 8) is not None:
+                if tap("id:signature-save") and find("Accounts", 8) is not None:
                     break
             else:
                 fail("the signature page never closed")
         # The notification settings: the keys agents read the feed with, and the rules.
-        if scroll_to("id:settings-keys"):
-            if tap("id:settings-keys"):
-                wait("id:api-keys", 15)
+        if scroll_to("API keys"):
+            if tap("API keys"):
+                wait("API keys", 15)
                 shot(f"{mode}-api-keys")
                 if tap("id:keys-add-top"):
-                    wait("id:new-key", 10)
+                    wait("New API key", 10)
                     shot(f"{mode}-new-key")
-                    back_to("id:api-keys")
-                back_to("id:settings")
-        if scroll_to("id:settings-rules"):
-            if tap("id:settings-rules"):
-                wait("id:notify-rules", 15)
+                    back_to("API keys")
+                back_to("id:account-more-0")
+        if scroll_to("Per source and priority"):
+            if tap("Per source and priority"):
+                wait("Per source and priority", 15)
                 shot(f"{mode}-notify-rules")
-                back_to("id:settings")
+                back_to("id:account-more-0")
+        # The end of the list: the last row must clear the tab bar, not go under it.
+        settings_bottom(f"{mode}-settings-bottom")
 
     if tab("Mail"):
         wait("id:messages")
@@ -653,8 +740,8 @@ launch()
 tap("id:message-.*")
 wait("id:reader")
 shot("tablet")
-adb("shell", "wm", "size", "reset")
-adb("shell", "wm", "density", "reset")
+adb("shell", "wm", "size", "1440x3120")
+adb("shell", "wm", "density", "480")
 
 adb("logcat", "-d", "-s", "nsh:*", "AndroidRuntime:E", check=False)
 with open(os.path.join(out, "logcat.txt"), "w") as f:

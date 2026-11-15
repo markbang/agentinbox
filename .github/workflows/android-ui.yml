@@ -93,7 +93,8 @@ jobs:
       - name: Drive the app in light and dark
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 34
+          # Android 15: the phones this ships to draw edge to edge by the system's rule, not the app's.
+          api-level: 35
           arch: x86_64
           target: google_apis
           profile: pixel_6
