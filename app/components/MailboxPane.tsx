@@ -17,6 +17,7 @@ import {
   loadMore,
   mailbox,
   moveMessages,
+  beginPicking,
   picking,
   refresh,
   reload,
@@ -149,6 +150,9 @@ export function MailboxPane(props: MailboxPaneProps) {
           }
         >
           <ActivityIndicator size={20} label={t("sync.running")} testID="refreshing" />
+        </If>
+        <If when={props.touchActions && !picking() && rows().length > 0}>
+          <Button title={t("actions.select")} variant="plain" onPress={() => beginPicking()} testID="select-rows" />
         </If>
         <Button icon="square.and.pencil" label={t("actions.compose")} variant="plain" onPress={() => props.onCompose()} testID="compose" />
       </View>

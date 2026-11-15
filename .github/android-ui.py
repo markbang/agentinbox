@@ -422,11 +422,11 @@ for mode in ("light", "dark"):
         during(["swipe", str(mid + quarter), str(y), str(mid), str(y), "1500"], f"{mode}-swipe-delete", 1.0)
         gone("id:toast-action")  # the deletion's Undo leaves before the next gesture
 
-        # Long-press selects; a tap adds the row below; back ends it. The selection has to show before
-        # that tap: a long-press taken for a scroll would leave the tap to open the message instead.
-        if long_press(x1 + 200, y):
+        # Select, then a tap picks a row; back ends the selection. The bar has to show the count
+        # before that tap: without it, the tap would open the message.
+        if tap("id:select-rows", 5):
             count = text_of("id:selection-count", 5)
-            adb("shell", "input", "tap", str(x1 + 200), str(y + (y2 - y1)))
+            adb("shell", "input", "tap", str(x1 + 200), str(y))
             if count and not changed("id:selection-count", count, 8):
                 print(f"the tap below the selection did not add a row: {text_of('id:selection-count', 3)}", flush=True)
             shot(f"{mode}-selection")
@@ -531,7 +531,7 @@ for mode in ("light", "dark"):
             row = settled("id:message-.*")
             if row:
                 x1, y1, x2, y2 = row
-                if long_press(x1 + 200, (y1 + y2) // 2) and tap("id:picked-delete"):
+                if tap("id:select-rows", 5) and tap("id:message-.*") and tap("id:picked-delete"):
                     wait("id:empty-compose", 15)
                     shot(f"{mode}-empty-folder")
         if tap("Mailboxes") and tap("id:mailbox-all"):

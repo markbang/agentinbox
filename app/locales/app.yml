@@ -200,6 +200,7 @@ actions.more:
 actions.select:
   en: Select
   zh-CN: 选择
+
 actions.selected:
   en: "%{count} selected"
   zh-CN: 已选 %{count} 封

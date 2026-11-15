@@ -38,7 +38,8 @@ the subject with its attachment and flag marks, and a preview. Wide windows show
 one preview line, phones two. The account is a 3 pt bar in its colour on the
 leading edge of a unified row. A selected row takes `fill`; a press flashes it.
 Swiping right reveals Archive (teal), left Delete (red), a full swipe fires the
-first; long-press selects, and the bar turns into the selection's actions.
+first. **Select** in the bar starts a selection (a long press does too, where
+the gesture reaches the row), and the bar turns into the selection's actions.
 
 The list is virtualized (`nsh`'s `List`): a 10,000-message mailbox keeps the rows
 on screen bounded (the large-mailbox test holds it to 300 texts). That is the one

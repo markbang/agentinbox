@@ -7,6 +7,7 @@
 - AgentInbox 在所有平台上都变成 iOS 的样子：外壳、列表、阅读器、写信页、搜索、设置和通知收件箱都由共享的
   [Cupertino 设计系统](https://github.com/markbang/nsh-cupertino)（`nsh-cupertino` 0.2.1）绘制，
   Material 3 Expressive 层已删除。
+- 列表上的 **选择** 按钮进入多选：行、已选数量，以及归档、删除、已读/未读，不再只靠长按。
 - 宽窗口是 iPad 邮件那样的分栏（侧边栏、列表、阅读器）；窄窗口和手机是标签栏加压栈页面，写信与设置以面板打开。
 
 ## 修复

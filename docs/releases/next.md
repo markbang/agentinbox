@@ -8,6 +8,8 @@ English | [简体中文](next.zh-CN.md)
   composer, search, settings and the notification inbox are drawn with the shared
   [Cupertino design system](https://github.com/markbang/nsh-cupertino) (`nsh-cupertino`
   0.2.1) — the Material 3 Expressive layer is gone.
+- The list's **Select** button starts a selection — rows, their count and Archive,
+  Delete and Read — so the actions no longer depend on a long press alone.
 - Wide windows are an iPad Mail split view (sidebar, list, reader); narrow windows
   and phones are a tab bar over pushed pages with sheets for compose and settings.
 

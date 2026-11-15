@@ -317,6 +317,23 @@ test("a draft outlives the composer and a restart; only Discard deletes it, afte
   expect(Object.keys(JSON.parse(again.storage()["nshmail.drafts"]))).not.toContain("new");
 });
 
+test("Select in the list's header starts a selection: rows, the count, archive", async () => {
+  const app = await open("./App.tsx", { platform: "android", width: 390, height: 844, locale: "en-US", ...demo });
+  await app.waitFor("id:messages");
+  await app.press("id:select-rows");
+  await app.waitFor("id:selection-count");
+  expect(app.texts()).toContain("0 selected");
+  await app.press("id:messages >> text:Design review notes: unified inbox");
+  expect(app.texts()).toContain("1 selected");
+  await app.press("id:messages >> text:Photos from the weekend");
+  expect(app.texts()).toContain("2 selected");
+  await app.press("id:picked-archive");
+  await app.waitFor("id:selection-count", { state: "gone" });
+  await app.press("id:select-rows");
+  await app.press("id:end-selection");
+  await app.waitFor("id:selection-count", { state: "gone" });
+});
+
 test("a signature per account: under new messages, above the quote, swapped with From", async () => {
   const app = await open("./App.tsx", { ...desktop, ...demo });
   await app.waitFor("id:open-settings");

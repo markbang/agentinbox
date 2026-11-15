@@ -137,8 +137,14 @@ export const conversationsEnabled = () => threadsOn();
 export const isLeaving = (key: string) => !!leaving()[key];
 export const pickedIds = () => Object.keys(picked());
 export const isPicked = (id: string) => !!picked()[id];
-export const picking = () => pickedIds().length > 0;
+const selecting = signal(false);
+export const picking = () => selecting() || pickedIds().length > 0;
+/** Enters selection with no row chosen, from the list's Select button: the bar's actions wait for one. */
+export function beginPicking() {
+  selecting.set(true);
+}
 export function togglePicked(id: string) {
+  selecting.set(true);
   picked.update((p) => {
     const next = { ...p };
     if (next[id]) delete next[id];
@@ -148,6 +154,7 @@ export function togglePicked(id: string) {
 }
 export function clearPicked() {
   picked.set({});
+  selecting.set(false);
 }
 export const toast = () => toastMessage();
 export const notificationsEnabled = () => notifyOn();
