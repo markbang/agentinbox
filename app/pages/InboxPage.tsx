@@ -41,7 +41,12 @@ export function InboxPage() {
   const selectionBar = () => (
     <View class="flex-row items-center gap-1 border-b border-separator bg-secondary-system-background px-2 py-1">
       <Button title={t("common.cancel")} variant="plain" size="small" onPress={clearPicked} testID="end-selection" />
-      <Text role="header" class="flex-1 text-center text-subheadline font-semibold text-label" testID="selection-count">
+      <Text
+        role="header"
+        accessibilityLabel={t("actions.selected", { count: pickedIds().length })}
+        class="flex-1 text-center text-subheadline font-semibold text-label"
+        testID="selection-count"
+      >
         {t("actions.selected", { count: pickedIds().length })}
       </Text>
       <If when={mailbox().folder !== "archive" && mailbox().folder !== "trash"}>
