@@ -665,6 +665,7 @@ pub async fn cancel_outgoing(
 pub struct SearchParams {
     q: String,
     limit: Option<u32>,
+    before: Option<String>,
 }
 
 #[utoipa::path(
@@ -675,8 +676,9 @@ pub struct SearchParams {
     description = "Full-text search over mail. The notification feed, mail included, searches \
                    with GET /v1/feed?q=.",
     params(
-        ("q" = String, Query, description = "Words to look for"),
+        ("q" = String, Query, description = "Words to look for; a quoted phrase is matched whole"),
         ("limit" = Option<u32>, Query, description = "1–200, default 50"),
+        ("before" = Option<String>, Query, description = "The previous page's last message id"),
     ),
     responses((status = 200, description = "Matches, newest first"))
 )]
@@ -686,7 +688,11 @@ pub async fn search(
     Query(p): Query<SearchParams>,
 ) -> ApiResult<impl IntoResponse> {
     let limit = p.limit.unwrap_or(50).clamp(1, MAX_LIMIT);
-    Ok(Json(mail(&s, &u).await?.search(p.q.trim(), limit).await?))
+    let hits = mail(&s, &u)
+        .await?
+        .search_from(p.q.trim(), limit, p.before.as_deref())
+        .await?;
+    Ok(Json(hits))
 }
 
 pub async fn unread(State(s): State<Arc<AppState>>, u: AuthUser) -> ApiResult<impl IntoResponse> {

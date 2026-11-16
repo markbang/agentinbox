@@ -718,7 +718,7 @@
           {
             "name": "q",
             "in": "query",
-            "description": "Words to look for",
+            "description": "Words to look for; a quoted phrase is matched whole",
             "required": true,
             "schema": {
               "type": "string"
@@ -733,6 +733,15 @@
               "type": "integer",
               "format": "int32",
               "minimum": 0
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "description": "The previous page's last message id",
+            "required": false,
+            "schema": {
+              "type": "string"
             }
           }
         ],

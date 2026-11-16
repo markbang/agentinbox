@@ -63,6 +63,9 @@ CREATE INDEX IF NOT EXISTS feed_messages_by_user ON feed_messages (user_id, rece
 CREATE INDEX IF NOT EXISTS feed_messages_by_source
     ON feed_messages (user_id, source_id, received_at DESC);
 CREATE INDEX IF NOT EXISTS feed_messages_unread ON feed_messages (user_id) WHERE read_at IS NULL;
+-- The unread count per source: without it the query scans the source index's every row.
+CREATE INDEX IF NOT EXISTS feed_messages_unread_by_source
+    ON feed_messages (user_id, source_id) WHERE read_at IS NULL AND archived_at IS NULL;
 -- Migration marker: the projection is reconciled once, not on every open of a large mailbox.
 CREATE TABLE IF NOT EXISTS feed_meta (version INTEGER NOT NULL);
 CREATE VIRTUAL TABLE IF NOT EXISTS feed_messages_fts USING fts5 (
