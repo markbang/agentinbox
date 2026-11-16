@@ -370,6 +370,18 @@ def scroll_up_to(key, tries=4, timeout=3):
     return find(key, timeout) is not None
 
 
+def close_compose(tries=3):
+    """Compose is a sheet over the inbox now, so id:messages is behind it and says nothing about it:
+    back until the composer's own page is gone."""
+    for _ in range(tries):
+        if find("id:compose-page", 2) is None:
+            return True
+        back()
+        quiet(2)
+    print("the composer stayed open", flush=True)
+    return find("id:compose-page", 2) is None
+
+
 def back_to(key, tries=3, timeout=6):
     """Back until `key` shows: a page's keyboard takes the first Back, the page the next."""
     for _ in range(tries):
@@ -578,6 +590,7 @@ for mode in ("light", "dark"):
         # Whatever the schedule step left open (a sheet, the composer itself), the inbox comes back
         # before the next screen: a stray focus would take the keystrokes meant for search.
         if not scheduled or find("id:compose-to", 3) is not None:
+            close_compose()
             back_to("id:messages")
     wait("id:messages")
 
@@ -709,8 +722,8 @@ for mode in ("light", "dark"):
         if tap("id:compose"):
             wait("id:compose-to")
             shot(f"{mode}-compose-signature")
-            back()
-            back()
+            back()  # the keyboard, when the field took the focus
+            close_compose()
             wait("id:messages")
 
     # The appearance changes while the app runs: a colour change, so this waits on the pixels.
