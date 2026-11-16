@@ -22,5 +22,13 @@ English | [简体中文](next.zh-CN.md)
 
 ## Fixed
 
+- Push reaches every source, not only mail: a webhook, Gotify or ntfy notification
+  now arrives on your phones and browsers while the app is closed, with the
+  source, sender, title and link. A paused source, or one whose minimum priority
+  is above the notification's, keeps it in the feed. A notification read or
+  archived on another device is not pushed.
+- `GET /healthz` reports the release's version and the commit it was built from,
+  not the server crate's `0.1.0`.
+
 ---
 - **GitHub, Uptime Kuma and Sentry sources keep every real event.** An issue that opens and closes is two notifications, a second outage of the same monitor is not swallowed, and Sentry's issue webhook no longer arrives as ": " with priority 0. Gotify clients may now authenticate with `X-Gotify-Key` or basic auth and post forms (`curl -F`), ntfy publishes without a priority arrive as the normal priority 3, and Uptime Kuma's ntfy notifier works when its URL points at the server root.

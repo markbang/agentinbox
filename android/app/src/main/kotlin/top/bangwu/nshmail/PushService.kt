@@ -15,24 +15,32 @@ import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 
 /**
- * The server's FCM data messages (`crates/server/src/push.rs`): `{type: "newMail", id, account, from?, subject?}`,
- * without `from` and `subject` when the user hides content. Each shows as the app's own notification for the
- * message would (`app/resident.ts`), so pressing it opens the message through the app's `Notifications` listener.
+ * The server's FCM data messages (`crates/server/src/push.rs`): `{type, id, source?, account?, from?, subject?, link?}`,
+ * where `type` is `newMail` for a mail account and `notification` for every other source, and everything after
+ * `id` is missing when the user hides content. Each shows as the app's own notification would
+ * (`app/resident.ts`): the tag's prefix makes the app's `Notifications` listener open the mail message or the
+ * feed's notification.
  */
 class PushService : FirebaseMessagingService() {
     override fun onNewToken(token: String) = PushToken.refreshed(token)
 
     override fun onMessageReceived(message: RemoteMessage) {
         val data = message.data
-        val id = data["id"]
-        if (data["type"] != "newMail" || id.isNullOrEmpty()) return
-        val title = data["from"] ?: getString(R.string.new_mail)
-        show(this, "$NOTIFICATION_PREFIX$id", title, data["subject"].orEmpty())
+        val id = data["id"] ?: return
+        val prefix = when (data["type"]) {
+            "newMail" -> MESSAGE_PREFIX
+            "notification" -> NOTIFICATION_PREFIX
+            else -> return
+        }
+        val fallback = if (prefix == MESSAGE_PREFIX) R.string.new_mail else R.string.new_notification
+        val title = data["from"] ?: data["source"] ?: getString(fallback)
+        show(this, "$prefix$id", title, data["subject"].orEmpty())
     }
 
     private companion object {
         const val TAG = "AgentInbox"
-        const val NOTIFICATION_PREFIX = "message:"
+        const val MESSAGE_PREFIX = "message:"
+        const val NOTIFICATION_PREFIX = "notification:"
 
         // nsh 0.5's Notifications (NshView.handleNotificationIntent reads EXTRA): the same channel, tag, id and
         // launch extra make a pushed notification one of the app's own.

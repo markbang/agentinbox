@@ -36,6 +36,7 @@ use db::Db;
 use mail::Mailboxes;
 use mail_core::MailDb;
 use push::{Fcm, Push};
+use tokio::sync::broadcast;
 use utoipa::OpenApi as _;
 
 pub struct AppState {
@@ -87,11 +88,13 @@ pub async fn build(config: Config) -> Result<Arc<AppState>> {
     }
     let push = Arc::new(Push {
         db: db.clone(),
+        mail_db: mail_db.clone(),
         http: http.clone(),
         vapid,
         vapid_subject: config.vapid_subject.clone(),
         fcm,
         presence: Default::default(),
+        pushed: Default::default(),
     });
     let notify_secrets = Arc::new(mail_core::secrets::EncryptedFileStore::with_key(
         users_dir.join("notify.secrets.json"),
@@ -128,7 +131,26 @@ pub async fn build(config: Config) -> Result<Arc<AppState>> {
             tracing::error!(user_id, "cannot open mail store: {}", e.message);
         }
     }
+    push_feed_messages(state.clone());
     Ok(state)
+}
+
+/// Pushes every notification the feed stores, mail included (mail's own event is the other entry),
+/// so a source reaches a closed app through the same path whether it is mail or a webhook.
+fn push_feed_messages(state: Arc<AppState>) {
+    let mut rx = state.feed_events.subscribe();
+    tokio::spawn(async move {
+        loop {
+            match rx.recv().await {
+                Ok(events::FeedEvent::Message { user_id, message }) => {
+                    let push = state.push.clone();
+                    tokio::spawn(async move { push.new_message(user_id, &message).await });
+                }
+                Ok(_) | Err(broadcast::error::RecvError::Lagged(_)) => {}
+                Err(broadcast::error::RecvError::Closed) => break,
+            }
+        }
+    });
 }
 
 pub fn router(state: Arc<AppState>) -> Router {

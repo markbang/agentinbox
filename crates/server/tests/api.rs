@@ -785,6 +785,172 @@ fn sync_resumes_after_restart() {
     });
 }
 
+/// A plain user with one FCM device and one webhook source: what a closed app needs to be reached.
+struct Hook {
+    s: Server,
+    captured: Captured,
+    token: String,
+    source: String,
+    url: String,
+}
+
+async fn hook_server() -> Hook {
+    let (mock, captured) = mock_push().await;
+    let s = start(fcm_config(temp_dir(), mock)).await;
+    let token = s.signup(&unique("dana")).await;
+    let res = s
+        .http
+        .post(format!("{}/devices", s.base))
+        .bearer_auth(&token)
+        .json(&json!({ "kind": "fcm", "token": "hook-token" }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::CREATED);
+    let res = s
+        .http
+        .post(format!("{}/sources", s.base))
+        .bearer_auth(&token)
+        .json(&json!({ "kind": "webhook", "name": "CI" }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::CREATED);
+    let created: Value = res.json().await.unwrap();
+    Hook {
+        url: format!(
+            "http://{}/hooks/{}",
+            s.addr,
+            created["token"].as_str().unwrap()
+        ),
+        source: created["source"]["id"].as_str().unwrap().to_string(),
+        token,
+        captured,
+        s,
+    }
+}
+
+impl Hook {
+    /// Posts a webhook notification; answers the feed id it stored.
+    async fn post(&self, body: Value) -> String {
+        let res = self
+            .s
+            .http
+            .post(&self.url)
+            .json(&body)
+            .send()
+            .await
+            .unwrap();
+        let status = res.status();
+        let answer: Value = res.json().await.unwrap();
+        assert_eq!(status, StatusCode::ACCEPTED, "{answer}");
+        answer["id"].as_str().unwrap().to_string()
+    }
+
+    async fn patch(&self, path: &str, body: Value) {
+        let res = self
+            .s
+            .http
+            .patch(format!("{}{path}", self.s.base))
+            .bearer_auth(&self.token)
+            .json(&body)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+    }
+
+    fn sent(&self) -> Vec<(String, HeaderMap, Bytes)> {
+        self.captured
+            .0
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(p, _, _)| p != "/token")
+            .cloned()
+            .collect()
+    }
+}
+
+/// The data of the first FCM message the mock received.
+async fn fcm_data(hook: &Hook) -> Value {
+    let sends = wait_for(&hook.captured, 1).await;
+    serde_json::from_slice::<Value>(&sends[0].2).unwrap()["message"]["data"].clone()
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_webhook_notification_pushes_to_a_device() {
+    let hook = hook_server().await;
+    let id = hook
+        .post(json!({
+            "title": "Deploy finished",
+            "message": "AgentInbox is live",
+            "sender": "buildbot",
+            "url": "https://example.test/builds/7",
+            "priority": 5,
+        }))
+        .await;
+    let data = fcm_data(&hook).await;
+    assert_eq!(data["type"], "notification");
+    assert_eq!(data["id"], id.as_str());
+    assert_eq!(data["source"], "CI");
+    assert_eq!(data["from"], "buildbot");
+    assert_eq!(data["subject"], "Deploy finished");
+    assert_eq!(data["link"], "https://example.test/builds/7");
+    assert!(data.get("account").is_none(), "{data}");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_muted_source_stores_without_pushing() {
+    let hook = hook_server().await;
+    let path = format!("/sources/{}", hook.source);
+    hook.patch(&path, json!({ "minPriority": 7 })).await;
+    hook.post(json!({ "title": "Routine", "priority": 2 }))
+        .await;
+    tokio::time::sleep(Duration::from_millis(400)).await;
+    assert!(
+        hook.sent().is_empty(),
+        "a source's minimum priority keeps a quiet notification in the feed"
+    );
+    hook.post(json!({ "title": "Down", "priority": 9 })).await;
+    assert_eq!(fcm_data(&hook).await["subject"], "Down");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn hidden_content_pushes_the_id_only() {
+    let hook = hook_server().await;
+    hook.patch("/me", json!({ "hideContent": true })).await;
+    let id = hook
+        .post(json!({ "title": "Secret", "sender": "someone", "priority": 5 }))
+        .await;
+    let data = fcm_data(&hook).await;
+    assert_eq!(data["id"], id.as_str());
+    assert_eq!(data["type"], "notification");
+    for hidden in ["source", "from", "subject", "link"] {
+        assert!(data.get(hidden).is_none(), "{hidden} leaked: {data}");
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn healthz_reports_the_release() {
+    let s = start(config(temp_dir())).await;
+    let res = s
+        .http
+        .get(format!("http://{}/healthz", s.addr))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let body: Value = res.json().await.unwrap();
+    assert_eq!(body["ok"], true);
+    // The image bakes the release in (`config::release`); a plain `cargo test` build has none.
+    assert_eq!(body["version"], agentinbox_server::config::release().0);
+    assert!(
+        body["version"].as_str().is_some_and(|v| !v.is_empty()),
+        "{body}"
+    );
+}
+
 impl Server {
     /// Stages `data` in chunks, as the app does.
     async fn upload(&self, user: &User, filename: &str, mime_type: &str, data: &[u8]) -> String {

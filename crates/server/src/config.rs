@@ -62,6 +62,23 @@ pub fn parse_master_key(name: &str, value: &str) -> Result<[u8; 32]> {
     })
 }
 
+/// The release a build reports at `/healthz`: the image bakes in `AGENTINBOX_VERSION` (the
+/// version in `app/nsh.json`) and `AGENTINBOX_GIT_SHA`; an operator can override either at run
+/// time; a plain `cargo run` reports the crate's own version and no sha.
+pub fn release() -> (String, Option<String>) {
+    release_from(var("AGENTINBOX_VERSION"), var("AGENTINBOX_GIT_SHA"))
+}
+
+fn release_from(version: Option<String>, sha: Option<String>) -> (String, Option<String>) {
+    let baked = option_env!("AGENTINBOX_VERSION").unwrap_or(env!("CARGO_PKG_VERSION"));
+    (
+        version.unwrap_or_else(|| baked.to_string()),
+        sha.or_else(|| option_env!("AGENTINBOX_GIT_SHA").map(str::to_owned))
+            .map(|sha| sha.trim().to_string())
+            .filter(|sha| !sha.is_empty()),
+    )
+}
+
 fn oauth_app(id: &str, secret: &str) -> Result<Option<OAuthApp>> {
     match (var(id), var(secret)) {
         (Some(client_id), Some(secret)) => Ok(Some(OAuthApp {
@@ -148,5 +165,20 @@ impl Config {
             vapid_subject: var("AGENTINBOX_VAPID_SUBJECT").unwrap_or_else(|| public_url.clone()),
             public_url,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::release_from;
+
+    #[test]
+    fn a_release_overrides_the_crate_version() {
+        assert_eq!(
+            release_from(Some("0.0.6".into()), Some(" abc123 \n".into())),
+            ("0.0.6".into(), Some("abc123".into()))
+        );
+        assert_eq!(release_from(None, None).0, env!("CARGO_PKG_VERSION"));
+        assert_eq!(release_from(None, Some("  ".into())).1, None);
     }
 }

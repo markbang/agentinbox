@@ -314,6 +314,11 @@ pub async fn test_source(
         tags: vec!["test".into()],
         ..Default::default()
     })?;
+    // The same event a real ingest sends: the feed follows it live, and the devices get it pushed.
+    let _ = s.feed_events.send(crate::events::FeedEvent::Message {
+        user_id: user.id,
+        message: Box::new(stored.message().clone()),
+    });
     Ok(Json(json!({ "message": stored.message() })))
 }
 

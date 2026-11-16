@@ -20,9 +20,15 @@ use web_push_native::{
     p256::PublicKey,
 };
 
+use mail_core::feed::FeedMessage;
 use mail_core::types::Summary;
 
 use crate::db::{Db, Device};
+
+/// How long a row is remembered as pushed. Mail's own event and the feed stream can both report
+/// the same mail row, and an ingest front end can answer a sender's retry with the row it already
+/// stored, so a device must not see the same notification twice.
+const PUSHED_FOR: Duration = Duration::from_secs(300);
 
 /// Loads the VAPID key from env, or from `<data>/vapid_private_key`, generating it on first start.
 pub fn load_vapid(env_key: Option<&str>, data_dir: &Path) -> Result<ES256KeyPair> {
@@ -194,36 +200,78 @@ impl Presence {
 
 pub struct Push {
     pub db: Db,
+    /// The feed rows a push is made of, and the sources whose rules decide whether one is due.
+    pub mail_db: mail_core::MailDb,
     pub http: reqwest::Client,
     pub vapid: ES256KeyPair,
     pub vapid_subject: String,
     pub fcm: Option<Fcm>,
     pub presence: Presence,
+    /// (user, message id) pairs pushed in the last [`PUSHED_FOR`].
+    pub pushed: StdMutex<HashMap<(i64, String), Instant>>,
 }
 
 impl Push {
+    /// Mail's own event. The row the feed projection wrote for it is what says whether it notifies:
+    /// mail in Drafts or Trash has none, and a message already read or archived needs no banner.
     pub async fn new_mail(&self, user_id: i64, summary: &Summary) {
+        match self.mail_db.feed(user_id).message(&summary.id) {
+            Ok(message) => self.new_message(user_id, &message).await,
+            Err(e) => {
+                tracing::debug!(id = %summary.id, "push: no feed row for new mail: {}", e.message)
+            }
+        }
+    }
+
+    /// Pushes one new feed row to every registered device that does not hold the app open, whatever
+    /// the row's source is: mail, a webhook, Gotify, ntfy. The source's rules hold a row back — a
+    /// paused source, or one whose minimum priority is above the message's, keeps it in the feed.
+    pub async fn new_message(&self, user_id: i64, message: &FeedMessage) {
+        let source = match self.mail_db.feed(user_id).source(&message.source_id) {
+            Ok(source) => source,
+            Err(e) => {
+                return tracing::warn!(source = %message.source_id, "push: loading source: {}", e.message);
+            }
+        };
+        if !source.enabled
+            || message.priority < source.min_priority
+            || message.read_at.is_some()
+            || message.archived_at.is_some()
+        {
+            return;
+        }
         let (devices, hide) = match (self.db.devices(user_id), self.db.user(user_id)) {
             (Ok(d), Ok(Some(u))) => (d, u.hide_content),
             (Err(e), _) | (_, Err(e)) => return tracing::error!("push: loading devices: {e:#}"),
             _ => return,
         };
-        let mut data =
-            json!({ "type": "newMail", "account": summary.account_id, "id": summary.id });
-        if !hide {
-            if let Some(from) = &summary.from {
-                data["from"] = from
-                    .name
-                    .clone()
-                    .unwrap_or_else(|| from.email.clone())
-                    .into();
-            }
-            data["subject"] = summary.subject.clone().into();
-        }
-        for d in devices
+        let offline: Vec<&Device> = devices
             .iter()
             .filter(|d| !self.presence.online(user_id, &d.id))
-        {
+            .collect();
+        if offline.is_empty() || !self.claim(user_id, &message.id) {
+            return;
+        }
+        // The kind and the id are what a client routes on; everything else is content, and with
+        // "notifications without content" on it stays on the server.
+        let mut data = json!({
+            "type": if source.is_mail() { "newMail" } else { "notification" },
+            "id": message.id,
+        });
+        if !hide {
+            data["source"] = source.name.clone().into();
+            if let Some(account) = source.account_id() {
+                data["account"] = account.into();
+            }
+            if let Some(from) = &message.sender {
+                data["from"] = from.clone().into();
+            }
+            data["subject"] = message.title.clone().into();
+            if let Some(link) = &message.link {
+                data["link"] = link.clone().into();
+            }
+        }
+        for d in offline {
             match self.send(d, &data).await {
                 Ok(true) => {}
                 Ok(false) => {
@@ -233,6 +281,14 @@ impl Push {
                 Err(e) => tracing::warn!(device = %d.id, "push failed: {e:#}"),
             }
         }
+    }
+
+    /// True for the first push of a row within [`PUSHED_FOR`], false for a repeat.
+    fn claim(&self, user_id: i64, id: &str) -> bool {
+        let mut pushed = self.pushed.lock().unwrap_or_else(|e| e.into_inner());
+        let now = Instant::now();
+        pushed.retain(|_, at| now.duration_since(*at) < PUSHED_FOR);
+        pushed.insert((user_id, id.to_owned()), now).is_none()
     }
 
     async fn send(&self, d: &Device, data: &Value) -> Result<bool> {

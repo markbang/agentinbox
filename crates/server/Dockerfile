@@ -14,7 +14,12 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
 FROM gcr.io/distroless/cc-debian12:nonroot AS server
 COPY --from=build /out/agentinbox-server /usr/local/bin/agentinbox-server
 COPY --from=build --chown=65532:65532 /out/data /data
-ENV AGENTINBOX_DATA_DIR=/data AGENTINBOX_BIND=0.0.0.0:8080
+# What `GET /healthz` reports: the release's version (app/nsh.json) and the commit. CI passes both;
+# a plain `docker build` names itself `0.0.0-dev`. Either can be overridden at run time (compose).
+ARG AGENTINBOX_VERSION=0.0.0-dev
+ARG AGENTINBOX_GIT_SHA=
+ENV AGENTINBOX_DATA_DIR=/data AGENTINBOX_BIND=0.0.0.0:8080 \
+    AGENTINBOX_VERSION=$AGENTINBOX_VERSION AGENTINBOX_GIT_SHA=$AGENTINBOX_GIT_SHA
 VOLUME /data
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s CMD ["/usr/local/bin/agentinbox-server", "healthcheck"]

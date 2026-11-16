@@ -9,8 +9,10 @@ Cloud-mode backend for AgentInbox: accounts, mail sync, REST + WebSocket API, pu
 ```sh
 echo "AGENTINBOX_MASTER_KEY=$(openssl rand -base64 32)" > .env
 docker compose up -d          # repository root
-curl localhost:8080/healthz
+curl localhost:8080/healthz   # {"ok":true,"version":"0.0.6","sha":"<commit>"}
 ```
+
+`GET /healthz` reports the release (`app/nsh.json`'s version, baked into the image by CI) and the commit as `sha`; `AGENTINBOX_VERSION` and `AGENTINBOX_GIT_SHA` override either at run time. `cargo run` reports the crate's own version.
 
 Images: `ghcr.io/markbang/agentinbox-server` (API only) and `ghcr.io/markbang/agentinbox` (also serves the web client at `/`), both `latest` and `sha-<commit>` from `main`. The old `ghcr.io/markbang/nsh-mail*` tags stay published for one release cycle, so a deployment can roll back. The container health check runs `agentinbox-server healthcheck` (GET `/healthz`).
 
@@ -37,16 +39,18 @@ Every setting also answers to its old `NSHMAIL_*` name, so an existing `.env` ke
 | `AGENTINBOX_FCM_SERVICE_ACCOUNT` | unset (no FCM) | Path to the Firebase service account JSON. |
 | `AGENTINBOX_VAPID_PRIVATE_KEY` | generated in data dir | Base64url 32-byte P-256 private key for Web Push. |
 | `AGENTINBOX_VAPID_SUBJECT` | `AGENTINBOX_PUBLIC_URL` | `mailto:` or `https:` contact sent to push services (Apple rejects `http:`). |
+| `AGENTINBOX_VERSION` | the release baked into the image | What `GET /healthz` reports; a plain `cargo run` reports the crate's own version. |
+| `AGENTINBOX_GIT_SHA` | the commit baked into the image | Reported as `sha` by `GET /healthz`; left out when unknown. |
 | `RUST_LOG` | `info` | Log filter. Paths only, never query strings or bodies. |
 
 ## API additions
 
-- `GET /v1/me`, `PATCH /v1/me {hideContent}` — notification privacy: when on, pushes carry only account and message ids.
+- `GET /v1/me`, `PATCH /v1/me {hideContent}` — notification privacy: when on, pushes carry only the kind and the message id.
 - `GET /v1/detect?email=` — provider presets and Mozilla autoconfig for the add-account form (`null` when unknown).
 - `POST /v1/sync` — sync every account now (pull to refresh).
 - `GET /v1/events?device=<id>` — while this socket is open, that device gets no push.
 - `GET /v1/oauth/{provider}/start?token=…&return=native|web` — ends at `nshmail://oauth-done?account=<id>` or `<PUBLIC_URL>/?oauth-done&account=<id>`; failures carry `error=<message>`.
-- Push data: `{type:"newMail", account, id, from?, subject?}`.
+- Push data: `{type, id, source, account?, from?, subject?, link?}` — `type` is `newMail` for a mail account's source and `notification` for every other source; a client routes on it (mail message or feed row) and `id` is the feed's id either way. See [Push](#push).
 - `GET|POST /v1/sources`, `GET|PATCH|DELETE /v1/sources/{id}`, `POST /v1/sources/{id}/token`, `POST /v1/sources/{id}/test` — notification sources (see [docs/design/notification-inbox.md](../../docs/design/notification-inbox.md)). A mail account is a `kind: "mail"` source created and deleted with the account. Creating a webhook/Gotify/ntfy source answers `{source, token, ingestUrl}` once; `/token` rotates it and the old URL stops working. Create takes `kind`, `name`, `icon`, `color`, `config`, `minPriority`, `preset`, `secret`; patch the same without `kind`, plus `enabled`. A field the API does not know answers `400` with the accepted names, because a field that is silently dropped is a lost mapping. Every mail message is also projected into the feed (`feed_messages`) by triggers in `mail_core`, so list and search behave the same for mail and for ingested notifications.
 
 ## Ingestion
@@ -62,6 +66,15 @@ Notifications arrive on URLs outside `/v1`; each one is a source, and the token 
 The web client's files sit at the same level as a topic (`/app.<hash>.js`, `/nsh.<hash>.wasm`), so `GET /` and `GET /{topic}` serve them from `AGENTINBOX_WEB_DIR`; only `PUT` and `POST` on those paths are publishes.
 
 Limits per source: 256 KiB a request, 60 messages a minute with a burst of 120. A source's `secret` (write-only, `hasSecret` in responses) turns on the `X-Hub-Signature-256` check for its webhook; it is stored AES-256-GCM in `users/notify.secrets.json`, which key rotation covers like the mail secrets. Ingested HTML goes through the same sanitizer as mail, with remote images removed; `externalId` makes a sender's retry a no-op; duplicates still answer `202` with the existing id.
+
+## Push
+
+Every new notification the feed stores is pushed to the user's devices, whatever its source: mail, webhook, Gotify and ntfy today, and IM sources as they land. Mail's own sync event is one entry and the feed's stream the other; both go through the same payload and a row is sent to a device once.
+
+- **Devices**: FCM tokens (`POST /v1/devices {kind:"fcm", token}`) and Web Push subscriptions (`{kind:"webpush", subscription, vapidKey}`). A device that holds `GET /v1/events?device=<id>` gets nothing — the app shows the notification live — and an endpoint that answers 404/410 is removed.
+- **Rules**: a paused source (`enabled: false`) and a message below the source's `minPriority` are stored in the feed and **not** pushed. The per-priority choices in the app (Settings → Notifications → Per source and priority: notify / silent / off) belong to the device and are not yet known to the server, so pausing a source or raising its `minPriority` is what stops its pushes.
+- **Privacy**: with `hideContent` on, the push carries `type` and `id` only; the client fetches the rest.
+- **Cloud mode only**: local mode has no server, so a phone or browser gets notifications only while the app is open. This is also why push needs a registered device: without one the server has nowhere to send.
 
 ## Notification feed
 

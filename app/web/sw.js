@@ -1,14 +1,15 @@
-// AgentInbox's service worker: shows Web Push notifications of new mail while
-// no page has the server's event stream open, and brings the app forward
-// when one is pressed. `nsh package --target web` does not ship extra files:
-// it is copied next to index.html (see app/README.md); the server serves it
-// as /sw.js with `Service-Worker-Allowed: /`.
+// AgentInbox's service worker: shows Web Push notifications of new mail and of
+// every other source while no page has the server's event stream open, and
+// brings the app forward when one is pressed. `nsh package --target web` does
+// not ship extra files: it is copied next to index.html (see app/README.md);
+// the server serves it as /sw.js with `Service-Worker-Allowed: /`.
 
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
 
-// The server's payload: {type: "newMail", account, id, from?, subject?};
-// with "hide content" on, only the ids.
+// The server's payload: {type, id, source?, account?, from?, subject?, link?} —
+// "newMail" for a mail account, "notification" for every other source (webhook,
+// Gotify, ntfy); with "hide content" on, only the type and the id.
 self.addEventListener("push", (event) => {
   let data = {};
   try {
@@ -16,11 +17,12 @@ self.addEventListener("push", (event) => {
   } catch {
     // Not ours to read: still say something arrived.
   }
-  const title = data.from || "AgentInbox";
+  const mail = data.type !== "notification";
+  const title = data.from || data.source || "AgentInbox";
   event.waitUntil(
     self.registration.showNotification(title, {
-      body: data.subject || "New mail",
-      tag: data.id ? `message:${data.id}` : undefined,
+      body: data.subject || (mail ? "New mail" : "New notification"),
+      tag: data.id ? `${mail ? "message" : "notification"}:${data.id}` : undefined,
       data,
     }),
   );

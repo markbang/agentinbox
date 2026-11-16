@@ -5,7 +5,7 @@ English | [简体中文](design.zh-CN.md)
 A client that puts several mail accounts into one inbox, written with [Native Shell](https://nsh.dev) (NSH 0.5), targeting Web, Android, Linux and Windows. Two modes:
 
 - **Local mode**: credentials and mail stay on the device; the client connects to IMAP/SMTP directly.
-- **Cloud mode**: the AgentInbox server syncs on the client's behalf and pushes new mail to clients.
+- **Cloud mode**: the AgentInbox server syncs on the client's behalf and pushes new mail and notifications to clients.
 
 ## 1. Platform facts (from the NSH docs)
 
@@ -146,7 +146,7 @@ client ──HTTPS REST──▶ agentinbox-server ──mail-core──▶ each
 1. The user signs up / signs in on the server (email + password) and gets a session token; the client stores the token (keychain on native platforms, localStorage on the web).
 2. Adding an account: plain IMAP hands the app password to the server; OAuth goes through the server's web flow (open `/v1/oauth/{provider}/start`, the callback stores the token, then redirects back to `nshmail://oauth-done` or the web page).
 3. The server keeps one resident tokio task per mail account, reusing mail-core's sync logic, and writes data into the shared `data/server.sqlite`, every row carrying a `user_id`.
-4. New mail: written to the store → sent to online clients over WebSocket → pushed to offline devices: FCM on Android, Web Push on the web; the desktop app is a resident process holding a WebSocket and shows its own system notification when an event arrives.
+4. New notifications — mail and every other source (webhook, Gotify, ntfy) — are written to the feed → sent to online clients over WebSocket → pushed to offline devices: FCM on Android, Web Push on the web; the desktop app is a resident process holding a WebSocket and shows its own system notification when an event arrives. A source's rules (paused, `minPriority`) keep a notification in the feed; see [notification-inbox.md](design/notification-inbox.md) and `crates/server/README.md` (Push).
 5. Reading, searching and sending all go through REST. Caching lists and bodies in the native client's local SQLite (readable offline) is not implemented yet, pending a write interface in mail-core.
 
 ### Attachments

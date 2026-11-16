@@ -5,7 +5,7 @@
 把多个邮箱账号放进一个收件箱的客户端，用 [Native Shell](https://nsh.dev)（NSH 0.5）写成，目标平台 Web、Android、Linux、Windows。两种模式：
 
 - **本地模式**：凭据和邮件只在本机，客户端直连 IMAP/SMTP。
-- **云端模式**：AgentInbox 服务端代为同步，向客户端推送新邮件。
+- **云端模式**：AgentInbox 服务端代为同步，向客户端推送新邮件和通知。
 
 ## 1. 平台事实（来自 NSH 文档）
 
@@ -133,7 +133,7 @@ TSX ──Mail.*──▶ Rust LocalBackend ──tokio/rustls──▶ IMAP (99
 1. 用户在服务端注册/登录（邮箱 + 密码），拿到会话 token；客户端存 token（原生平台进钥匙串，Web 进 localStorage）。
 2. 添加账号：普通 IMAP 把应用专用密码交给服务端；OAuth 走服务端的 Web 流程（打开 `/v1/oauth/{provider}/start`，回调存 token，再跳回 `nshmail://oauth-done` 或 Web 页面）。
 3. 服务端为每个邮箱账号常驻一个 tokio 任务，复用 mail-core 的同步逻辑，数据写进共享的 `data/server.sqlite`，每行带 `user_id`。
-4. 新信：写库 → 通过 WebSocket 发给在线客户端 → 给不在线的设备发推送：Android 用 FCM，Web 用 Web Push；桌面端是常驻进程，挂着 WebSocket，收到事件后自己弹系统通知。
+4. 新通知——邮件和所有其他来源（webhook、Gotify、ntfy）——写进 feed → 通过 WebSocket 发给在线客户端 → 给不在线的设备发推送：Android 用 FCM，Web 用 Web Push；桌面端是常驻进程，挂着 WebSocket，收到事件后自己弹系统通知。来源的规则（暂停、`minPriority`）会把通知留在 feed 里；详见 [notification-inbox.zh-CN.md](design/notification-inbox.zh-CN.md) 和 `crates/server/README.zh-CN.md`（推送）。
 5. 读、搜、发都走 REST。原生客户端在本地 SQLite 缓存列表和正文（离线可读）尚未实现，待 mail-core 提供写入接口。
 
 ### 附件

@@ -18,7 +18,7 @@ use mail_core::{
     },
 };
 
-use crate::{AppState, crypto, push::parse_subscription_keys};
+use crate::{AppState, config, crypto, push::parse_subscription_keys};
 
 /// Error bodies are `mail_core::types::Error` JSON (`{code, message}`), so clients share one decoder.
 pub struct ApiError(StatusCode, Error);
@@ -789,11 +789,14 @@ pub async fn vapid_key(State(s): State<Arc<AppState>>) -> Json<Value> {
     get,
     path = "/healthz",
     tag = "auth",
-    responses((status = 200, description = "`{ok, version}`"))
+    responses((status = 200, description = "`{ok, version}`, plus `sha` when the build knows its commit"))
 )]
 pub async fn health(State(s): State<Arc<AppState>>) -> ApiResult<Json<Value>> {
     s.db.ping()?;
-    Ok(Json(
-        json!({ "ok": true, "version": env!("CARGO_PKG_VERSION") }),
-    ))
+    let (version, sha) = config::release();
+    let mut body = json!({ "ok": true, "version": version });
+    if let Some(sha) = sha {
+        body["sha"] = sha.into();
+    }
+    Ok(Json(body))
 }

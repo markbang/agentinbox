@@ -2,10 +2,10 @@
 // actions.
 import { t } from "nsh/i18n";
 import { Page } from "../components/Page";
-import { Empty } from "../components/Empty";
+import { Empty, Loading } from "../components/Empty";
 import { NotificationReader } from "../components/NotificationReader";
 import { NavContext, phoneStack, selectTab, TAB } from "../nav";
-import { archiveNotifications, markNotifications, notifications, sourceById } from "../notify";
+import { archiveNotifications, feedStatus, markNotifications, notifications, sourceById } from "../notify";
 import { openMessage } from "../store";
 
 export function NotificationPage(props: { id: string }) {
@@ -19,7 +19,17 @@ export function NotificationPage(props: { id: string }) {
   };
   return (
     <Page title={source()?.name ?? t("notify.title")} back={t("common.back")} onBack={nav.close} testID="notification-page">
-      <If when={note()} else={<Empty icon="bell" title={t("notify.gone")} description={t("notify.goneHint")} />}>
+      <If
+        when={note()}
+        else={
+          <If
+            when={feedStatus() === "idle"}
+            else={<Loading label={t("notify.loading")} />}
+          >
+            <Empty icon="bell" title={t("notify.gone")} description={t("notify.goneHint")} />
+          </If>
+        }
+      >
         {(n) => (
           <NotificationReader
             note={n()}

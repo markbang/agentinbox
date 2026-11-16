@@ -33,8 +33,8 @@ onboarding.cloud:
   en: Through an AgentInbox server
   zh-CN: 通过 AgentInbox 服务器
 onboarding.cloudDetail:
-  en: The server syncs your accounts and pushes new mail to every device, also when the app is closed.
-  zh-CN: 服务器代为同步账号，并把新邮件推送到每台设备，应用关闭时也能收到。
+  en: The server syncs your accounts and pushes new mail and notifications to every device, also when the app is closed.
+  zh-CN: 服务器代为同步账号，并把新邮件和通知推送到每台设备，应用关闭时也能收到。
 onboarding.webOnlyCloud:
   en: Browsers can't connect to mail servers, so the web app works through an AgentInbox server, the official one or your own.
   zh-CN: 浏览器无法直接连接邮件服务器，所以网页版需要通过 AgentInbox 服务器使用，可以是官方的，也可以是你自己部署的。
@@ -608,8 +608,8 @@ settings.localDetail:
   en: Passwords and mail stay on this device.
   zh-CN: 密码和邮件只保存在本机。
 settings.androidLocal:
-  en: On Android, this mode checks for mail only while the app is open. Use an AgentInbox server to get new mail pushed.
-  zh-CN: 在 Android 上，此模式只在应用打开时收取邮件。如需推送新邮件，请使用 AgentInbox 服务器。
+  en: On Android, this mode checks for mail only while the app is open. Use an AgentInbox server to get mail and notifications pushed.
+  zh-CN: 在 Android 上，此模式只在应用打开时收取邮件。如需推送邮件和通知，请使用 AgentInbox 服务器。
 settings.signOut:
   en: Sign out
   zh-CN: 退出登录
@@ -1031,8 +1031,8 @@ rules.summary:
   en: Which sources reach your devices, and which only the feed.
   zh-CN: 哪些来源推送到设备，哪些只留在收件箱。
 rules.intro:
-  en: A notification can show on your devices, wait in the feed only, or be dropped. The switch above turns all of them off at once.
-  zh-CN: 通知可以推送到设备、只留在收件箱，或被丢弃。上面的开关会一次关闭全部。
+  en: A notification can show on your devices, wait in the feed only, or be dropped. The switch above turns all of them off at once. To keep a source quiet while the app is closed, pause it or give it a minimum priority.
+  zh-CN: 通知可以推送到设备、只留在收件箱，或被丢弃。上面的开关会一次关闭全部。想让某个来源在应用关闭时也不打扰，请暂停它或给它设一个最低优先级。
 rules.label:
   en: "%{source}, %{priority}"
   zh-CN: "%{source}，%{priority}"
