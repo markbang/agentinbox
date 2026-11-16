@@ -5,11 +5,11 @@ import { t } from "nsh/i18n";
 import { Button, Icon } from "cupertino";
 import { errorInfoText, mailStatus, refresh } from "../store";
 
-export function SyncBanner() {
+export function SyncBanner(props: { class?: string }) {
   return (
     <If when={mailStatus().error}>
       {(error) => (
-        <View role="alert" testID="sync-banner" class="mx-3 mb-1 flex-row items-center gap-2 rounded-row bg-system-red/10 px-3 py-2">
+        <View role="alert" testID="sync-banner" class={`mx-3 mb-1 flex-row items-center gap-2 rounded-row bg-system-red/10 px-3 py-2 ${props.class ?? ""}`}>
           <Icon name="exclamationmark.triangle" size={18} tint="system-red" />
           <View class="min-w-0 flex-1">
             <Text class="text-footnote font-semibold text-system-red">{t("sync.failed")}</Text>

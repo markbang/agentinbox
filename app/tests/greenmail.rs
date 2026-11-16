@@ -247,7 +247,7 @@ fn local_mode_reads_replies_and_searches_real_mail() {
     step(&mut app, |a| {
         a.wait_for_within("text:Signature saved", WAIT)
     });
-    step(&mut app, |a| a.press("id:modal-done"));
+    step(&mut app, |a| a.press("label:Done"));
     step(&mut app, |a| a.wait_for_gone("id:modal", WAIT));
     let signature = "-- \nBob\nbob.example <https://bob.example>";
     let body = |a: &Headless| {

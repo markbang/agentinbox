@@ -103,7 +103,7 @@ test("with conversations off, every message is a row of its own", async () => {
   await app.waitFor("id:messages >> text:Offsite in March: Lisbon or Porto?");
   await app.press("id:open-settings");
   await app.press("text:Group by conversation");
-  await app.press("id:modal-done");
+  await app.press("label:Done");
   await app.waitFor("id:modal", { state: "gone" });
   await app.waitFor("id:messages >> text:Re: Offsite in March: Lisbon or Porto?");
   expect(app.count("id:messages >> text:Re: Offsite in March: Lisbon or Porto?")).toBe(2);
@@ -353,7 +353,7 @@ test("a signature per account: under new messages, above the quote, swapped with
   await app.waitFor("id:signature-preview");
   await app.press("id:signature-save");
   await app.waitFor("text:Signature saved");
-  await app.press("id:modal-done");
+  await app.press("label:Done");
   await app.waitFor("id:modal", { state: "gone" });
   const signature = "-- \nLin Chen\nNorthwind · northwind.dev <https://northwind.dev>";
 

@@ -136,7 +136,8 @@ export function MailboxPane(props: MailboxPaneProps) {
   return (
     <View class="h-full flex-col bg-system-background" testID={props.testID}>
       <If when={!floating()}>{header()}</If>
-      <SyncBanner />
+      {/* Under the floating bar: the banner starts where the rows do. */}
+      <SyncBanner class={floating() ? "mt-11" : ""} />
       <View class="min-h-0 flex-1">
         <If when={searching()} else={<If when={folder() === "scheduled"} else={mailList()}><ScheduledList /></If>}>
           <If when={searchResults()?.length} else={<SearchEmpty />}>

@@ -33,17 +33,21 @@ export function Page(props: PageProps) {
   const bar = () => !!(props.title || props.back || props.trailing || done());
   return (
     <View class="flex-1 bg-system-background pt-[env(safe-area-inset-top)]" testID={props.testID}>
-      <View class="min-h-0 flex-1">{props.children}</View>
-      <If when={bar()}>
-        <View class="absolute left-0 right-0 top-0 z-10">
-          {/* collapsed 1: a compact title, always there; nothing here tracks a scroll. */}
-          <NavigationBar title={props.title} back={props.back} onBack={props.onBack} collapsed={1} material="regular" testID={props.titleTestID}>
-            <If when={props.trailing} else={<If when={done()}><Button title={t("common.done")} variant="plain" onPress={nav.done} testID="modal-done" /></If>}>
-              {props.trailing}
-            </If>
-          </NavigationBar>
-        </View>
-      </If>
+      {/* The bar is placed inside the page's safe area, over the content: an absolute child would
+          otherwise start at the window's top, under the status bar, where its buttons take no taps. */}
+      <View class="relative min-h-0 flex-1">
+        {props.children}
+        <If when={bar()}>
+          <View class="absolute left-0 right-0 top-0 z-10">
+            {/* collapsed 1: a compact title, always there; nothing here tracks a scroll. */}
+            <NavigationBar title={props.title} back={props.back} onBack={props.onBack} collapsed={1} material="regular" testID={props.titleTestID}>
+              <If when={props.trailing} else={<If when={done()}><Button title={t("common.done")} variant="plain" onPress={nav.done} testID="modal-done" /></If>}>
+                {props.trailing}
+              </If>
+            </NavigationBar>
+          </View>
+        </If>
+      </View>
     </View>
   );
 }

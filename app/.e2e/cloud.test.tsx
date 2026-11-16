@@ -103,7 +103,7 @@ test("cloud mode: sign up, add a mailbox, read, get new mail live, reply, sign o
   await alices.type("id:signature-text", "*Alice*");
   await alices.press("id:signature-save");
   await alices.waitFor("text:Signature saved", slow);
-  await alices.press("id:modal-done");
+  await alices.press("label:Done");
   await alices.waitFor("id:modal", { state: "gone" });
   const again = await open("../App.tsx", { ...desktop, storage: alices.storage() });
   await again.waitFor("id:open-settings", slow);
@@ -230,7 +230,7 @@ test("cloud mode: a webhook lands live in the feed, reads, archives, and an agen
   expect(hook).toBeTruthy();
   await alices.press("id:source-done");
   await alices.press("label:Back");
-  await alices.press("id:modal-done");
+  await alices.press("label:Done");
   await alices.waitFor("id:modal", { state: "gone" });
 
   // The feed is empty and the rail says so before anything arrives.

@@ -52,17 +52,17 @@ export function TabShell(props: { page: (route: Route) => JSX.Element }) {
         </Each>
         <Toasts class={covered() ? "bottom-4" : "bottom-24"} />
       </View>
-      {/* Mail's compose control: a floating button of glass over the rows, above the bar. */}
-      <If when={!covered() && selectedTab() === TAB.mail && !picking()}>
-        <View class="absolute bottom-0 right-4 pb-[calc(env(safe-area-inset-bottom)+65px)]" style={{ pointerEvents: "box-none" }}>
-          <View class="h-14 w-14">
-            <GlassButton class="h-full w-full" icon="square.and.pencil" label={t("actions.compose")} onPress={() => openCompose({ mode: "new" })} testID="compose" />
-          </View>
-        </View>
-      </If>
-      {/* The bar is glass and floats: the lists end under it, as Mail's do. */}
+      {/* The bar is glass and floats: the lists end under it, as Mail's do. Mail's compose control
+          is a floating button of glass above it — in the same stack, so neither covers the other's taps. */}
       <If when={!covered()}>
         <View class="absolute bottom-0 left-0 right-0">
+          <If when={selectedTab() === TAB.mail && !picking()}>
+            <View class="items-end pr-4 pb-3">
+              <View class="h-14 w-14">
+                <GlassButton class="h-full w-full" icon="square.and.pencil" label={t("actions.compose")} onPress={() => openCompose({ mode: "new" })} testID="compose" />
+              </View>
+            </View>
+          </If>
           <TabBar
             items={tabs.map((tab) => ({
               value: tab.name,
