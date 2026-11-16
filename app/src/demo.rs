@@ -1194,6 +1194,7 @@ impl Backend for DemoBackend {
                 expires_at: input
                     .expires_days
                     .map(|days| now + i64::from(days) * 86_400_000),
+                revoked_at: None,
             };
             data.keys.push(key.clone());
             Ok(CreatedApiKey { key, token: raw })
@@ -1202,13 +1203,16 @@ impl Backend for DemoBackend {
 
     fn revoke_api_key(&self, id: String) -> MailFuture<'_, ()> {
         let mut data = self.update();
-        let before = data.keys.len();
-        data.keys.retain(|k| k.id != id);
-        ok(if data.keys.len() == before {
-            Err(not_found("key"))
-        } else {
-            Ok(())
-        })
+        let now = unix_ms() as i64;
+        let Some(key) = data
+            .keys
+            .iter_mut()
+            .find(|k| k.id == id && k.revoked_at.is_none())
+        else {
+            return ok(Err(not_found("key")));
+        };
+        key.revoked_at = Some(now);
+        ok(Ok(()))
     }
 }
 
@@ -2360,6 +2364,7 @@ fn seed(now: f64) -> Data {
             created_at: (now - 22.0 * DAY) as i64,
             last_used_at: Some((now - 12.0 * MINUTE) as i64),
             expires_at: None,
+            revoked_at: None,
         },
         ApiKey {
             id: "key-2".to_owned(),
@@ -2371,8 +2376,23 @@ fn seed(now: f64) -> Data {
             created_at: (now - 9.0 * DAY) as i64,
             last_used_at: Some((now - 2.0 * DAY) as i64),
             expires_at: Some((now + 21.0 * DAY) as i64),
+            revoked_at: None,
+        },
+        ApiKey {
+            id: "key-3".to_owned(),
+            name: "Old script".to_owned(),
+            prefix: "nb_5a0c71be".to_owned(),
+            read: true,
+            write: false,
+            source_ids: Vec::new(),
+            created_at: (now - 60.0 * DAY) as i64,
+            last_used_at: Some((now - 34.0 * DAY) as i64),
+            expires_at: None,
+            revoked_at: Some((now - 30.0 * DAY) as i64),
         },
     ];
+    // Created keys take ids after the seeded ones.
+    data.next_key = data.keys.len() as u64;
     data
 }
 

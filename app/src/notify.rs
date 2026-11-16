@@ -145,6 +145,8 @@ pub struct ApiKey {
     pub created_at: i64,
     pub last_used_at: Option<i64>,
     pub expires_at: Option<i64>,
+    /// When the key stopped working; the server keeps revoked keys in its list.
+    pub revoked_at: Option<i64>,
 }
 
 /// What creating a key takes.
@@ -228,7 +230,7 @@ pub const DECLARATIONS: &[(&str, &str)] = &[
         "/** An agent's key to the feed. */\n\
          export interface ApiKey {\n  id: string;\n  name: string;\n  /** Its first characters, to recognise it in a list. */\n  prefix: string;\n  \
          read: boolean;\n  write: boolean;\n  /** Empty: every source. */\n  sourceIds: string[];\n  createdAt: number;\n  \
-         lastUsedAt?: number | null;\n  expiresAt?: number | null;\n}",
+         lastUsedAt?: number | null;\n  expiresAt?: number | null;\n  /** When it stopped working; the server lists revoked keys too. */\n  revokedAt?: number | null;\n}",
     ),
     (
         "NewApiKey",

@@ -125,6 +125,8 @@ struct ServerKey {
     last_used_at: Option<i64>,
     #[serde(default)]
     expires_at: Option<i64>,
+    #[serde(default)]
+    revoked_at: Option<i64>,
 }
 
 impl ServerKey {
@@ -139,6 +141,7 @@ impl ServerKey {
             created_at: self.created_at,
             last_used_at: self.last_used_at,
             expires_at: self.expires_at,
+            revoked_at: self.revoked_at,
         }
     }
 }

@@ -3,7 +3,7 @@
 // composer keeps it (an edited outbox message goes back to the outbox),
 // Cancel asks first. Send waits out the undo delay with Undo; the clock
 // schedules it (../outbox.ts).
-import { cleanup, effect, keymap, Picker, platform, signal, Text, untracked, View } from "nsh";
+import { cleanup, effect, Keyboard, keymap, Picker, platform, signal, Text, untracked, View } from "nsh";
 import { Input } from "nsh/base";
 import { t } from "nsh/i18n";
 import { Mail, type Draft as MailDraft, type Outgoing } from "agentinbox/native";
@@ -163,7 +163,18 @@ export function ComposePage(props: { init: ComposeInit }) {
   };
   const actions = () => (
     <View class="flex-row items-center gap-1">
-      <Button icon="clock" label={t("compose.schedule")} variant="plain" disabled={sending()} onPress={() => choosing.set(true)} testID="send-later" />
+      <Button
+        icon="clock"
+        label={t("compose.schedule")}
+        variant="plain"
+        disabled={sending()}
+        // The menu sits at the bottom: the keyboard would cover it.
+        onPress={() => {
+          Keyboard.dismiss();
+          choosing.set(true);
+        }}
+        testID="send-later"
+      />
       <Button
         title={sending() ? t("compose.sending") : t("compose.send")}
         variant="plain"

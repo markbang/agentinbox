@@ -396,7 +396,11 @@ export async function createKey(input: NewApiKey): Promise<CreatedApiKey> {
 export async function revokeKey(key: ApiKey) {
   try {
     await Mail.revokeApiKey(key.id);
-    keys.update((list) => list.filter((k) => k.id !== key.id));
+    // The server keeps revoked keys in its list; the row stays, marked revoked.
+    const revokedAt = Date.now();
+    keys.update((list) =>
+      list.map((k) => (k.id === key.id ? { ...k, revokedAt } : k)),
+    );
     showToast(t("keys.revoked", { name: key.name }));
   } catch (e) {
     showToast(errorText(e), "error");

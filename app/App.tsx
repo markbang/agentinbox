@@ -2,7 +2,7 @@
 // windows, or the tab bar over a stack per section on phones and narrow
 // windows; the sheet the wide layout opens pages in, the toasts, the
 // shortcuts and the keys.
-import { keymap, mount, View, type InputRef } from "nsh";
+import { keymap, mount, signal, Text, View, type InputRef } from "nsh";
 import { NavPage, NavStack } from "nsh/base";
 import { Sheet, Theme } from "cupertino";
 import { Toasts } from "./components/Toasts";
@@ -93,6 +93,8 @@ function body(route: Route) {
 
 function Main() {
   let search: InputRef | undefined;
+  // The modal panel's measured width: a test checks that the library caps it.
+  const sheetWidth = signal(0);
   const compose = (mode: ComposeMode) => {
     const source = mode === "new" ? undefined : current();
     if (mode !== "new" && !source) return;
@@ -151,9 +153,12 @@ function Main() {
       {/* The wide layout opens pages in a sheet with a stack of its own. */}
       <Sheet open={isModalOpen()} detent="large" scroll={false} testID="modal" onOpenChange={({ open }: { open: boolean }) => (open ? undefined : closeModal())}>
         <NavContext.Provider value={modalNavigator}>
-          <NavStack state={modalStack} class="flex-1">
-            {page}
-          </NavStack>
+          <View class="min-h-0 flex-1" onLayout={({ bounds }) => sheetWidth.set(bounds.size.width)}>
+            <Text testID="sheet-width" class="absolute left-0 top-0 size-1 overflow-hidden opacity-0">{`sheet ${Math.round(sheetWidth())}`}</Text>
+            <NavStack state={modalStack} class="flex-1">
+              {page}
+            </NavStack>
+          </View>
         </NavContext.Provider>
       </Sheet>
     </If>
