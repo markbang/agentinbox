@@ -244,6 +244,25 @@ for (const theme of ["light", "dark"]) {
   }
   log("narrow reader scrolls sideways by", overflow, "px");
   if (overflow === null || overflow > 0) throw new Error(`the booking mail at 412px: sideways overflow ${overflow}`);
+
+  // The glass: rows under the bar at the top and the tab bar at the foot, and compose as a sheet.
+  await page.goto(origin + "/");
+  for (const text of synced) await page.getByText(text).first().waitFor({ timeout: 90_000 });
+  await page.mouse.move(206, 500);
+  await page.mouse.wheel(0, 700);
+  await shot("narrow-inbox-scrolled", theme);
+  await press("compose");
+  await field("compose-to").waitFor();
+  await shot("narrow-compose", theme);
+  await page.keyboard.press("Escape");
+  await field("compose-to").waitFor({ state: "detached", timeout: 15_000 }).catch(() => {});
+  // Settings: the large title under the bar, then scrolled away under it.
+  await page.getByText("Settings", { exact: true }).last().click();
+  await id("signed-in-as").waitFor({ timeout: 30_000 });
+  await shot("narrow-settings", theme);
+  await page.mouse.move(206, 500);
+  await page.mouse.wheel(0, 900);
+  await shot("narrow-settings-scrolled", theme);
 }
 // Empty and failure states, at 1440 again: a folder with nothing in it, a search that finds nothing.
 await page.setViewportSize({ width: 1440, height: 900 });

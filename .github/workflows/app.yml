@@ -331,6 +331,10 @@ jobs:
         with:
           tool: wasm-bindgen@${{ steps.bindgen.outputs.version }}
       - run: nsh package App.tsx --target web -o "$RUNNER_TEMP/web"
+      # Liquid Glass draws through a WebGL 2 shader, and NSH 0.5's web runtime binds one stage's
+      # uniform block only: the library's patch fixes a built site until NSH binds both.
+      - name: Patch the web runtime's shader uniform blocks
+        run: node vendor/nsh-cupertino/tools/patch-runtime.mjs "$RUNNER_TEMP/web/AgentInbox"
       # `nsh package` ships no extra files: the Web Push service worker goes next to index.html.
       - name: Add the service worker
         run: |

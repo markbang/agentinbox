@@ -96,6 +96,12 @@ export function show(route: Route, wide: boolean) {
   modalOpen.set(true);
 }
 
+/** Compose opens as a sheet on every shell, as Mail does: a task, not a place on a tab's stack. */
+export function openCompose(init: ComposeInit) {
+  modalStack.setRoutes([{ name: "compose", init }]);
+  modalOpen.set(true);
+}
+
 export function closeModal() {
   modalOpen.set(false);
 }

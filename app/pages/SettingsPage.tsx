@@ -3,9 +3,9 @@
 import { appInfo, Notifications, platform, signal, Text, View } from "nsh";
 import { t } from "nsh/i18n";
 import { Mail, type Account } from "agentinbox/native";
-import { ActionSheet, Icon, List, ListTile, Section, Switch } from "cupertino";
-import { Page } from "../components/Page";
+import { ActionSheet, Icon, List, ListTile, NavPage, Section, Switch } from "cupertino";
 import { NavContext } from "../nav";
+import { wide } from "../layout";
 import { sources } from "../notify";
 import { providerName as named } from "../lib/format";
 import { shortcutsOpen } from "../lib/shortcuts";
@@ -63,9 +63,18 @@ export function SettingsPage() {
   };
 
   const account = () => accounts().find((a) => a.id === menuFor());
+  // A sheet's first page leaves the flow with Done; a tab's own page has no bar action.
+  const done = () => nav.modal && nav.stack.routes().length === 1;
   return (
-    <Page title={t("settings.title")} testID="settings">
-      <List>
+    <NavPage
+      title={t("settings.title")}
+      largeTitle={t("settings.title")}
+      material="regular"
+      trailing={done() ? t("common.done") : undefined}
+      onTrailing={done() ? nav.done : undefined}
+      testID="settings"
+    >
+      <List scroll={false}>
         <Section header={t("settings.accounts")}>
           <Each of={accounts()} key={(a) => a.id}>
             {(a, index) => (
@@ -181,6 +190,10 @@ export function SettingsPage() {
             testID="open-shortcuts"
           />
         </Section>
+        {/* The tab bar floats over the settings list on a phone: its 49 pt of room at the end. */}
+        <If when={!wide()}>
+          <View class="h-12" />
+        </If>
       </List>
 
       <ActionSheet
@@ -239,6 +252,6 @@ export function SettingsPage() {
         }}
         testID="confirm-dialog"
       />
-    </Page>
+    </NavPage>
   );
 }

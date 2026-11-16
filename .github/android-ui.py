@@ -533,6 +533,7 @@ for mode in ("light", "dark"):
     tap("id:message-.*")
     wait("id:reader")
     shot(f"{mode}-reader")
+    during(["swipe", str(w // 2), str(h * 8 // 10), str(w // 2), str(h * 5 // 10), "1200"], f"{mode}-reader-mid-scroll", 0.6)
     adb("shell", "input", "swipe", str(w // 2), str(h * 7 // 10), str(w // 2), str(h * 3 // 10), "400")
     shot(f"{mode}-reader-scrolled")
     if tap("id:message-more"):
@@ -580,7 +581,9 @@ for mode in ("light", "dark"):
             back_to("id:messages")
     wait("id:messages")
 
-    # Scroll the inbox, switch tabs and back: the inbox keeps its place.
+    # The inbox scrolled: rows under the glass bar at the top and the glass tab bar at the foot,
+    # a frame taken while the finger is still dragging, and one once it settled.
+    during(["swipe", str(w // 2), str(h * 8 // 10), str(w // 2), str(h * 5 // 10), "1200"], f"{mode}-inbox-mid-scroll", 0.6)
     adb("shell", "input", "swipe", str(w // 2), str(h * 7 // 10), str(w // 2), str(h * 3 // 10), "300")
     shot(f"{mode}-inbox-scrolled")
 
@@ -637,6 +640,9 @@ for mode in ("light", "dark"):
     if tab("Notifications"):
         find("Search notifications", 20)
         shot(f"{mode}-notifications")
+        during(["swipe", str(w // 2), str(h * 8 // 10), str(w // 2), str(h * 5 // 10), "1200"], f"{mode}-notifications-mid-scroll", 0.6)
+        adb("shell", "input", "swipe", str(w // 2), str(h * 7 // 10), str(w // 2), str(h * 3 // 10), "300")
+        shot(f"{mode}-notifications-scrolled")
         if tap("id:notify-more"):
             find("Sources", 10)  # its menu, before it is screenshotted
             shot(f"{mode}-notifications-menu")
@@ -661,6 +667,10 @@ for mode in ("light", "dark"):
     if tab("Settings"):
         find("Accounts", 10)
         shot(f"{mode}-settings")
+        # The large title scrolls away under the bar; the rows continue under it.
+        during(["swipe", str(w // 2), str(h * 8 // 10), str(w // 2), str(h * 5 // 10), "1200"], f"{mode}-settings-mid-scroll", 0.6)
+        adb("shell", "input", "swipe", str(w // 2), str(h * 7 // 10), str(w // 2), str(h * 3 // 10), "300")
+        shot(f"{mode}-settings-scrolled")
         # The first account's signature, then a new message that carries it.
         if tap("id:account-more-0", 10) and tap("Signature…") and tap("id:signature-text"):
             adb("shell", "input", "text", "'**Lin%sChen**'")

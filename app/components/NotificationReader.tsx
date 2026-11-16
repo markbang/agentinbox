@@ -17,7 +17,7 @@ export function NotificationReader(props: {
   const n = () => props.note;
   return (
     <ScrollView class="flex-1" testID="notify-reader">
-      <View class="gap-4 px-4 pb-10 pt-4" testID="notify-scroll">
+      <View class="gap-4 px-4 pb-10 pt-11" testID="notify-scroll">
         <View class="flex-row items-center gap-2">
           <If when={props.source}>{(s) => <SourceMark source={s()} size="sm" />}</If>
           <Text class="text-footnote font-semibold text-secondary-label" testID="notify-source">

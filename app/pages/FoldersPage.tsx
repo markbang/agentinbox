@@ -3,7 +3,7 @@
 import { Text, View } from "nsh";
 import { t } from "nsh/i18n";
 import { ActivityIndicator, Button, Icon, List, ListTile, Section } from "cupertino";
-import { Page } from "../components/Page";
+import { BarSpace, Page } from "../components/Page";
 import { AccountMark, Badge } from "../components/Marks";
 import { NavContext, selectTab, TAB, tabs } from "../nav";
 import { notificationsSection, showMail, showNotifications, unreadNotifications } from "../notify";
@@ -37,6 +37,7 @@ export function FoldersPage() {
       testID="mailboxes"
     >
       <List>
+        <BarSpace />
         <Section>
           <ListTile
             title={t("notify.allTitle")}
@@ -109,6 +110,8 @@ export function FoldersPage() {
             <Button icon="slider.horizontal.3" label={t("settings.title")} variant="plain" onPress={() => selectTab(TAB.settings)} testID="open-settings" />
           </View>
         </Section>
+        {/* The tab bar floats over the list: its 49 pt of room at the end. */}
+        <View class="h-12" />
       </List>
     </Page>
   );

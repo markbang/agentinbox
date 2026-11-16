@@ -27,6 +27,11 @@ Download from [Releases](https://github.com/markbang/agentinbox/releases/latest)
 
 `SHA256SUMS.txt` in each release lists the checksums.
 
+Building the web client: `nsh package App.tsx --target web`, then
+`node vendor/nsh-cupertino/tools/patch-runtime.mjs <site>` — Liquid Glass is a WebGL 2 shader and NSH 0.5's web
+runtime needs that fix to bind both stages' uniform blocks (CI runs it; the server image and the site bundle
+carry the patched runtime).
+
 Design: [docs/design.md](docs/design.md)
 
 ## License

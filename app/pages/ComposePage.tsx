@@ -9,6 +9,7 @@ import { t } from "nsh/i18n";
 import { Mail, type Draft as MailDraft, type Outgoing } from "agentinbox/native";
 import { ActionSheet, AlertDialog, Button } from "cupertino";
 import { Page } from "../components/Page";
+import { openCompose } from "../nav";
 import { ChoiceRow, FormNote, TextRow } from "../components/Fields";
 import { AttachmentChips } from "../components/Attachments";
 import { ScheduleDialog } from "../components/ScheduleDialog";
@@ -18,8 +19,7 @@ import { isAddress, parseRecipient, sendDate, splitRecipients, type ComposeInit 
 import { queueDraft, schedulePresets, undoDelay } from "../outbox";
 import { bodyHtml, signatureMode, swapSignature } from "../lib/signature";
 import { accountById, accounts, errorText, mailbox, showToast } from "../store";
-import { isModalOpen, NavContext, show } from "../nav";
-import { wide } from "../layout";
+import { isModalOpen, NavContext } from "../nav";
 
 export function ComposePage(props: { init: ComposeInit }) {
   const nav = NavContext();
@@ -96,9 +96,8 @@ export function ComposePage(props: { init: ComposeInit }) {
     // A forward's files came back as uploads; the draft still names the originals.
     const mine = new Set(files.draft().flatMap((a) => (a.kind === "upload" ? [a.id] : [])));
     for (const f of back.files) if (!mine.has(f.id)) void Mail.unstage(f.id).catch(() => {});
-    // The sheet it came from is closed: the wide layout opens a new one, a phone pushes the page.
-    if (wide()) show({ name: "compose", init: props.init }, true);
-    else nav.stack.push({ name: "compose", init: props.init });
+    // The sheet it came from is closed: it opens again with the draft.
+    openCompose(props.init);
   };
 
   /** Sends now (no undo delay), after the undo delay (`at` null), or at `at`. */
@@ -190,7 +189,7 @@ export function ComposePage(props: { init: ComposeInit }) {
   return (
     <Page title={title()} back={t("common.close")} onBack={close} trailing={actions()} testID="compose-page">
       <View
-        class="min-h-0 flex-1 bg-system-background"
+        class="min-h-0 flex-1 bg-system-background pt-11"
         onFileDragEnter={() => dragging.set(true)}
         onFileDragLeave={() => dragging.set(false)}
         onFileDrop={(e: { uris: string[]; mimeTypes: string[] }) => {

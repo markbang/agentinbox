@@ -5,7 +5,7 @@ import { signal, Text, View } from "nsh";
 import { t } from "nsh/i18n";
 import type { Source } from "agentinbox/native";
 import { ActionSheet, AlertDialog, Button, Icon, List, ListTile, Section } from "cupertino";
-import { Page } from "../components/Page";
+import { BarSpace, Page } from "../components/Page";
 import { SourceMark } from "../components/SourceMark";
 import { NavContext } from "../nav";
 import { deleteSource, rotateSource, serverInbox, setSourceEnabled, sources, testSource } from "../notify";
@@ -44,6 +44,7 @@ export function SourcesPage() {
       testID="sources"
     >
       <List>
+        <BarSpace />
         <If
           when={serverInbox()}
           else={

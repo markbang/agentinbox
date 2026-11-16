@@ -5,8 +5,8 @@ import { effect, platform, signal, untracked, View, type JSX } from "nsh";
 import { BackHandler } from "nsh/mobile";
 import { NavStack } from "nsh/base";
 import { t } from "nsh/i18n";
-import { TabBar } from "cupertino";
-import { NavContext, selectedTab, selectTab, tabs, TAB, type Route } from "../nav";
+import { GlassButton, TabBar } from "cupertino";
+import { NavContext, openCompose, selectedTab, selectTab, tabs, TAB, type Route } from "../nav";
 import { picking } from "../store";
 import { Toasts } from "./Toasts";
 
@@ -50,20 +50,31 @@ export function TabShell(props: { page: (route: Route) => JSX.Element }) {
             </View>
           )}
         </Each>
-        <Toasts class={covered() ? "bottom-4" : "bottom-16"} />
+        <Toasts class={covered() ? "bottom-4" : "bottom-24"} />
       </View>
+      {/* Mail's compose control: a floating button of glass over the rows, above the bar. */}
+      <If when={!covered() && selectedTab() === TAB.mail && !picking()}>
+        <View class="absolute bottom-0 right-4 pb-[calc(env(safe-area-inset-bottom)+65px)]" style={{ pointerEvents: "box-none" }}>
+          <View class="h-14 w-14">
+            <GlassButton class="h-full w-full" icon="square.and.pencil" label={t("actions.compose")} onPress={() => openCompose({ mode: "new" })} testID="compose" />
+          </View>
+        </View>
+      </If>
+      {/* The bar is glass and floats: the lists end under it, as Mail's do. */}
       <If when={!covered()}>
-        <TabBar
-          items={tabs.map((tab) => ({
-            value: tab.name,
-            title: t(`tabs.${tab.name}`),
-            icon: navIcons[tab.name],
-          }))}
-          value={tabs[selectedTab()].name}
-          onChange={({ value, index }: { value: string; index: number }) => choose(index)}
-          label={t("tabs.label")}
-          testID="tab-bar"
-        />
+        <View class="absolute bottom-0 left-0 right-0">
+          <TabBar
+            items={tabs.map((tab) => ({
+              value: tab.name,
+              title: t(`tabs.${tab.name}`),
+              icon: navIcons[tab.name],
+            }))}
+            value={tabs[selectedTab()].name}
+            onChange={({ value, index }: { value: string; index: number }) => choose(index)}
+            label={t("tabs.label")}
+            testID="tab-bar"
+          />
+        </View>
       </If>
       <If when={covered() && picking()}>
         <View />

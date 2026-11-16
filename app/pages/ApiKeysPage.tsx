@@ -4,7 +4,7 @@ import { signal, Text, View } from "nsh";
 import { t } from "nsh/i18n";
 import type { ApiKey } from "agentinbox/native";
 import { ActionSheet, Button, Icon, List, ListTile, Section } from "cupertino";
-import { Page } from "../components/Page";
+import { BarSpace, Page } from "../components/Page";
 import { fullDate } from "../lib/format";
 import { NavContext } from "../nav";
 import { apiKeys, apiKeysState, keySources, loadKeys, revokeKey, serverInbox } from "../notify";
@@ -58,6 +58,7 @@ export function ApiKeysPage() {
       testID="api-keys"
     >
       <List>
+        <BarSpace />
         <Section footer={t("keys.intro")}>
           <If when={!serverInbox()}>
             <View class="gap-1 px-4 py-3" testID="keys-local">

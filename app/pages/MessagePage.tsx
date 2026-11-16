@@ -5,14 +5,14 @@ import { Button } from "cupertino";
 import { Page } from "../components/Page";
 import { Empty, Loading } from "../components/Empty";
 import { Reader } from "../components/Reader";
-import { NavContext } from "../nav";
+import { NavContext, openCompose } from "../nav";
 import { conversation, current, setFlags, shownMessage } from "../store";
 import type { ComposeMode } from "../lib/format";
 
 export function MessagePage(props: { id: string }) {
   const nav = NavContext();
   const message = () => shownMessage();
-  const compose = (mode: ComposeMode) => nav.stack.push({ name: "compose", init: { mode, source: message() } });
+  const compose = (mode: ComposeMode) => openCompose({ mode, source: message() });
   return (
     <Page
       title={message()?.subject ?? ""}

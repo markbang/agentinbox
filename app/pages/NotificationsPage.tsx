@@ -23,10 +23,15 @@ export function NotificationsPage() {
       trailing={<Button icon="ellipsis" label={t("notify.actions")} variant="plain" onPress={() => menu.set(true)} testID="notify-more" />}
       testID="notifications"
     >
-      <FeedFilters />
-      <FeedSearch />
       <View class="min-h-0 flex-1">
         <NotificationList
+          header={
+            <>
+              <FeedFilters />
+              <FeedSearch />
+            </>
+          }
+          contentClass="pt-11 pb-[calc(env(safe-area-inset-bottom)+49px)]"
           items={notifications()}
           onOpen={open}
           refreshing={feedStatus() === "refreshing" && feedRefreshFrom() === "pull"}

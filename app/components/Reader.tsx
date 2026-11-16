@@ -199,7 +199,8 @@ export function Reader(props: ReaderProps) {
   return (
     <View class="flex-1">
       <ScrollView class="flex-1" testID="reader">
-        <View class="gap-3 pb-8 pt-3" style={enter.style}>
+        {/* Under the page's floating bar on a phone: the message scrolls under the glass. */}
+        <View class={`gap-3 pb-8 ${props.phone ? "pt-11" : "pt-3"}`} style={enter.style}>
           <View class="flex-row items-start gap-2 px-4">
             <Text role="header" class="flex-1 text-title2 font-semibold text-label">
               {subject()}

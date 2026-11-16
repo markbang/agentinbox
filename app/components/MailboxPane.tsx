@@ -36,6 +36,9 @@ import {
 } from "../store";
 import type { InputRef } from "nsh";
 
+// Under the floating tab bar: its 49 pt and the gesture area below the rows.
+const TAB_ROOM = "pt-11 pb-[calc(env(safe-area-inset-bottom)+49px)]";
+
 /** The chosen mailbox's name. */
 export function mailboxTitle() {
   const box = mailbox();
@@ -71,11 +74,15 @@ export interface MailboxPaneProps {
   trailing?: JSX.Element;
   /** Opens the mailboxes (the split view without its sidebar). */
   onMailboxes?: () => void;
+  /** The page's glass bar draws the title and the Search tab the field: the list starts under the bar. */
+  floating?: boolean;
   testID?: string;
 }
 
 export function MailboxPane(props: MailboxPaneProps) {
   const searching = () => props.searchable !== false && searchActive();
+  // Under a floating bar the pane is the rows and nothing else.
+  const floating = () => !!props.floating;
   const folder = () => mailbox().folder;
   const open = (list: () => Row[]) => (key: string) => {
     const row = list().find((r) => r.key === key);
@@ -128,50 +135,7 @@ export function MailboxPane(props: MailboxPaneProps) {
   );
   return (
     <View class="h-full flex-col bg-system-background" testID={props.testID}>
-      <View class="flex-row items-center gap-1 pe-1.5 ps-3 pb-1 pt-2">
-        <If when={props.onMailboxes}>
-          <Button icon="tray" label={t("tabs.folders")} variant="plain" onPress={() => props.onMailboxes?.()} testID="open-mailboxes" />
-        </If>
-        <If
-          when={searching()}
-          else={
-            <Text role="header" class="line-clamp-1 flex-1 text-title2 font-bold text-label">
-              {mailboxTitle()}
-            </Text>
-          }
-        >
-          <Text role="header" class="line-clamp-1 flex-1 text-title2 font-bold text-label" testID="results-title">
-            {t("search.title", { query: searchQuery().trim() })}
-          </Text>
-        </If>
-        <If
-          when={listStatus() === "refreshing" && refreshingFrom() !== "pull"}
-          else={
-            <Button icon="arrow.clockwise" label={t("actions.refresh")} variant="plain" onPress={() => void refresh()} testID="refresh" />
-          }
-        >
-          <ActivityIndicator size={20} label={t("sync.running")} testID="refreshing" />
-        </If>
-        <If when={props.touchActions && !picking() && rows().length > 0}>
-          <Button title={t("actions.select")} variant="plain" onPress={() => beginPicking()} testID="select-rows" />
-        </If>
-        <Button icon="square.and.pencil" label={t("actions.compose")} variant="plain" onPress={() => props.onCompose()} testID="compose" />
-      </View>
-      <View class="px-3 pb-2">
-        <SearchField
-          value={searchQuery()}
-          onChange={({ value }: { value: string }) => typeSearch(value)}
-          onSubmit={() => void runSearch(searchQuery())}
-          placeholder={t("search.placeholder")}
-          label={t("search.label")}
-          testID="search"
-        />
-      </View>
-      <If when={searching()}>
-        <Text role="summary" class="px-4 pb-1 text-footnote tabular-nums text-secondary-label">
-          {resultCount(searchResults()?.length ?? 0)}
-        </Text>
-      </If>
+      <If when={!floating()}>{header()}</If>
       <SyncBanner />
       <View class="min-h-0 flex-1">
         <If when={searching()} else={<If when={folder() === "scheduled"} else={mailList()}><ScheduledList /></If>}>
@@ -184,6 +148,7 @@ export function MailboxPane(props: MailboxPaneProps) {
               highlight={searchQuery()}
               label={t("search.results")}
               testID="results"
+              contentClass={floating() ? TAB_ROOM : undefined}
               empty={<SearchEmpty />}
             />
           </If>
@@ -191,6 +156,57 @@ export function MailboxPane(props: MailboxPaneProps) {
       </View>
     </View>
   );
+
+  function header() {
+    return (
+      <>
+        <View class="flex-row items-center gap-1 pe-1.5 ps-3 pb-1 pt-2">
+          <If when={props.onMailboxes}>
+            <Button icon="tray" label={t("tabs.folders")} variant="plain" onPress={() => props.onMailboxes?.()} testID="open-mailboxes" />
+          </If>
+          <If
+            when={searching()}
+            else={
+              <Text role="header" class="line-clamp-1 flex-1 text-title2 font-bold text-label">
+                {mailboxTitle()}
+              </Text>
+            }
+          >
+            <Text role="header" class="line-clamp-1 flex-1 text-title2 font-bold text-label" testID="results-title">
+              {t("search.title", { query: searchQuery().trim() })}
+            </Text>
+          </If>
+          <If
+            when={listStatus() === "refreshing" && refreshingFrom() !== "pull"}
+            else={
+              <Button icon="arrow.clockwise" label={t("actions.refresh")} variant="plain" onPress={() => void refresh()} testID="refresh" />
+            }
+          >
+            <ActivityIndicator size={20} label={t("sync.running")} testID="refreshing" />
+          </If>
+          <If when={props.touchActions && !picking() && rows().length > 0}>
+            <Button title={t("actions.select")} variant="plain" onPress={() => beginPicking()} testID="select-rows" />
+          </If>
+          <Button icon="square.and.pencil" label={t("actions.compose")} variant="plain" onPress={() => props.onCompose()} testID="compose" />
+        </View>
+        <View class="px-3 pb-2">
+          <SearchField
+            value={searchQuery()}
+            onChange={({ value }: { value: string }) => typeSearch(value)}
+            onSubmit={() => void runSearch(searchQuery())}
+            placeholder={t("search.placeholder")}
+            label={t("search.label")}
+            testID="search"
+          />
+        </View>
+        <If when={searching()}>
+          <Text role="summary" class="px-4 pb-1 text-footnote tabular-nums text-secondary-label">
+            {resultCount(searchResults()?.length ?? 0)}
+          </Text>
+        </If>
+      </>
+    );
+  }
 
   function mailList() {
     return (
@@ -206,6 +222,7 @@ export function MailboxPane(props: MailboxPaneProps) {
         showRecipients={mailbox().folder === "sent" || mailbox().folder === "drafts"}
         label={t("list.conversations")}
         testID="messages"
+        contentClass={floating() ? TAB_ROOM : undefined}
         onArchive={props.touchActions && folder() !== "archive" && folder() !== "trash" ? move("archive") : undefined}
         onDelete={props.touchActions && folder() !== "trash" ? move("trash") : undefined}
         picked={isPicked}

@@ -31,6 +31,10 @@ export interface MessageListProps {
   /** What screen readers call the list (its rows name themselves). */
   label?: string;
   testID?: string;
+  /** Content that scrolls above the rows (a large title). */
+  header?: JSX.Element;
+  /** Room around the rows: what a floating bar needs (`pt-11`), on top of the standing padding. */
+  contentClass?: string;
   /** Swipe actions (touch screens). */
   onArchive?: (id: string) => void;
   onDelete?: (id: string) => void;
@@ -66,7 +70,8 @@ export function MessageList(props: MessageListProps) {
         testID={props.testID}
         empty={props.empty}
         class="flex-1"
-        contentClass="pb-[env(safe-area-inset-bottom)]"
+        header={props.header}
+        contentClass={props.contentClass ?? "pb-[env(safe-area-inset-bottom)]"}
       >
         {(m) => (
           <If

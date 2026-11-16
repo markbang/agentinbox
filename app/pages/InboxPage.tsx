@@ -1,13 +1,15 @@
 // The Mail tab's first page: the chosen mailbox, its rows swiped and
-// long-pressed as iOS Mail does, and the selection's actions in the bar.
+// long-pressed as iOS Mail does, and the selection's actions in the bar. The
+// bar is glass over the rows, and the compose button is a floating control of
+// glass at the foot, as Mail draws it.
 import { platform, Text, View } from "nsh";
 import { BackHandler } from "nsh/mobile";
 import { t } from "nsh/i18n";
-import { Button } from "cupertino";
+import { ActivityIndicator, Button } from "cupertino";
 import { Page } from "../components/Page";
-import { MailboxPane } from "../components/MailboxPane";
-import { NavContext, selectTab, TAB } from "../nav";
-import { clearPicked, mailbox, moveMessages, openRow, pickedIds, picking, refresh, rows, setFlags, setThreadFlags, type Row } from "../store";
+import { MailboxPane, mailboxTitle } from "../components/MailboxPane";
+import { NavContext, openCompose, selectTab, TAB } from "../nav";
+import { beginPicking, clearPicked, listStatus, mailbox, moveMessages, openRow, pickedIds, picking, refresh, refreshingFrom, rows, setFlags, setThreadFlags, type Row } from "../store";
 
 export function InboxPage() {
   const nav = NavContext();
@@ -38,17 +40,11 @@ export function InboxPage() {
     for (const r of picked()) void (r.thread ? setThreadFlags(r.key, { seen: unread }) : setFlags(r.key, { seen: unread }));
     clearPicked();
   };
-  const selectionBar = () => (
-    <View class="flex-row items-center gap-1 border-b border-separator bg-secondary-system-background px-2 py-1">
-      <Button title={t("common.cancel")} variant="plain" size="small" onPress={clearPicked} testID="end-selection" />
-      <Text
-        role="header"
-        accessibilityLabel={t("actions.selected", { count: pickedIds().length })}
-        class="flex-1 text-center text-subheadline font-semibold text-label"
-        testID="selection-count"
-      >
-        {t("actions.selected", { count: pickedIds().length })}
-      </Text>
+  const compose = () => openCompose({ mode: "new" });
+  // The selection's actions are the bar's: glass over the rows, as Mail has them.
+  const selectionActions = () => (
+    <>
+      <Button title={t("common.cancel")} variant="plain" onPress={clearPicked} testID="end-selection" />
       <If when={mailbox().folder !== "archive" && mailbox().folder !== "trash"}>
         <Button icon="archivebox" label={t("actions.archive")} variant="plain" onPress={() => move("archive")} testID="picked-archive" />
       </If>
@@ -62,23 +58,36 @@ export function InboxPage() {
         onPress={mark}
         testID="picked-seen"
       />
-    </View>
+    </>
+  );
+  const barActions = () => (
+    <>
+      <If
+        when={listStatus() === "refreshing" && refreshingFrom() !== "pull"}
+        else={<Button icon="arrow.clockwise" label={t("actions.refresh")} variant="plain" onPress={() => void refresh()} testID="refresh" />}
+      >
+        <ActivityIndicator size={20} label={t("sync.running")} testID="refreshing" />
+      </If>
+      <If when={rows().length > 0}>
+        <Button title={t("actions.select")} variant="plain" onPress={() => beginPicking()} testID="select-rows" />
+      </If>
+    </>
   );
   return (
     <Page
-      title={picking() ? t("actions.selected", { count: pickedIds().length }) : undefined}
+      title={picking() ? t("actions.selected", { count: pickedIds().length }) : mailboxTitle()}
+      titleTestID={picking() ? "selection-count" : undefined}
+      trailing={picking() ? selectionActions() : barActions()}
       testID="inbox"
     >
-      <If when={picking()}>
-        {selectionBar()}
-      </If>
       <View class="min-h-0 flex-1">
         <MailboxPane
           onOpen={open}
           onAddAccount={() => nav.stack.push({ name: "addAccount" })}
-          onCompose={() => nav.stack.push({ name: "compose", init: { mode: "new" } })}
+          onCompose={compose}
           searchable={false}
           touchActions
+          floating
         />
       </View>
     </Page>

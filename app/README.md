@@ -43,12 +43,18 @@ nsh test                    # cargo test, then App.test.tsx headless
                             # (java -Dgreenmail.setup.test.all -Dgreenmail.auth.disabled -jar greenmail-standalone.jar)
 nsh run                     # this machine; --target web needs wasm32-unknown-unknown, clang and llvm-ar
 nsh package --target web    # needs wasm-bindgen-cli of the version Cargo.toml pins
+node ../vendor/nsh-cupertino/tools/patch-runtime.mjs .nsh/out/AgentInbox  # Liquid Glass on WebGL 2: see below
 cp web/sw.js .nsh/out/AgentInbox/  # nsh ships no extra files; the server serves it as /sw.js
 nsh package --target android --abi arm64-v8a  # preview APK; releases are the AAB (--format aab), see android/README.md
 GREENMAIL_JAR=… .e2e/run.sh # cloud mode end to end; or with GreenMail already on 3993 / 3465
 ```
 
 Run `nsh package` from this directory: release builds take their size profile from `.cargo/config.toml` (z, fat LTO).
+
+**The web build needs one patch.** Liquid Glass is a GPU shader, and NSH 0.5's web runtime binds only one stage's
+uniform block, so a shader draws nothing in a browser until `vendor/nsh-cupertino/tools/patch-runtime.mjs` rewrites
+the built site's runtime (it exits 1 if the runtime it patches is gone: then NSH has fixed it and the call goes).
+CI runs it right after `nsh package --target web`. Native builds need nothing.
 
 The web client is meant to be served by its server (`AGENTINBOX_WEB_DIR`; the old `NSHMAIL_WEB_DIR`
 still works), so it signs in to the page's own origin by
