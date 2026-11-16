@@ -19,16 +19,40 @@ One look everywhere; only the shell changes with the window.
 | --- | --- |
 | 1080 pt and up | **Split view**, as Mail on an iPad: the sidebar (286 pt: notifications, mailboxes, folders, sync status), the list column (380 pt: the mailbox's rows or the feed, with the search field) and the reader (the rest). Columns are separated by hairlines on `system-grouped-background`. |
 | 840–1080 pt | Split view without the sidebar: the list column and the reader; the mailboxes open in a large sheet from the tray button in the list's bar. |
-| Below 840 pt (phones and narrow windows) | **Tab bar** (Mail, Notifications, Search, Mailboxes, Settings) over a navigation stack per tab. Pages push from the right with a back button, cover the bar, and keep the reader's toolbar at the foot. |
+| Below 840 pt (phones and narrow windows) | **Tab bar** (Mail, Notifications, Search, Mailboxes, Settings) over a navigation stack per tab. Pages push from the right with a back button, cover the bar, and keep the reader's toolbar at the foot. The bar floats over the lists, and the Mail tab carries a floating compose button above it. |
 
 Pages that are tasks rather than places — compose, settings, adding an account,
 sources, keys, rules, shortcuts — open as a **sheet** with a stack of their own:
-Done at the root, back inside. On a phone they push instead.
+Done at the root, back inside. Compose is a sheet on every shell, as Mail has it;
+the other tasks push on a phone's tab.
 
 Android keeps the platform's back gesture and hardware button: the app registers
 no back handler, so a page never swallows them; the tabs' Mail tab is the first
-stop. Nothing Material remains: no ripples, no M3 shapes, no floating action
-button.
+stop. Nothing Material remains: no ripples, no M3 shapes.
+
+## Liquid Glass
+
+The material of the floating layer, from `nsh-cupertino`'s `Glass` (a GPU
+shader: it reads the backdrop, bends it through the surface's rounded-rect
+height field, blurs and tints it, and adds a specular rim). Its rules:
+
+- **Where it may be used**: the navigation bar (`material="regular"`), the tab
+  bar (the library's default), sheets, action sheets, alerts, the search field
+  where it floats (`glass`), and floating controls (`GlassButton`). Bars are
+  `regular`, sheets and alerts `thick`.
+- **Where it may not**: never on content. A list row, a message body, a form, the
+  reader's white card and the page backgrounds stay solid — the HIG's rule, and
+  what keeps text legible.
+- **Content scrolls under it**: a page's content carries the room at the top
+  (`pt-11`, or the list's `contentClass`) so the first row sits below the bar and
+  later rows pass behind it; the floating tab bar's 49 pt and the gesture area
+  are the lists' bottom room (`pb-[calc(env(safe-area-inset-bottom)+49px)]`).
+  Nothing is drawn *on* glass that is not a bar, a sheet or a control.
+- **Fallbacks are the library's**: without a GPU the material's fill and backdrop
+  blur draw instead; Increased Contrast makes the fills near opaque; Reduce
+  Motion drops the press springs and the squash. The app adds no path of its own.
+- **The web needs the runtime patch** (`vendor/nsh-cupertino/tools/patch-runtime.mjs`)
+  until NSH binds both stages' shader blocks; CI runs it after `nsh package --target web`.
 
 ## The list
 
@@ -83,8 +107,10 @@ The library's, unmodified, generated from its `src/tokens.rs` into
 - **Motion**: the library's springs and durations (push 500 ms 0.86/300, sheet
   0.8/400, pressed opacity 0.4, quick 150, base 300); reduce motion is honoured by
   the library.
-- **Materials**: `regular` for the tab bar and the toasts, `chrome` for the
-  reader's toolbar.
+- **Materials**: `regular` for the navigation bar, the tab bar and the toasts,
+  `thick` for sheets and alerts, `chrome` for the reader's toolbar; the glass
+  fills (`glass-regular`, `glass-clear`, `glass-thick`) follow the appearance
+  and Increased Contrast.
 
 ## The app's own parts
 

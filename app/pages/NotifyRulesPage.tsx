@@ -5,7 +5,7 @@ import { Text, View } from "nsh";
 import { t } from "nsh/i18n";
 import { ActionSheet, Icon, List, ListTile, Section } from "cupertino";
 import { signal } from "nsh";
-import { Page } from "../components/Page";
+import { BarSpace, Page } from "../components/Page";
 import { SourceMark } from "../components/SourceMark";
 import { NavContext } from "../nav";
 import { band, rulesOf, setRule, sources, type Band, type NotifyMode } from "../notify";
@@ -23,6 +23,7 @@ export function NotifyRulesPage() {
   return (
     <Page title={t("rules.title")} back={t("common.back")} onBack={nav.close} testID="notify-rules">
       <List>
+        <BarSpace />
         <Section footer={t("rules.intro")}>
           <Each of={sources()} key={(s) => s.id}>
             {(source) => (

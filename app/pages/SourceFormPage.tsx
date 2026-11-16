@@ -4,7 +4,7 @@ import { signal, Text, View } from "nsh";
 import { t } from "nsh/i18n";
 import type { SourceKind } from "agentinbox/native";
 import { ActionSheet, Button, List, ListTile, Section } from "cupertino";
-import { Page } from "../components/Page";
+import { BarSpace, Page } from "../components/Page";
 import { FieldRow, FormNote } from "../components/Fields";
 import { kindIcon, sourceColours } from "../components/SourceMark";
 import { NavContext } from "../nav";
@@ -55,6 +55,7 @@ export function SourceFormPage(props: { kind: SourceKind }) {
   return (
     <Page title={t("sources.new")} back={t("common.back")} onBack={nav.close} testID="source-form">
       <List>
+        <BarSpace />
         <Section footer={t(`source.hint.${props.kind}`)}>
           <FieldRow label={t("sources.name")} value={name()} onChange={name.set} autoFocus testID="source-name" />
           <Text class="px-4 pb-1 text-footnote text-secondary-label">{t("sources.nameHint")}</Text>

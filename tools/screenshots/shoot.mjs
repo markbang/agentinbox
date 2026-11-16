@@ -133,6 +133,10 @@ for (const theme of ["light", "dark"]) {
   await field("compose-body").press("Control+Home");
   await page.keyboard.type("Hi Maya,\n\nSounds good, 12:15 works. I'll bring the dark mode mockups so we can go through contrast before Thursday.\n\nLin");
   await shot("compose", theme);
+  // The draft would come back in the other appearance's shot: discard it.
+  await press("compose-discard");
+  await page.getByText("Discard").last().click();
+  await id("modal").waitFor({ state: "detached", timeout: 20_000 }).catch(() => {});
 
   await home();
   await field("search").fill("Tokyo");
@@ -244,6 +248,34 @@ for (const theme of ["light", "dark"]) {
   }
   log("narrow reader scrolls sideways by", overflow, "px");
   if (overflow === null || overflow > 0) throw new Error(`the booking mail at 412px: sideways overflow ${overflow}`);
+
+  // The glass: rows under the bar at the top and the tab bar at the foot, and compose as a sheet.
+  await page.goto(origin + "/");
+  for (const text of synced) await page.getByText(text).first().waitFor({ timeout: 90_000 });
+  await page.mouse.move(206, 500);
+  await page.mouse.wheel(0, 700);
+  await shot("narrow-inbox-scrolled", theme);
+  await press("compose");
+  await field("compose-to").waitFor();
+  await shot("narrow-compose", theme);
+  await page.keyboard.press("Escape");
+  await field("compose-to").waitFor({ state: "detached", timeout: 15_000 }).catch(() => {});
+  // Settings: the large title under the bar, then scrolled away under it.
+  await page.getByText("Settings", { exact: true }).last().click();
+  await id("signed-in-as").waitFor({ timeout: 30_000 });
+  await shot("narrow-settings", theme);
+  await page.mouse.move(206, 500);
+  await page.mouse.wheel(0, 900);
+  await shot("narrow-settings-scrolled", theme);
+  // Search on its own tab: the glass field over the results, and the feed's filters.
+  await page.getByText("Search", { exact: true }).last().click();
+  await field("search").fill("Tokyo");
+  await field("search").press("Enter");
+  await id("results").waitFor({ timeout: 30_000 });
+  await shot("narrow-search", theme);
+  await page.getByText("Notifications", { exact: true }).last().click();
+  await id("notify-list").waitFor({ timeout: 30_000 }).catch(() => {});
+  await shot("narrow-notifications", theme);
 }
 // Empty and failure states, at 1440 again: a folder with nothing in it, a search that finds nothing.
 await page.setViewportSize({ width: 1440, height: 900 });

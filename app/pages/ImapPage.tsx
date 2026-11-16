@@ -4,7 +4,7 @@ import { openUrl, signal, Text, View } from "nsh";
 import { t } from "nsh/i18n";
 import { Mail, type Endpoint, type Security, type ServerSettings } from "agentinbox/native";
 import { ActionSheet, Button, Icon, List, ListTile, Section } from "cupertino";
-import { Page } from "../components/Page";
+import { BarSpace, Page } from "../components/Page";
 import { FieldRow } from "../components/Fields";
 import { NavContext } from "../nav";
 import { isAddress, providerName } from "../lib/format";
@@ -88,6 +88,7 @@ export function ImapPage() {
   return (
     <Page title={t("accounts.other")} back={t("common.back")} onBack={nav.close} testID="imap">
       <List>
+        <BarSpace />
         <Section footer={t("imap.nameHint")}>
           <FieldRow label={t("imap.email")} value={email()} onChange={(v) => (email.set(v), step.set("address"))} placeholder="you@example.com" keyboard="email" returnKey="next" onSubmit={() => void detect()} autoFocus testID="imap-email" />
           <FieldRow label={t("imap.name")} value={name()} onChange={(v) => name.set(v)} testID="imap-name" />

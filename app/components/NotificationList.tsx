@@ -47,6 +47,10 @@ export function NotificationList(props: {
   onLoadMore?: () => void;
   empty: JSX.Element;
   testID?: string;
+  /** Content that scrolls above the rows (the feed's filters and field). */
+  header?: JSX.Element;
+  /** Room around the rows: what a floating bar needs (`pt-11`), on top of the standing padding. */
+  contentClass?: string;
 }) {
   const oneLine = () => !wide();
   // The pull indicator follows this; the platform's own spinner stays off.
@@ -77,7 +81,8 @@ export function NotificationList(props: {
         testID={props.testID}
         empty={props.empty}
         class="flex-1"
-        contentClass="pb-[env(safe-area-inset-bottom)]"
+        header={props.header}
+        contentClass={props.contentClass ?? "pb-[env(safe-area-inset-bottom)]"}
       >
         {(row) => (
           <If

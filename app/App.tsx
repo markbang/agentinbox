@@ -10,7 +10,7 @@ import { TabShell } from "./components/TabShell";
 import { ShortcutsDialog } from "./components/ShortcutsDialog";
 import { Workspace } from "./components/Workspace";
 import { wide } from "./layout";
-import { closeModal, isModalOpen, modalNavigator, modalStack, NavContext, phoneStack, selectTab, show, tabs, TAB, type Route } from "./nav";
+import { closeModal, isModalOpen, modalNavigator, modalStack, NavContext, openCompose, phoneStack, selectTab, show, tabs, TAB, type Route } from "./nav";
 import { AddAccountPage } from "./pages/AddAccountPage";
 import { AddSourcePage } from "./pages/AddSourcePage";
 import { ApiKeysPage } from "./pages/ApiKeysPage";
@@ -98,7 +98,7 @@ function Main() {
   const compose = (mode: ComposeMode) => {
     const source = mode === "new" ? undefined : current();
     if (mode !== "new" && !source) return;
-    show({ name: "compose", init: { mode, source } }, wide());
+    openCompose({ mode, source });
   };
   const openFromNotification = (id: string) => {
     showMail();
@@ -138,19 +138,21 @@ function Main() {
   );
 
   return (
-    <If
-      when={wide()}
-      else={<TabShell page={page} />}
-    >
-      <Workspace
-        onCompose={compose}
-        onSettings={() => show({ name: "settings" }, true)}
-        onAddAccount={() => show({ name: "addAccount" }, true)}
-        onAddSource={() => show({ name: "addSource" }, true)}
-        onSources={() => show({ name: "sources" }, true)}
-        searchRef={(ref) => (search = ref)}
-      />
-      {/* The wide layout opens pages in a sheet with a stack of its own. */}
+    <View class="flex-1">
+      <If
+        when={wide()}
+        else={<TabShell page={page} />}
+      >
+        <Workspace
+          onCompose={compose}
+          onSettings={() => show({ name: "settings" }, true)}
+          onAddAccount={() => show({ name: "addAccount" }, true)}
+          onAddSource={() => show({ name: "addSource" }, true)}
+          onSources={() => show({ name: "sources" }, true)}
+          searchRef={(ref) => (search = ref)}
+        />
+      </If>
+      {/* A sheet with a stack of its own: every shell opens compose and the wide layout's pages in it. */}
       <Sheet open={isModalOpen()} detent="large" scroll={false} testID="modal" onOpenChange={({ open }: { open: boolean }) => (open ? undefined : closeModal())}>
         <NavContext.Provider value={modalNavigator}>
           <View class="min-h-0 flex-1" onLayout={({ bounds }) => sheetWidth.set(bounds.size.width)}>
@@ -161,7 +163,7 @@ function Main() {
           </View>
         </NavContext.Provider>
       </Sheet>
-    </If>
+    </View>
   );
 }
 

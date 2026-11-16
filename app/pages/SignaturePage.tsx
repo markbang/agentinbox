@@ -5,7 +5,7 @@ import { Input } from "nsh/base";
 import { TextView } from "nsh/base";
 import { t } from "nsh/i18n";
 import { Button, List, ListTile, Section, Switch } from "cupertino";
-import { Page } from "../components/Page";
+import { BarSpace, Page } from "../components/Page";
 import { NavContext } from "../nav";
 import { renderSignature } from "../lib/signature";
 import { accountById, errorText, setSignature, showToast } from "../store";
@@ -37,6 +37,7 @@ export function SignaturePage(props: { accountId: string }) {
   return (
     <Page title={t("signature.title")} back={t("common.back")} onBack={nav.close} testID="signature">
       <List>
+        <BarSpace />
         <Section header={account()?.email ?? undefined} footer={t("signature.hint")}>
           <View class="px-4 py-3">
             <Input

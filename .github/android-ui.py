@@ -370,6 +370,18 @@ def scroll_up_to(key, tries=4, timeout=3):
     return find(key, timeout) is not None
 
 
+def close_compose(tries=3):
+    """Compose is a sheet over the inbox now, so id:messages is behind it and says nothing about it:
+    back until the composer's own page is gone."""
+    for _ in range(tries):
+        if find("id:compose-page", 2) is None:
+            return True
+        back()
+        quiet(2)
+    print("the composer stayed open", flush=True)
+    return find("id:compose-page", 2) is None
+
+
 def back_to(key, tries=3, timeout=6):
     """Back until `key` shows: a page's keyboard takes the first Back, the page the next."""
     for _ in range(tries):
@@ -450,30 +462,6 @@ def first_row():
     return None
 
 
-def swipe_archive(row, tries=3):
-    """Swipes the first row away until it is archived: True once the Undo snackbar shows."""
-    for attempt in range(1, tries + 1):
-        x1, y1, x2, y2 = row
-        y = (y1 + y2) // 2
-        before = first_row()
-        # Slow enough that the distance alone (past the 35% mark) archives, whatever the measured velocity.
-        adb("shell", "input", "swipe", str((x1 + x2) // 2 - (x2 - x1) // 4), str(y), str(x2 - 60), str(y), "400")
-        end = time.time() + 6
-        while time.time() < end:
-            found = nodes()
-            if any(n.get("resource-id") == "toast-action" for n in found):
-                return True
-            rows = [n.get("resource-id") for n in found if n.get("resource-id", "").startswith("message-")]
-            if before and rows and before not in rows:
-                fail(f"archived {before}, but no Undo snackbar")
-                return False
-            time.sleep(0.5)
-        print(f"swipe {attempt} did not archive, retrying", flush=True)
-        row = settled("id:message-.*") or row
-    fail(f"{tries} swipes never archived the first row")
-    return False
-
-
 booted()
 # A phone's own screen: 1440 x 3120 at density 3.0 (the profile's is 1080 x 2400 at 2.625), as the
 # phones this ships to draw it.
@@ -507,13 +495,24 @@ for mode in ("light", "dark"):
         y = (y1 + y2) // 2
         mid = (x1 + x2) // 2
         quarter = (x2 - x1) // 4
-        during(["swipe", str(mid - quarter), str(y), str(mid), str(y), "1500"], f"{mode}-swipe-archive", 1.0)
-        settled("id:message-.*")
-        if swipe_archive(row):
-            screenshot(f"{mode}-archived-snackbar")  # the snackbar lives seconds: no waiting for it
+        # A full swipe needs the content to travel past 66 % of the row's width (cupertino's swipe.rs):
+        # a drag of about 2/3 of the screen, started and ended clear of the system's back-gesture edges.
+        undo = None
+        for start, end, ms in ((120, x2 - 100, "800"), (70, x2 - 70, "1000"), (70, x2 - 70, "1600")):
+            adb("shell", "input", "swipe", str(x1 + start), str(y), str(end), str(y), ms)
+            undo = find("id:toast-action", 6)
+            if undo is not None:
+                break
+            print(f"the swipe {start}->{end} over {ms} ms revealed without archiving", flush=True)
+        if undo is not None:
+            # The snackbar lives seconds: the tap goes straight after the shot, at the node's own bounds.
+            screenshot(f"{mode}-archived-snackbar")
             print("shot", f"{mode}-archived-snackbar", flush=True)
-            if tap("id:toast-action", 5):
-                gone("id:toast-action")  # Undo: the row is back once its snackbar has gone
+            adb("shell", "input", "tap", *map(str, centre(undo)))
+            gone("id:toast-action", 6)  # Undo: the row is back once its snackbar has gone
+        else:
+            fail("the swipe did not archive the first row")
+        # The swipe in flight, for the action row it reveals; Delete is not fired.
         during(["swipe", str(mid + quarter), str(y), str(mid), str(y), "1500"], f"{mode}-swipe-delete", 1.0)
         gone("id:toast-action")  # the deletion's Undo leaves before the next gesture
 
@@ -533,6 +532,7 @@ for mode in ("light", "dark"):
     tap("id:message-.*")
     wait("id:reader")
     shot(f"{mode}-reader")
+    during(["swipe", str(w // 2), str(h * 8 // 10), str(w // 2), str(h * 5 // 10), "1200"], f"{mode}-reader-mid-scroll", 0.6)
     adb("shell", "input", "swipe", str(w // 2), str(h * 7 // 10), str(w // 2), str(h * 3 // 10), "400")
     shot(f"{mode}-reader-scrolled")
     if tap("id:message-more"):
@@ -577,10 +577,13 @@ for mode in ("light", "dark"):
         # Whatever the schedule step left open (a sheet, the composer itself), the inbox comes back
         # before the next screen: a stray focus would take the keystrokes meant for search.
         if not scheduled or find("id:compose-to", 3) is not None:
+            close_compose()
             back_to("id:messages")
     wait("id:messages")
 
-    # Scroll the inbox, switch tabs and back: the inbox keeps its place.
+    # The inbox scrolled: rows under the glass bar at the top and the glass tab bar at the foot,
+    # a frame taken while the finger is still dragging, and one once it settled.
+    during(["swipe", str(w // 2), str(h * 8 // 10), str(w // 2), str(h * 5 // 10), "1200"], f"{mode}-inbox-mid-scroll", 0.6)
     adb("shell", "input", "swipe", str(w // 2), str(h * 7 // 10), str(w // 2), str(h * 3 // 10), "300")
     shot(f"{mode}-inbox-scrolled")
 
@@ -637,6 +640,9 @@ for mode in ("light", "dark"):
     if tab("Notifications"):
         find("Search notifications", 20)
         shot(f"{mode}-notifications")
+        during(["swipe", str(w // 2), str(h * 8 // 10), str(w // 2), str(h * 5 // 10), "1200"], f"{mode}-notifications-mid-scroll", 0.6)
+        adb("shell", "input", "swipe", str(w // 2), str(h * 7 // 10), str(w // 2), str(h * 3 // 10), "300")
+        shot(f"{mode}-notifications-scrolled")
         if tap("id:notify-more"):
             find("Sources", 10)  # its menu, before it is screenshotted
             shot(f"{mode}-notifications-menu")
@@ -661,6 +667,12 @@ for mode in ("light", "dark"):
     if tab("Settings"):
         find("Accounts", 10)
         shot(f"{mode}-settings")
+        # The large title scrolls away under the bar; the rows continue under it.
+        during(["swipe", str(w // 2), str(h * 8 // 10), str(w // 2), str(h * 5 // 10), "1200"], f"{mode}-settings-mid-scroll", 0.6)
+        adb("shell", "input", "swipe", str(w // 2), str(h * 7 // 10), str(w // 2), str(h * 3 // 10), "300")
+        shot(f"{mode}-settings-scrolled")
+        # The shots scrolled the list: the account row the next steps use is back at the top.
+        scroll_up_to("Accounts")
         # The first account's signature, then a new message that carries it.
         if tap("id:account-more-0", 10) and tap("Signature…") and tap("id:signature-text"):
             adb("shell", "input", "text", "'**Lin%sChen**'")
@@ -699,8 +711,8 @@ for mode in ("light", "dark"):
         if tap("id:compose"):
             wait("id:compose-to")
             shot(f"{mode}-compose-signature")
-            back()
-            back()
+            back()  # the keyboard, when the field took the focus
+            close_compose()
             wait("id:messages")
 
     # The appearance changes while the app runs: a colour change, so this waits on the pixels.

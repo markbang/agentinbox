@@ -8,15 +8,14 @@ import { Mail, type Outgoing } from "agentinbox/native";
 import { Empty, Loading } from "./Empty";
 import { AccountMark } from "./Marks";
 import { displayName, sendDate } from "../lib/format";
-import { wide } from "../layout";
-import { show } from "../nav";
+import { openCompose } from "../nav";
 import { cancelScheduled, loadOutbox, outboxLoaded, waiting } from "../outbox";
 import { accountIndex, errorText, mailbox, mailStatus, showToast } from "../store";
 
 async function edit(o: Outgoing) {
   try {
     const back = await Mail.cancel(o.id);
-    show({ name: "compose", init: { mode: "edit", outgoing: back } }, wide());
+    openCompose({ mode: "edit", outgoing: back });
   } catch (e) {
     showToast(errorText(e), "error");
     void loadOutbox();
