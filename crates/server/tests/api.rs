@@ -318,6 +318,29 @@ async fn auth_accounts_and_messages() {
         .unwrap();
     assert_eq!(hits.as_array().unwrap().len(), 1);
 
+    // Both messages come from bob: one a page, the next page continuing after the first.
+    let first: Vec<Value> = s
+        .get(&alice.token, "/search?q=bob&limit=1")
+        .await
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(first.len(), 1);
+    let second: Vec<Value> = s
+        .get(
+            &alice.token,
+            &format!(
+                "/search?q=bob&limit=1&before={}",
+                first[0]["id"].as_str().unwrap()
+            ),
+        )
+        .await
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(second.len(), 1);
+    assert_ne!(second[0]["id"], first[0]["id"]);
+
     assert_eq!(
         s.get(&bob.token, &format!("/messages/{lunch_id}"))
             .await

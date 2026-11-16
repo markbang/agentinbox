@@ -117,7 +117,7 @@ TSX ──Mail.*──▶ Rust LocalBackend ──tokio/rustls──▶ IMAP (99
 4. 增量：新信取本地已有最大 UID 之上的（`UID FETCH n:*`，RFC 4549 §4.3.1），`UIDNEXT` 只用来判断有没有新信，不当水位线（服务器可能先分配 UID、后让信可见）；支持 `CONDSTORE` 时用 `HIGHESTMODSEQ` 同步标记；UIDVALIDITY 变了就重建该文件夹。
 5. 实时：INBOX 上 `IDLE`，收到 `EXISTS`/`EXPUNGE`/`FETCH`（别的客户端改了标记）就同步 INBOX；每 30 秒重发一次 IDLE，因为有的服务器（如 GreenMail）把别处的标记改动攒到 IDLE 结束才发；每 29 分钟全量同步。不支持 IDLE 的服务器每 2 分钟轮询。命令连接每账户一条、复用；复用的连接已被服务器关掉（空闲超时）时，在新连接上重试一次，其他错误不重试。连接或同步出错时记日志（带账户 id），按 5 秒到 5 分钟退避重连并全量同步。新信写库后发 `newMail` 事件，并在应用不在前台时发系统通知。
 6. 发送：lettre 经 SMTP 发出，成功后 `APPEND` 到"已发送"（Gmail 自动保存的除外）。
-7. 搜索：本地 FTS5（主题、发件人、收件人、正文）；本地没有的旧信，后续版本再补 IMAP `SEARCH`。结果仍按单封邮件列出，打开时进入它所在的会话。
+7. 搜索：本地 FTS5（主题、发件人、收件人、正文）；本地没有的旧信，后续版本再补 IMAP `SEARCH`。每个词按前缀匹配（`fest` 能找到 `festival`），双引号里的一串词按整句匹配，重音会折叠（`cafe` 能找到 `café`）；CJK 按单字建索引，所以任意子串都能找到（`烧肉` 能找到 `红烧肉`）。最新的 50 条在前，`before=<上一页最后一条 id>` 接着取下一页。`message_dates`（pk → user_id、date）让每个命中先按日期排序而不必读邮件正文行，只有当前页的行才去关联文件夹和账号；5 万封的邮箱里，命中几千封的词约 1–3 ms，命中全部约 10 ms（`cargo test -p mail-core --release --lib -- --ignored --nocapture bench_search_50k` 打印表格）。结果仍按单封邮件列出，打开时进入它所在的会话。
 
 桌面端主窗口关闭后留在托盘，IDLE 继续，系统通知照常。Android 本地模式只在应用打开时同步（没有后台服务），需要后台推送请用云端模式，设置页写明。
 
@@ -195,7 +195,7 @@ GET  /v1/threads?folder=&account=&before=&limit=          GET /v1/threads/{id}�
 PATCH /v1/threads/{id}  {seen?, flagged?}   POST /v1/threads/{id}/move  {folder: "archive"|"trash"}
 POST /v1/send            Draft → 204；带 {delay}（秒）或 {sendAt}（毫秒）→ 202 Outgoing，放进发件箱
 GET  /v1/outbox          DELETE /v1/outbox/{id} → Outgoing（在发出前取消；附件重新成为 upload）
-GET  /v1/search?q=&limit=      GET /v1/unread → {accountId: 未读数}
+GET  /v1/search?q=&limit=&before=   （before：上一页最后一条消息的 id）   GET /v1/unread → {accountId: 未读数}
 POST /v1/uploads         {filename, mimeType, size} → Upload {id, filename, mimeType, size}
 PATCH /v1/uploads/{id}?offset=   分块原始字节（≤ 4 MiB）→ {received}      DELETE /v1/uploads/{id}
 POST /v1/devices         {kind: "fcm"|"webpush", token | subscription, vapidKey?}  DELETE /v1/devices/{id}

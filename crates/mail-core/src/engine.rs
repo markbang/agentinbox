@@ -736,6 +736,19 @@ impl Engine {
         self.store().run(move |s| s.search(&text, limit)).await
     }
 
+    /// The next page of a search, after the message `before`.
+    pub async fn search_from(
+        &self,
+        text: &str,
+        limit: u32,
+        before: Option<&str>,
+    ) -> Result<Vec<Summary>> {
+        let (text, before) = (text.to_string(), before.map(str::to_string));
+        self.store()
+            .run(move |s| s.search_from(&text, limit, before.as_deref()))
+            .await
+    }
+
     /// The full message; the body is downloaded on first open and cached.
     pub async fn get(&self, id: &str) -> Result<Message> {
         let (mut stored, raw) = self.body(id).await?;

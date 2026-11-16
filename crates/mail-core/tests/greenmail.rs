@@ -86,7 +86,7 @@ async fn sync_send_search_flags_and_pagination() {
             &bob,
             &alice_email,
             &format!("hello {i}"),
-            &format!("body {i} 季度发票"),
+            &format!("body {i} 季度发票 café"),
         );
         if i == 0 {
             d.html = Some(
@@ -132,13 +132,53 @@ async fn sync_send_search_flags_and_pagination() {
     );
     assert_eq!(page2[0].from.as_ref().unwrap().email, bob_email);
 
-    let hits = engine.search("发票", 50).await.unwrap();
-    assert_eq!(hits.iter().filter(|h| h.account_id == alice.id).count(), 3);
+    let delivered = engine.search("发票", 50).await.unwrap();
+    assert_eq!(
+        delivered
+            .iter()
+            .filter(|h| h.account_id == alice.id)
+            .count(),
+        3
+    );
+    assert!(engine.search("烧肉", 50).await.unwrap().is_empty());
+    let substrings = engine.search("季度", 50).await.unwrap();
+    assert_eq!(
+        substrings.len(),
+        delivered.len(),
+        "a CJK substring of every hit"
+    );
     let hits = engine.search("hello 1", 50).await.unwrap();
     assert!(
         hits.iter()
             .any(|h| h.account_id == alice.id && h.subject == "hello 1")
     );
+    let alice_hits = |hits: Vec<mail_core::types::Summary>| {
+        hits.iter().filter(|h| h.account_id == alice.id).count()
+    };
+    let prefix = engine.search("hell", 50).await.unwrap();
+    assert_eq!(alice_hits(prefix), 3, "a prefix of every subject");
+    let accented = engine.search("cafe", 50).await.unwrap();
+    assert_eq!(alice_hits(accented), 3, "accents fold");
+    let phrase = engine.search("\"hello 1\"", 50).await.unwrap();
+    assert_eq!(alice_hits(phrase), 1, "a quoted phrase");
+
+    // The search pages: two a page to the end, every hit once.
+    let mut paged = Vec::new();
+    let mut before: Option<String> = None;
+    loop {
+        let page = engine
+            .search_from("hello", 2, before.as_deref())
+            .await
+            .unwrap();
+        if page.is_empty() {
+            break;
+        }
+        before = Some(page.last().unwrap().id.clone());
+        paged.extend(page);
+    }
+    assert_eq!(paged.len(), 6, "every hit on a page, Sent copies included");
+    let ids: std::collections::HashSet<_> = paged.iter().map(|h| h.id.as_str()).collect();
+    assert_eq!(ids.len(), 6, "a hit on two pages");
 
     let first = engine.get(&page2[0].id).await.unwrap();
     assert!(first.text.as_deref().unwrap().contains("body 0"));

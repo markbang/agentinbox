@@ -182,6 +182,20 @@ CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5 (
 CREATE TRIGGER IF NOT EXISTS messages_fts_delete AFTER DELETE ON messages BEGIN
     DELETE FROM messages_fts WHERE rowid = old.pk;
 END;
+-- FTS5 cannot order by a column, and the messages table is too wide to read once per match: this
+-- narrow key table sorts every match by date before the page's rows are fetched.
+CREATE TABLE IF NOT EXISTS message_dates (
+    pk INTEGER PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    date INTEGER NOT NULL
+);
+CREATE TRIGGER IF NOT EXISTS message_dates_insert AFTER INSERT ON messages BEGIN
+    INSERT OR REPLACE INTO message_dates (pk, user_id, date)
+    VALUES (new.pk, new.user_id, new.date);
+END;
+CREATE TRIGGER IF NOT EXISTS message_dates_delete AFTER DELETE ON messages BEGIN
+    DELETE FROM message_dates WHERE pk = old.pk;
+END;
 CREATE TABLE IF NOT EXISTS outbox (
     id TEXT PRIMARY KEY,
     user_id INTEGER NOT NULL,
@@ -276,6 +290,12 @@ impl MailDb {
         }
         conn.pragma_update(None, "foreign_keys", true)?;
         conn.execute_batch(SCHEMA)?;
+        backfill_dates(&mut conn).map_err(|e| {
+            err(
+                ErrorCode::Storage,
+                format!("cannot index {} by date: {}", path.display(), e.message),
+            )
+        })?;
         if migrate_feed {
             Self::migrate_feed(&mut conn).map_err(|e| {
                 err(
@@ -345,6 +365,39 @@ impl MailDb {
         thread_unthreaded(&mut conn)?;
         Ok(counts)
     }
+}
+
+/// Fills [`message_dates`](SCHEMA) for the messages of a database from before it, in one
+/// transaction that commits only when the table holds every message. A database that is already
+/// complete costs one count.
+fn backfill_dates(conn: &mut Connection) -> Result<()> {
+    let missing = count(
+        conn,
+        "SELECT count(*) FROM messages m
+         WHERE NOT EXISTS (SELECT 1 FROM message_dates d WHERE d.pk = m.pk)",
+        [],
+    )?;
+    if missing == 0 {
+        return Ok(());
+    }
+    let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+    tx.execute(
+        "INSERT OR REPLACE INTO message_dates (pk, user_id, date)
+         SELECT pk, user_id, date FROM messages",
+        [],
+    )?;
+    let (messages, dates) = (
+        count(&tx, "SELECT count(*) FROM messages", [])?,
+        count(&tx, "SELECT count(*) FROM message_dates", [])?,
+    );
+    if messages != dates {
+        return Err(err(
+            ErrorCode::Storage,
+            format!("the date index holds {dates} of {messages} messages"),
+        ));
+    }
+    tx.commit()?;
+    Ok(())
 }
 
 fn lock(conn: &Mutex<Connection>) -> MutexGuard<'_, Connection> {
@@ -576,6 +629,24 @@ fn verify_legacy(tx: &Connection, user: i64) -> Result<ImportCounts> {
             ));
         }
         n[i] = a;
+    }
+    let (dated, messages) = (
+        count(
+            tx,
+            "SELECT count(*) FROM main.message_dates WHERE user_id = ?1",
+            [user],
+        )?,
+        count(
+            tx,
+            "SELECT count(*) FROM main.messages WHERE user_id = ?1",
+            [user],
+        )?,
+    );
+    if dated != messages {
+        return Err(err(
+            ErrorCode::Storage,
+            format!("the date index covers {dated} of {messages} imported messages"),
+        ));
     }
     let same_message = MESSAGE_COLUMNS
         .split(", ")
@@ -1467,18 +1538,52 @@ impl Store {
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
+    /// Up to `limit` newest messages that match `text`, newest first.
     pub fn search(&self, text: &str, limit: u32) -> Result<Vec<Summary>> {
+        self.search_from(text, limit, None)
+    }
+
+    /// The page after the message `before` (the previous page's last hit), for a search that
+    /// finds more than one page. The date index sorts every match without reading a message row;
+    /// only the page's rows are joined to their folder.
+    pub fn search_from(
+        &self,
+        text: &str,
+        limit: u32,
+        before: Option<&str>,
+    ) -> Result<Vec<Summary>> {
         let Some(query) = fts_query(text) else {
             return Ok(Vec::new());
         };
         let conn = self.conn();
+        let cursor: Option<(i64, i64)> = match before {
+            Some(id) => Some(
+                conn.query_row(
+                    "SELECT pk, date FROM messages WHERE user_id = ?1 AND id = ?2",
+                    params![self.user, id],
+                    |r| Ok((r.get(0)?, r.get(1)?)),
+                )
+                .optional()?
+                .ok_or_else(|| not_found(id))?,
+            ),
+            None => None,
+        };
+        let (after_pk, after_date) = cursor.unwrap_or((i64::MAX, i64::MAX));
         let mut stmt = conn.prepare(&format!(
-            "SELECT {SUMMARY_COLUMNS} FROM messages_fts s
-             JOIN messages m ON m.pk = s.rowid JOIN folders f ON f.id = m.folder_id
-             WHERE messages_fts MATCH ?2 AND m.user_id = ?1
-             ORDER BY m.date DESC, m.pk DESC LIMIT ?3"
+            "SELECT {SUMMARY_COLUMNS} FROM (
+                 SELECT d.pk AS pk FROM messages_fts s
+                 JOIN message_dates d ON d.pk = s.rowid
+                 WHERE messages_fts MATCH ?2 AND d.user_id = ?1
+                   AND (d.date, d.pk) < (?3, ?4)
+                 ORDER BY d.date DESC, d.pk DESC LIMIT ?5
+             ) top
+             JOIN messages m ON m.pk = top.pk JOIN folders f ON f.id = m.folder_id
+             ORDER BY m.date DESC, m.pk DESC"
         ))?;
-        let rows = stmt.query_map(params![self.user, query, limit.clamp(1, 500)], summary_row)?;
+        let rows = stmt.query_map(
+            params![self.user, query, after_date, after_pk, limit.clamp(1, 500)],
+            summary_row,
+        )?;
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
@@ -1814,15 +1919,41 @@ pub(crate) fn fts_text(s: &str) -> String {
     out
 }
 
-/// Every whitespace-separated term must match, as a prefix phrase.
+/// Every whitespace-separated term must match: as a prefix, so `fest` finds `festival`, or, in
+/// double quotes, as one whole phrase.
 pub(crate) fn fts_query(text: &str) -> Option<String> {
-    let terms: Vec<String> = text
-        .split_whitespace()
-        .map(|t| {
-            let seg = fts_text(t).split_whitespace().collect::<Vec<_>>().join(" ");
-            format!("\"{}\"*", seg.replace('"', "\"\""))
+    let mut terms: Vec<(String, bool)> = Vec::new();
+    let (mut current, mut quoted, mut in_quotes) = (String::new(), false, false);
+    for c in text.chars() {
+        if c == '"' {
+            in_quotes = !in_quotes;
+            quoted |= in_quotes;
+        } else if c.is_whitespace() && !in_quotes {
+            if !current.is_empty() {
+                terms.push((std::mem::take(&mut current), quoted));
+                quoted = false;
+            }
+        } else {
+            current.push(c);
+        }
+    }
+    if !current.is_empty() {
+        terms.push((current, quoted));
+    }
+    let terms: Vec<String> = terms
+        .iter()
+        .filter_map(|(term, quoted)| {
+            let tokens = fts_text(term);
+            let tokens: Vec<&str> = tokens.split_whitespace().collect();
+            let phrase = tokens.join(" ").replace('"', "\"\"");
+            (!tokens.is_empty()).then(|| {
+                if *quoted {
+                    format!("\"{phrase}\"")
+                } else {
+                    format!("\"{phrase}\"*")
+                }
+            })
         })
-        .filter(|t| t != "\"\"*")
         .collect();
     (!terms.is_empty()).then(|| terms.join(" "))
 }
@@ -1832,7 +1963,7 @@ pub(crate) fn fts_query(text: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::Instant;
+    use std::time::{Duration, Instant};
 
     fn seeded_db(dir: &tempfile::TempDir) -> (MailDb, Store, i64) {
         let db = MailDb::open(&dir.path().join("mail.sqlite")).unwrap();
@@ -1994,6 +2125,436 @@ mod tests {
             t.elapsed()
         );
         assert!(!hits.is_empty());
+    }
+
+    fn percentile(runs: &mut [Duration], q: f64) -> Duration {
+        runs.sort();
+        runs[((runs.len() - 1) as f64 * q).round() as usize]
+    }
+
+    /// `runs` timings of `f` after one warm-up, as p50/p95/p99.
+    fn timed<T>(runs: usize, mut f: impl FnMut() -> T) -> (Duration, Duration, Duration, T) {
+        let _ = f();
+        let mut times = Vec::with_capacity(runs);
+        let mut last = None;
+        for _ in 0..runs {
+            let t = Instant::now();
+            last = Some(f());
+            times.push(t.elapsed());
+        }
+        let p99 = percentile(&mut times, 0.99);
+        let p95 = percentile(&mut times, 0.95);
+        let p50 = percentile(&mut times, 0.5);
+        (p50, p95, p99, last.unwrap())
+    }
+
+    /// Search at 50,000 messages, the shapes the app's field sends. Times are milliseconds over
+    /// 30 runs of a warm cache:
+    /// `cargo test -p mail-core --release --lib -- --ignored --nocapture bench_search_50k`.
+    #[test]
+    #[ignore = "benchmark: seeds 50,000 messages, prints search latency (run with --release)"]
+    fn bench_search_50k() {
+        let dir = tempfile::tempdir().unwrap();
+        let (_db, store, folder_id) = seeded_db(&dir);
+        let state = FolderRow {
+            id: folder_id,
+            kind: FolderKind::Inbox,
+            name: "INBOX".into(),
+            uidvalidity: Some(1),
+            uidnext: Some(50_001),
+            catchup_seq: None,
+            backfill_seq: None,
+            highestmodseq: None,
+        };
+        let started = Instant::now();
+        for start in (1..=50_000).step_by(200) {
+            let page: Vec<_> = (start..start + 200).map(bench_message).collect();
+            store.insert_page(folder_id, &page, Some(&state)).unwrap();
+        }
+        println!("seed 50k: {:?}", started.elapsed());
+
+        let search = |q: &str| store.search(q, 50).unwrap();
+        let cases = [
+            "one word (festival)",
+            "two words AND (red festival)",
+            "phrase (\"red festival\")",
+            "prefix (fest)",
+            "CJK (红烧肉)",
+            "CJK substring (烧肉)",
+            "diacritics (café)",
+            "accents stripped (cafe)",
+            "sender only (announcements)",
+            "subject only (Quarterly)",
+            "common word (project)",
+            "common CJK (今天)",
+            "old only (ancient)",
+        ];
+        println!(
+            "\n{:<34} {:>6} {:>8} {:>8} {:>8} {:>8}",
+            "query", "rows", "p50", "p95", "p99", "matches"
+        );
+        for label in cases {
+            let q = label.rsplit_once('(').unwrap().1.trim_end_matches(')');
+            let (p50, p95, p99, hits) = timed(30, || search(q));
+            let matches: i64 = store
+                .conn()
+                .query_row(
+                    "SELECT count(*) FROM messages_fts WHERE messages_fts MATCH ?1",
+                    [fts_query(q).unwrap()],
+                    |r| r.get(0),
+                )
+                .unwrap();
+            let ms = |d: Duration| d.as_secs_f64() * 1000.0;
+            println!(
+                "{label:<34} {:>6} {:>8.2} {:>8.2} {:>8.2} {matches:>8}",
+                hits.len(),
+                ms(p50),
+                ms(p95),
+                ms(p99)
+            );
+        }
+
+        // 2,100 matches in, in 50s: the whole way there is measured, then that page alone.
+        let mut hits = Vec::new();
+        let mut cursor: Option<String> = None;
+        let mut pages = 0;
+        let t = Instant::now();
+        loop {
+            let page = store
+                .search_from("festival", 50, cursor.as_deref())
+                .unwrap();
+            if page.is_empty() {
+                break;
+            }
+            pages += 1;
+            cursor = Some(page.last().unwrap().id.clone());
+            hits.extend(page);
+            if hits.len() >= 2_100 {
+                break;
+            }
+        }
+        println!("\npage {pages} x 50 ({}) in {:?}", hits.len(), t.elapsed());
+        let unique: std::collections::HashSet<&str> = hits.iter().map(|h| h.id.as_str()).collect();
+        assert_eq!(unique.len(), hits.len(), "a hit on two pages");
+        assert!(
+            hits.windows(2).all(|w| w[0].date >= w[1].date),
+            "out of order across pages"
+        );
+        let cursor = cursor.unwrap();
+        let (p50, p95, p99, page) = timed(30, || {
+            store.search_from("festival", 50, Some(&cursor)).unwrap()
+        });
+        let ms = |d: Duration| d.as_secs_f64() * 1000.0;
+        println!(
+            "deep page 42 after 2,100      {:>6} {:>8.2} {:>8.2} {:>8.2}",
+            page.len(),
+            ms(p50),
+            ms(p95),
+            ms(p99)
+        );
+
+        // The feed's text filter, which the server's GET /v1/feed?q= runs.
+        let feed = store.feed();
+        let list = |text: &str, limit: u32, before: Option<&str>| {
+            feed.list(&crate::feed::ListFilter {
+                sources: None,
+                source: None,
+                unread: false,
+                archived: crate::feed::Archived::Hide,
+                text: Some(text.into()),
+                since: None,
+                before: before.map(|id| feed.cursor_of(id).unwrap()),
+                limit,
+            })
+            .unwrap()
+        };
+        println!();
+        for (label, q, limit) in [
+            ("feed: one word (festival)", "festival", 50),
+            ("feed: CJK (红烧肉)", "红烧肉", 50),
+            ("feed: sender (announcements)", "announcements", 50),
+            ("feed: common word (project)", "project", 50),
+            ("feed: 200 a page (festival)", "festival", 200),
+        ] {
+            let (p50, p95, p99, page) = timed(20, || list(q, limit, None));
+            let ms = |d: Duration| d.as_secs_f64() * 1000.0;
+            println!(
+                "{label:<34} {:>6} {:>8.2} {:>8.2} {:>8.2}",
+                page.messages.len(),
+                ms(p50),
+                ms(p95),
+                ms(p99)
+            );
+        }
+        // 2,100 feed rows in, which the feed pages with a cursor already.
+        let mut seen = Vec::new();
+        let mut before: Option<String> = None;
+        while seen.len() < 2_100 {
+            let page = list("festival", 50, before.as_deref());
+            before = Some(page.messages.last().unwrap().id.clone());
+            seen.extend(page.messages);
+            if !page.more {
+                break;
+            }
+        }
+        let cursor = before.unwrap();
+        let (p50, p95, p99, page) = timed(20, || list("festival", 50, Some(&cursor)));
+        let ms = |d: Duration| d.as_secs_f64() * 1000.0;
+        println!(
+            "feed: deep page after 2,100      {:>6} {:>8.2} {:>8.2} {:>8.2}",
+            page.messages.len(),
+            ms(p50),
+            ms(p95),
+            ms(p99)
+        );
+    }
+
+    /// The search benchmark's mailbox: 50,000 messages with the shapes a search meets (a common
+    /// word, an adjacent phrase, prefixes, CJK, accents, sender-only and subject-only words).
+    fn bench_message(i: u32) -> NewMessage {
+        const WORDS: [&str; 10] = [
+            "project", "budget", "report", "meeting", "design", "release", "customer", "update",
+            "invoice", "contract",
+        ];
+        let mut body = String::new();
+        for k in 0..24 {
+            body.push_str(WORDS[(i as usize * 7 + k * 3) % WORDS.len()]);
+            body.push(' ');
+        }
+        if i.is_multiple_of(10) {
+            body.push_str("festival ");
+        }
+        if i % 20 == 7 {
+            body.push_str("festive ");
+        }
+        if i.is_multiple_of(50) {
+            body.push_str(if i.is_multiple_of(200) {
+                "red big festival "
+            } else {
+                "red festival "
+            });
+        }
+        if i.is_multiple_of(100) {
+            body.push_str("café ");
+        } else if i % 100 == 1 {
+            body.push_str("cafe ");
+        }
+        if i % 1000 == 6 {
+            body.push_str("ancient archive ");
+        }
+        if i % 100 == 2 {
+            body.push_str("今天做了红烧肉，全家都爱吃。");
+        } else if i % 10 == 2 {
+            body.push_str("今天天气很好，我们去公园散步。");
+        }
+        NewMessage {
+            uid: i,
+            date: 1_700_000_000_000 + i as i64 * 60_000,
+            from: Some(Address {
+                name: Some(if i.is_multiple_of(7) {
+                    "Announcements".into()
+                } else {
+                    format!("Person {i}")
+                }),
+                email: format!("person{i}@test.local"),
+            }),
+            to: vec![Address {
+                name: None,
+                email: "a@test.local".into(),
+            }],
+            cc: Vec::new(),
+            subject: if i.is_multiple_of(13) {
+                format!("Quarterly numbers {i}")
+            } else {
+                format!("message {i:05}")
+            },
+            snippet: body.chars().take(120).collect(),
+            message_id: Some(format!("<{i}@test.local>")),
+            in_reply_to: None,
+            references: Vec::new(),
+            seen: !i.is_multiple_of(20),
+            flagged: false,
+            has_attachments: false,
+            size: body.len() as u32,
+            body: None,
+            index_text: Some(body),
+            gmail_thread: None,
+        }
+    }
+
+    fn message(uid: u32, subject: &str, body: &str) -> NewMessage {
+        NewMessage {
+            uid,
+            date: 1_600_000_000_000 + uid as i64 * 1_000,
+            from: Some(Address {
+                name: None,
+                email: "from@test.local".into(),
+            }),
+            to: vec![Address {
+                name: None,
+                email: "a@test.local".into(),
+            }],
+            cc: Vec::new(),
+            subject: subject.into(),
+            snippet: body.into(),
+            message_id: Some(format!("<{uid}@test.local>")),
+            in_reply_to: None,
+            references: Vec::new(),
+            seen: false,
+            flagged: false,
+            has_attachments: false,
+            size: body.len() as u32,
+            body: None,
+            index_text: Some(body.into()),
+            gmail_thread: None,
+        }
+    }
+
+    /// The index finds CJK substrings, prefixes, an exact phrase and accented words, which
+    /// unicode61 folds (café as cafe).
+    #[test]
+    fn search_finds_cjk_prefix_phrase_and_accents() {
+        let dir = tempfile::tempdir().unwrap();
+        let (_db, store, folder_id) = seeded_db(&dir);
+        let state = FolderRow {
+            id: folder_id,
+            kind: FolderKind::Inbox,
+            name: "INBOX".into(),
+            uidvalidity: None,
+            uidnext: None,
+            catchup_seq: None,
+            backfill_seq: None,
+            highestmodseq: None,
+        };
+        let messages = [
+            message(1, "Dinner", "今天做了红烧肉，很好吃"),
+            message(2, "Festival plan", "the red festival starts at noon"),
+            message(3, "Festival notes", "a red big festival in town"),
+            message(4, "Café", "meet at the café"),
+            message(5, "Cafe", "meet at the cafe"),
+            message(6, "Festive", "festive season"),
+        ];
+        store
+            .insert_page(folder_id, &messages, Some(&state))
+            .unwrap();
+        let hits = |q: &str| {
+            let mut ids: Vec<String> = store
+                .search(q, 50)
+                .unwrap()
+                .into_iter()
+                .map(|h| h.subject)
+                .collect();
+            ids.sort();
+            ids
+        };
+        assert_eq!(hits("红烧肉"), ["Dinner"]);
+        assert_eq!(hits("烧肉"), ["Dinner"], "a substring inside a word");
+        assert_eq!(hits("肉"), ["Dinner"], "one character");
+        assert_eq!(hits("fest"), ["Festival notes", "Festival plan", "Festive"]);
+        assert_eq!(hits("festival"), ["Festival notes", "Festival plan"]);
+        assert_eq!(
+            hits("red festival"),
+            ["Festival notes", "Festival plan"],
+            "every word matches, in any order"
+        );
+        assert_eq!(
+            hits("\"red big festival\""),
+            ["Festival notes"],
+            "a quoted phrase"
+        );
+        assert_eq!(hits("cafe"), ["Cafe", "Café"]);
+        assert_eq!(hits("café"), ["Cafe", "Café"], "accents fold both ways");
+        assert_eq!(fts_query("红烧肉").unwrap(), "\"红 烧 肉\"*");
+        assert_eq!(fts_query("\"red festival\"").unwrap(), "\"red festival\"");
+        assert_eq!(fts_query("  \"unbalanced ").unwrap(), "\"unbalanced\"");
+    }
+
+    /// A database from before the date index opens with it filled for every message, and a
+    /// second open changes nothing.
+    #[test]
+    fn dates_backfill_an_older_database() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("mail.sqlite");
+        {
+            let (_db, store, folder_id) = seeded_db(&dir);
+            store.insert_page(folder_id, &page(1, 300), None).unwrap();
+        }
+        {
+            let raw = Connection::open(&path).unwrap();
+            raw.execute_batch("DROP TABLE message_dates").unwrap();
+        }
+        let count = |path: &Path| -> i64 {
+            Connection::open(path)
+                .unwrap()
+                .query_row("SELECT count(*) FROM message_dates", [], |r| r.get(0))
+                .unwrap()
+        };
+        let db = MailDb::open(&path).unwrap();
+        assert_eq!(count(&path), 300, "every message is dated");
+        let hits = db.user(LOCAL_USER).search("message", 50).unwrap();
+        assert_eq!(hits.len(), 50, "and search uses it");
+        drop(db);
+        let db = MailDb::open(&path).unwrap();
+        assert_eq!(count(&path), 300, "a second open adds nothing");
+        drop(db);
+    }
+
+    /// A client pages 2,100 hits to their end 50 at a time: every hit once, in the listing's
+    /// order, and the page after a given one continues where it stopped.
+    #[test]
+    fn search_pages_without_gaps_or_repeats() {
+        let dir = tempfile::tempdir().unwrap();
+        let (_db, store, folder_id) = seeded_db(&dir);
+        let state = FolderRow {
+            id: folder_id,
+            kind: FolderKind::Inbox,
+            name: "INBOX".into(),
+            uidvalidity: None,
+            uidnext: None,
+            catchup_seq: None,
+            backfill_seq: None,
+            highestmodseq: None,
+        };
+        // Seven messages share a date, so the page cursor has to break ties by id.
+        let mut messages = page(1, 2_100);
+        for (i, m) in messages.iter_mut().enumerate() {
+            m.date = 1_700_000_000_000 + (i as i64 / 7) * 1_000;
+        }
+        store
+            .insert_page(folder_id, &messages, Some(&state))
+            .unwrap();
+        let first = store.search("message", 50).unwrap();
+        assert_eq!(first.len(), 50);
+
+        let mut hits = Vec::new();
+        let mut cursor: Option<String> = None;
+        loop {
+            let page = store.search_from("message", 50, cursor.as_deref()).unwrap();
+            if page.is_empty() {
+                break;
+            }
+            assert!(page.len() <= 50, "a page over the limit: {}", page.len());
+            cursor = Some(page.last().unwrap().id.clone());
+            hits.extend(page);
+        }
+        assert_eq!(hits.len(), 2_100, "a hit is missing or repeated");
+        let ids: std::collections::HashSet<&str> = hits.iter().map(|h| h.id.as_str()).collect();
+        assert_eq!(ids.len(), 2_100, "a hit on two pages");
+        assert!(
+            hits.windows(2).all(|w| w[0].date >= w[1].date),
+            "out of listing order"
+        );
+        assert_eq!(
+            hits[..50].iter().map(|h| &h.id).collect::<Vec<_>>(),
+            first.iter().map(|h| &h.id).collect::<Vec<_>>(),
+            "paging starts where the plain search does"
+        );
+        assert!(
+            store
+                .search_from("message", 50, Some("no-such-message"))
+                .is_err(),
+            "a cursor that names no message is refused, not silently restarted"
+        );
     }
 
     /// A message of conversation `thread`, `reply`-th in it, as a sync stores it.
