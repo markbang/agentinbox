@@ -495,13 +495,14 @@ for mode in ("light", "dark"):
         y = (y1 + y2) // 2
         mid = (x1 + x2) // 2
         quarter = (x2 - x1) // 4
-        # A full swipe needs the content to travel past 66 % of the row's width (cupertino's swipe.rs),
-        # and a screenshot taken while the finger is down cuts the gesture short: this one runs alone.
-        adb("shell", "input", "swipe", str(x1 + 200), str(y), str(x2 - 60), str(y), "700")
-        if find("id:toast-action", 8) is None:
-            print("the full swipe revealed without archiving; one more, slower", flush=True)
-            adb("shell", "input", "swipe", str(x1 + 200), str(y), str(x2 - 60), str(y), "1500")
-        if find("id:toast-action", 8) is not None:
+        # A full swipe needs the content to travel past 66 % of the row's width (cupertino's swipe.rs):
+        # a drag of about 2/3 of the screen, started and ended clear of the system's back-gesture edges.
+        for start, end, ms in ((120, x2 - 100, "800"), (70, x2 - 70, "1000"), (70, x2 - 70, "1600")):
+            adb("shell", "input", "swipe", str(x1 + start), str(y), str(end), str(y), ms)
+            if find("id:toast-action", 6) is not None:
+                break
+            print(f"the swipe {start}->{end} over {ms} ms revealed without archiving", flush=True)
+        if find("id:toast-action", 6) is not None:
             screenshot(f"{mode}-archived-snackbar")  # the snackbar lives seconds: no waiting for it
             print("shot", f"{mode}-archived-snackbar", flush=True)
             if tap("id:toast-action", 5):
