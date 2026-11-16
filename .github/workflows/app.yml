@@ -371,6 +371,9 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      # GET /healthz reports the release (app/nsh.json) and the commit it was built from.
+      - id: release
+        run: echo "version=$(jq -r .version app/nsh.json)" >> "$GITHUB_OUTPUT"
       - uses: docker/build-push-action@v6
         with:
           context: .
@@ -378,6 +381,9 @@ jobs:
           target: web
           build-contexts: site=${{ runner.temp }}/web/AgentInbox
           push: ${{ github.ref == 'refs/heads/main' }}
+          build-args: |
+            AGENTINBOX_VERSION=${{ steps.release.outputs.version }}
+            AGENTINBOX_GIT_SHA=${{ github.sha }}
           # The old image name stays published for one release cycle, so a deployment can roll back.
           tags: |
             ghcr.io/markbang/agentinbox:latest

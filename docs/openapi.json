@@ -23,7 +23,7 @@
         "operationId": "health",
         "responses": {
           "200": {
-            "description": "`{ok, version}`"
+            "description": "`{ok, version}`, plus `sha` when the build knows its commit"
           }
         }
       }
