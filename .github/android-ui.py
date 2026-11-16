@@ -495,12 +495,12 @@ for mode in ("light", "dark"):
         y = (y1 + y2) // 2
         mid = (x1 + x2) // 2
         quarter = (x2 - x1) // 4
-        # One slow drag that ends well inside the screen: a drag that reaches the right edge runs into
-        # the system's back gesture, which cancels it with the action merely revealed and the row open.
-        during(["swipe", str(x1 + 200), str(y), str(x2 - 200), str(y), "1400"], f"{mode}-swipe-archive", 0.9)
+        # A full swipe needs the content to travel past 66 % of the row's width (cupertino's swipe.rs),
+        # and a screenshot taken while the finger is down cuts the gesture short: this one runs alone.
+        adb("shell", "input", "swipe", str(x1 + 200), str(y), str(x2 - 60), str(y), "700")
         if find("id:toast-action", 8) is None:
-            print("the slow swipe revealed without archiving; one more, longer", flush=True)
-            adb("shell", "input", "swipe", str(x1 + 200), str(y), str(x2 - 200), str(y), "2000")
+            print("the full swipe revealed without archiving; one more, slower", flush=True)
+            adb("shell", "input", "swipe", str(x1 + 200), str(y), str(x2 - 60), str(y), "1500")
         if find("id:toast-action", 8) is not None:
             screenshot(f"{mode}-archived-snackbar")  # the snackbar lives seconds: no waiting for it
             print("shot", f"{mode}-archived-snackbar", flush=True)
@@ -508,6 +508,7 @@ for mode in ("light", "dark"):
                 gone("id:toast-action")  # Undo: the row is back once its snackbar has gone
         else:
             fail("the swipe did not archive the first row")
+        # The swipe in flight, for the action row it reveals; Delete is not fired.
         during(["swipe", str(mid + quarter), str(y), str(mid), str(y), "1500"], f"{mode}-swipe-delete", 1.0)
         gone("id:toast-action")  # the deletion's Undo leaves before the next gesture
 
