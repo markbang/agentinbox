@@ -495,9 +495,12 @@ for mode in ("light", "dark"):
         y = (y1 + y2) // 2
         mid = (x1 + x2) // 2
         quarter = (x2 - x1) // 4
-        # One swipe, captured while the Archive action is out and carried past the full-swipe mark: a
-        # gesture that only reveals leaves the row open, and the next one on it then does nothing.
-        during(["swipe", str(mid - quarter), str(y), str(x2 - 60), str(y), "1200"], f"{mode}-swipe-archive", 0.7)
+        # One slow drag that ends well inside the screen: a drag that reaches the right edge runs into
+        # the system's back gesture, which cancels it with the action merely revealed and the row open.
+        during(["swipe", str(x1 + 200), str(y), str(x2 - 200), str(y), "1400"], f"{mode}-swipe-archive", 0.9)
+        if find("id:toast-action", 8) is None:
+            print("the slow swipe revealed without archiving; one more, longer", flush=True)
+            adb("shell", "input", "swipe", str(x1 + 200), str(y), str(x2 - 200), str(y), "2000")
         if find("id:toast-action", 8) is not None:
             screenshot(f"{mode}-archived-snackbar")  # the snackbar lives seconds: no waiting for it
             print("shot", f"{mode}-archived-snackbar", flush=True)
