@@ -2,13 +2,13 @@
 // long-pressed as iOS Mail does, and the selection's actions in the bar. The
 // bar is glass over the rows, and the compose button is a floating control of
 // glass at the foot, as Mail draws it.
-import { platform, Text, View } from "nsh";
+import { platform, View } from "nsh";
 import { BackHandler } from "nsh/mobile";
 import { t } from "nsh/i18n";
 import { ActivityIndicator, Button } from "cupertino";
 import { Page } from "../components/Page";
 import { MailboxPane, mailboxTitle } from "../components/MailboxPane";
-import { NavContext, openCompose, selectTab, TAB } from "../nav";
+import { NavContext, openCompose } from "../nav";
 import { beginPicking, clearPicked, listStatus, mailbox, moveMessages, openRow, pickedIds, picking, refresh, refreshingFrom, rows, setFlags, setThreadFlags, type Row } from "../store";
 
 export function InboxPage() {
