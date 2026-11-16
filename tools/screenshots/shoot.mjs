@@ -263,6 +263,15 @@ for (const theme of ["light", "dark"]) {
   await page.mouse.move(206, 500);
   await page.mouse.wheel(0, 900);
   await shot("narrow-settings-scrolled", theme);
+  // Search on its own tab: the glass field over the results, and the feed's filters.
+  await page.getByText("Search", { exact: true }).last().click();
+  await field("search").fill("Tokyo");
+  await field("search").press("Enter");
+  await id("results").waitFor({ timeout: 30_000 });
+  await shot("narrow-search", theme);
+  await page.getByText("Notifications", { exact: true }).last().click();
+  await id("notify-list").waitFor({ timeout: 30_000 }).catch(() => {});
+  await shot("narrow-notifications", theme);
 }
 // Empty and failure states, at 1440 again: a folder with nothing in it, a search that finds nothing.
 await page.setViewportSize({ width: 1440, height: 900 });
