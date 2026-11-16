@@ -684,6 +684,8 @@ for mode in ("light", "dark"):
         during(["swipe", str(w // 2), str(h * 8 // 10), str(w // 2), str(h * 5 // 10), "1200"], f"{mode}-settings-mid-scroll", 0.6)
         adb("shell", "input", "swipe", str(w // 2), str(h * 7 // 10), str(w // 2), str(h * 3 // 10), "300")
         shot(f"{mode}-settings-scrolled")
+        # The shots scrolled the list: the account row the next steps use is back at the top.
+        scroll_up_to("Accounts")
         # The first account's signature, then a new message that carries it.
         if tap("id:account-more-0", 10) and tap("Signature…") and tap("id:signature-text"):
             adb("shell", "input", "text", "'**Lin%sChen**'")

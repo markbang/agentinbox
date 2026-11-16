@@ -133,6 +133,10 @@ for (const theme of ["light", "dark"]) {
   await field("compose-body").press("Control+Home");
   await page.keyboard.type("Hi Maya,\n\nSounds good, 12:15 works. I'll bring the dark mode mockups so we can go through contrast before Thursday.\n\nLin");
   await shot("compose", theme);
+  // The draft would come back in the other appearance's shot: discard it.
+  await press("compose-discard");
+  await page.getByText("Discard").last().click();
+  await id("modal").waitFor({ state: "detached", timeout: 20_000 }).catch(() => {});
 
   await home();
   await field("search").fill("Tokyo");
