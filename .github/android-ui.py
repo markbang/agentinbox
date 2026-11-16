@@ -497,16 +497,19 @@ for mode in ("light", "dark"):
         quarter = (x2 - x1) // 4
         # A full swipe needs the content to travel past 66 % of the row's width (cupertino's swipe.rs):
         # a drag of about 2/3 of the screen, started and ended clear of the system's back-gesture edges.
+        undo = None
         for start, end, ms in ((120, x2 - 100, "800"), (70, x2 - 70, "1000"), (70, x2 - 70, "1600")):
             adb("shell", "input", "swipe", str(x1 + start), str(y), str(end), str(y), ms)
-            if find("id:toast-action", 6) is not None:
+            undo = find("id:toast-action", 6)
+            if undo is not None:
                 break
             print(f"the swipe {start}->{end} over {ms} ms revealed without archiving", flush=True)
-        if find("id:toast-action", 6) is not None:
-            screenshot(f"{mode}-archived-snackbar")  # the snackbar lives seconds: no waiting for it
+        if undo is not None:
+            # The snackbar lives seconds: the tap goes straight after the shot, at the node's own bounds.
+            screenshot(f"{mode}-archived-snackbar")
             print("shot", f"{mode}-archived-snackbar", flush=True)
-            if tap("id:toast-action", 5):
-                gone("id:toast-action")  # Undo: the row is back once its snackbar has gone
+            adb("shell", "input", "tap", *map(str, centre(undo)))
+            gone("id:toast-action", 6)  # Undo: the row is back once its snackbar has gone
         else:
             fail("the swipe did not archive the first row")
         # The swipe in flight, for the action row it reveals; Delete is not fired.
