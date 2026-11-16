@@ -462,34 +462,6 @@ def first_row():
     return None
 
 
-def swipe_archive(row, tries=3):
-    """Swipes the first row away until it is archived: True once the Undo snackbar shows."""
-    for attempt in range(1, tries + 1):
-        x1, y1, x2, y2 = row
-        y = (y1 + y2) // 2
-        before = first_row()
-        # The shot above may have left the row's Archive action open, and a swipe that starts on an
-        # open action does nothing: a short swipe the other way closes it first (too short to reveal Delete).
-        adb("shell", "input", "swipe", str(x2 - 200), str(y), str(x2 - 260), str(y), "300")
-        quiet(1)
-        # Slow enough that the distance alone (past the 35% mark) archives, whatever the measured velocity.
-        adb("shell", "input", "swipe", str((x1 + x2) // 2 - (x2 - x1) // 4), str(y), str(x2 - 60), str(y), "400")
-        end = time.time() + 6
-        while time.time() < end:
-            found = nodes()
-            if any(n.get("resource-id") == "toast-action" for n in found):
-                return True
-            rows = [n.get("resource-id") for n in found if n.get("resource-id", "").startswith("message-")]
-            if before and rows and before not in rows:
-                fail(f"archived {before}, but no Undo snackbar")
-                return False
-            time.sleep(0.5)
-        print(f"swipe {attempt} did not archive, retrying", flush=True)
-        row = settled("id:message-.*") or row
-    fail(f"{tries} swipes never archived the first row")
-    return False
-
-
 booted()
 # A phone's own screen: 1440 x 3120 at density 3.0 (the profile's is 1080 x 2400 at 2.625), as the
 # phones this ships to draw it.
@@ -523,13 +495,16 @@ for mode in ("light", "dark"):
         y = (y1 + y2) // 2
         mid = (x1 + x2) // 2
         quarter = (x2 - x1) // 4
-        during(["swipe", str(mid - quarter), str(y), str(mid), str(y), "1500"], f"{mode}-swipe-archive", 1.0)
-        settled("id:message-.*")
-        if swipe_archive(row):
+        # One swipe, captured while the Archive action is out and carried past the full-swipe mark: a
+        # gesture that only reveals leaves the row open, and the next one on it then does nothing.
+        during(["swipe", str(mid - quarter), str(y), str(x2 - 60), str(y), "1200"], f"{mode}-swipe-archive", 0.7)
+        if find("id:toast-action", 8) is not None:
             screenshot(f"{mode}-archived-snackbar")  # the snackbar lives seconds: no waiting for it
             print("shot", f"{mode}-archived-snackbar", flush=True)
             if tap("id:toast-action", 5):
                 gone("id:toast-action")  # Undo: the row is back once its snackbar has gone
+        else:
+            fail("the swipe did not archive the first row")
         during(["swipe", str(mid + quarter), str(y), str(mid), str(y), "1500"], f"{mode}-swipe-delete", 1.0)
         gone("id:toast-action")  # the deletion's Undo leaves before the next gesture
 
