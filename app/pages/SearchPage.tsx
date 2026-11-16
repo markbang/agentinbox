@@ -10,12 +10,13 @@ import { SearchEmpty } from "../components/SearchEmpty";
 import { NavContext } from "../nav";
 import { clearSearch, openRow, runSearch, SEARCH_LIMIT, searchActive, searchQuery, searchResults, typeSearch } from "../store";
 import { SearchField } from "cupertino";
+import { TAB_BAR_ROOM } from "../scroll";
 
 export function SearchPage() {
   const nav = NavContext();
   cleanup(clearSearch);
   return (
-    <Page title={t("search.label")} testID="search-page">
+    <Page scroll={false} title={t("search.label")} testID="search-page">
       <View class="min-h-0 flex-1">
         <View class="absolute left-0 right-0 top-11 z-10 px-3 pb-2 pt-1">
           <SearchField
@@ -49,7 +50,7 @@ export function SearchPage() {
               highlight={searchQuery()}
               label={t("search.results")}
               testID="results"
-              contentClass="pt-24 pb-[calc(env(safe-area-inset-bottom)+49px)]"
+              contentClass={`pt-24 ${TAB_BAR_ROOM}`}
               header={
                 <If when={searchResults()?.length}>
                   {(count) => (

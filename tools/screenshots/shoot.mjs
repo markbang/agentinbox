@@ -249,10 +249,20 @@ for (const theme of ["light", "dark"]) {
   log("narrow reader scrolls sideways by", overflow, "px");
   if (overflow === null || overflow > 0) throw new Error(`the booking mail at 412px: sideways overflow ${overflow}`);
 
-  // The glass: rows under the bar at the top and the tab bar at the foot, and compose as a sheet.
+  // The glass: rows under the bar at the top and the tab bar at the foot, the scroll edge's ramp
+  // mid-scroll, the tab bar minimised by a scroll down and back on the way up, and compose as a sheet.
   await page.goto(origin + "/");
   for (const text of synced) await page.getByText(text).first().waitFor({ timeout: 90_000 });
   await page.mouse.move(206, 500);
+  await page.mouse.wheel(0, 160);
+  await page.waitForTimeout(500);
+  await shot("narrow-inbox-mid", theme);
+  await page.mouse.wheel(0, 900);
+  await page.waitForTimeout(800);
+  await shot("narrow-inbox-tabmin", theme);
+  await page.mouse.wheel(0, -140);
+  await page.waitForTimeout(800);
+  await shot("narrow-inbox-expanded", theme);
   await page.mouse.wheel(0, 700);
   await shot("narrow-inbox-scrolled", theme);
   await press("compose");

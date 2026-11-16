@@ -187,7 +187,7 @@ export function ComposePage(props: { init: ComposeInit }) {
   // What the user writes goes above the quote and the signature.
   const caretAtTop = replying || !draft.edited();
   return (
-    <Page title={title()} back={t("common.close")} onBack={close} trailing={actions()} testID="compose-page">
+    <Page scroll={false} title={title()} back={t("common.close")} onBack={close} trailing={actions()} testID="compose-page">
       <View
         class="min-h-0 flex-1 bg-system-background pt-11"
         onFileDragEnter={() => dragging.set(true)}

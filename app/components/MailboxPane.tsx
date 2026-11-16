@@ -35,9 +35,10 @@ import {
   type Row,
 } from "../store";
 import type { InputRef } from "nsh";
+import { LIST_ROOM } from "../scroll";
 
-// Under the floating tab bar: its 49 pt and the gesture area below the rows.
-const TAB_ROOM = "pt-11 pb-[calc(env(safe-area-inset-bottom)+49px)]";
+// Under the page's floating group and the tab bar: what the rows keep clear at either end.
+const TAB_ROOM = LIST_ROOM;
 
 /** The chosen mailbox's name. */
 export function mailboxTitle() {

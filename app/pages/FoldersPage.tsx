@@ -3,7 +3,7 @@
 import { Text, View } from "nsh";
 import { t } from "nsh/i18n";
 import { ActivityIndicator, Button, Icon, List, ListTile, Section } from "cupertino";
-import { BarSpace, Page } from "../components/Page";
+import { Page } from "../components/Page";
 import { AccountMark, Badge } from "../components/Marks";
 import { NavContext, selectTab, TAB, tabs } from "../nav";
 import { notificationsSection, showMail, showNotifications, unreadNotifications } from "../notify";
@@ -28,7 +28,9 @@ export function FoldersPage() {
   };
   return (
     <Page
+      background="system-grouped-background"
       title={t("tabs.folders")}
+      largeTitle={t("tabs.folders")}
       trailing={
         <If when={mailStatus().syncing}>
           <ActivityIndicator size={20} label={t("sync.running")} />
@@ -36,8 +38,7 @@ export function FoldersPage() {
       }
       testID="mailboxes"
     >
-      <List>
-        <BarSpace />
+      <List scroll={false}>
         <Section>
           <ListTile
             title={t("notify.allTitle")}

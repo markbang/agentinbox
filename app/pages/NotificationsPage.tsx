@@ -8,6 +8,7 @@ import { FeedEmpty } from "../components/FeedEmpty";
 import { FeedFilters, FeedSearch } from "../components/FeedFilters";
 import { NotificationList } from "../components/NotificationList";
 import { NavContext } from "../nav";
+import { LIST_ROOM } from "../scroll";
 import { feedRefreshFrom, feedStatus, loadMoreFeed, notifications, openNotificationAt, reloadFeed, serverInbox, setFeedFilter } from "../notify";
 
 export function NotificationsPage() {
@@ -19,6 +20,7 @@ export function NotificationsPage() {
   };
   return (
     <Page
+      scroll={false}
       title={t("notify.title")}
       trailing={<Button icon="ellipsis" label={t("notify.actions")} variant="plain" onPress={() => menu.set(true)} testID="notify-more" />}
       testID="notifications"
@@ -31,7 +33,7 @@ export function NotificationsPage() {
               <FeedSearch />
             </>
           }
-          contentClass="pt-11 pb-[calc(env(safe-area-inset-bottom)+49px)]"
+          contentClass={LIST_ROOM}
           items={notifications()}
           onOpen={open}
           refreshing={feedStatus() === "refreshing" && feedRefreshFrom() === "pull"}

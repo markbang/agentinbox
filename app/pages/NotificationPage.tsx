@@ -18,7 +18,7 @@ export function NotificationPage(props: { id: string }) {
     phoneStack.setRoutes([{ name: "inbox" }, { name: "message", id: props.id }]);
   };
   return (
-    <Page title={source()?.name ?? t("notify.title")} back={t("common.back")} onBack={nav.close} testID="notification-page">
+    <Page scroll={false} title={source()?.name ?? t("notify.title")} back={t("common.back")} onBack={nav.close} testID="notification-page">
       <If
         when={note()}
         else={

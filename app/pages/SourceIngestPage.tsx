@@ -4,7 +4,7 @@ import { Clipboard, Text, View } from "nsh";
 import { t } from "nsh/i18n";
 import type { Source } from "agentinbox/native";
 import { Button, Icon, List, Section } from "cupertino";
-import { BarSpace, Page } from "../components/Page";
+import { Page } from "../components/Page";
 import { SourceMark } from "../components/SourceMark";
 import { NavContext } from "../nav";
 import { testSource } from "../notify";
@@ -27,9 +27,8 @@ export function SourceIngestPage(props: { source: Source; url: string; created: 
     }
   };
   return (
-    <Page title={t("sources.ingest")} back={t("common.back")} onBack={back} testID="source-ingest">
-      <List>
-        <BarSpace />
+    <Page background="system-grouped-background" title={t("sources.ingest")} back={t("common.back")} onBack={back} testID="source-ingest">
+      <List scroll={false}>
         <Section>
           <View class="flex-row items-center gap-3 px-4 py-3">
             <SourceMark source={props.source} />

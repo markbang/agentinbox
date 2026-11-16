@@ -32,25 +32,52 @@ stop. Nothing Material remains: no ripples, no M3 shapes.
 
 ## Liquid Glass
 
-The material of the floating layer, from `nsh-cupertino`'s `Glass` (a GPU
-shader: it reads the backdrop, bends it through the surface's rounded-rect
-height field, blurs and tints it, and adds a specular rim). Its rules:
+Liquid Glass is the app's design language, not a material: the floating layer
+moves out of the content's way as the page scrolls. It comes from `nsh-cupertino`
+0.4.0 (`Glass`, `GlassTabBar`, `ScrollEdge`, the floating navigation group).
 
-- **Where it may be used**: the navigation bar (`material="regular"`), the tab
-  bar (the library's default), sheets, action sheets, alerts, the search field
-  where it floats (`glass`), and floating controls (`GlassButton`). Bars are
-  `regular`, sheets and alerts `thick`.
+- **The tab bar is a capsule that floats** (`GlassTabBar`): 64 pt tall, radius
+  32, 20 pt in from the sides and 12 pt above the home indicator, so the page
+  scrolls behind *and around* it. The chosen tab sits in a capsule of its own; a
+  20 pt scroll down minimises the bar to a 50 pt pill around that tab, a 12 pt
+  scroll up expands it, and the top of a page always expands it (UIKit's
+  `MinimizeBehavior.on-scroll-down`). Mail's floating compose button sits above
+  it, in the same stack.
+- **A page's bar is a floating group**: a 40 pt circle of glass for Back, the
+  compact title in the middle (press it to scroll to the top), a capsule of
+  glass for the page's actions, 16 pt in from the edges, 44 pt tall. A page with
+  a large title (Settings, Mailboxes) scrolls it away under the group and fades
+  the compact title in over its last 10 pt, as `NavPage` does.
+- **Content dissolves under the group** (`ScrollEdge`): progressive blur, 20 pt
+  at the edge and sharp 110 pt in, fading into the page's background, and a
+  reveal that runs 0 → 1 over the first 26 pt of scroll, so at rest at the top
+  there is nothing to dissolve.
+- **Where it may be used**: those two bars, the floating compose control,
+  sheets, action sheets, alerts, and the search field where it floats over
+  results. Bars are `regular`, sheets and alerts `thick`.
 - **Where it may not**: never on content. A list row, a message body, a form, the
   reader's white card and the page backgrounds stay solid — the HIG's rule, and
   what keeps text legible.
-- **Content scrolls under it**: a page's content carries the room at the top
-  (`pt-11`, or the list's `contentClass`) so the first row sits below the bar and
-  later rows pass behind it; the floating tab bar's 49 pt and the gesture area
-  are the lists' bottom room (`pb-[calc(env(safe-area-inset-bottom)+49px)]`).
-  Nothing is drawn *on* glass that is not a bar, a sheet or a control.
+- **The room it takes**: a page's content keeps 44 pt at the top (`pt-11`, the
+  page's own padding, or the list's `contentClass`) so the first row sits below
+  the group and later rows pass behind it; a tab's own page keeps
+  `TAB_BAR_ROOM` (64 + 12 + the safe area) at the foot, and a pushed page or a
+  sheet keeps only the safe area and 24 pt, since the bar is not over it.
+- **One scroller per page reports where it is** (`app/scroll.ts`): the page's own
+  scroll view, or the virtualized list that scrolls instead. The group, its large
+  title and the scroll edge read that offset, and so does the tab bar; a page
+  that appears starts at 0.
 - **Fallbacks are the library's**: without a GPU the material's fill and backdrop
   blur draw instead; Increased Contrast makes the fills near opaque; Reduce
-  Motion drops the press springs and the squash. The app adds no path of its own.
+  Motion drops the press springs, the squash and the minimise spring. The app
+  adds no path of its own.
+- **The app draws its own group**, from the library's parts (`Glass`,
+  `ScrollEdge`, `Icon`, `Button`) at the library's numbers: a 40 pt circle, a
+  44 pt row 16 pt in from the edges, a 40 pt capsule for the actions. A page here
+  scrolls with its own virtualized list — or the composer's fixed layout — and
+  carries up to four trailing controls, and the library's `NavPage` takes one
+  scroll view and one trailing label. Settings ran on `NavPage` before this, so
+  the two were compared frame by frame; the group is the same shape.
 - **The web needs the runtime patch** (`vendor/nsh-cupertino/tools/patch-runtime.mjs`)
   until NSH binds both stages' shader blocks; CI runs it after `nsh package --target web`.
 

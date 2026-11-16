@@ -327,7 +327,13 @@ def tab_bar():
 
 
 def tab(name):
-    """Taps a tab by its place in the bar, clear of the system's gesture area."""
+    """Taps a tab by its place in the bar, clear of the system's gesture area.
+
+    The bar minimises to a pill around the chosen tab as a page scrolls down, and
+    the pill takes the taps over that tab: a short drag up brings the bar back
+    before anything is pressed."""
+    adb("shell", "input", "swipe", str(w // 2), str(h * 7 // 10), str(w // 2), str(h * 7 // 10 - 80), "250")
+    quiet(1)
     bar = tab_bar()
     if bar:
         x1, y1, x2, _ = bar
@@ -586,6 +592,19 @@ for mode in ("light", "dark"):
     during(["swipe", str(w // 2), str(h * 8 // 10), str(w // 2), str(h * 5 // 10), "1200"], f"{mode}-inbox-mid-scroll", 0.6)
     adb("shell", "input", "swipe", str(w // 2), str(h * 7 // 10), str(w // 2), str(h * 3 // 10), "300")
     shot(f"{mode}-inbox-scrolled")
+    # Deeper: the bar minimises to a pill around the chosen tab, the page showing either side of it.
+    adb("shell", "input", "swipe", str(w // 2), str(h * 7 // 10), str(w // 2), str(h * 4 // 10), "400")
+    quiet(2)
+    shot(f"{mode}-inbox-tabmin")
+    bar = tab_bar()
+    if bar:
+        foot = bar[3] if bar[3] <= h else h
+        print(
+            f"tab bar: x {bar[0]}..{bar[2]} of {w}, y {bar[1]}..{foot} of {h}"
+            f" ({round((bar[2] - bar[0]) / w * 100)} % of the width, {h - foot} px from the foot)",
+            flush=True,
+        )
+    scroll_up_to("id:message-.*")
 
     if tab("Search") and wait("id:search"):
         shot(f"{mode}-search")

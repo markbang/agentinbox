@@ -4,7 +4,7 @@ import { Clipboard, Text, View } from "nsh";
 import { t } from "nsh/i18n";
 import type { ApiKey } from "agentinbox/native";
 import { Button, Icon, List, Section } from "cupertino";
-import { BarSpace, Page } from "../components/Page";
+import { Page } from "../components/Page";
 import { keyExpiry, keyScopes } from "./ApiKeysPage";
 import { NavContext } from "../nav";
 import { showToast } from "../store";
@@ -26,9 +26,8 @@ export function KeyCreatedPage(props: { apiKey: ApiKey; token: string }) {
     }
   };
   return (
-    <Page title={t("keys.created")} back={t("common.back")} onBack={back} testID="key-created">
-      <List>
-        <BarSpace />
+    <Page background="system-grouped-background" title={t("keys.created")} back={t("common.back")} onBack={back} testID="key-created">
+      <List scroll={false}>
         <Section>
           <View class="flex-row items-start gap-2 px-4 py-3">
             <Icon name="exclamationmark.triangle" size={16} tint="system-orange" />

@@ -5,7 +5,7 @@ import { signal, Text, View } from "nsh";
 import { t } from "nsh/i18n";
 import type { Source } from "agentinbox/native";
 import { ActionSheet, AlertDialog, Button, Icon, List, ListTile, Section } from "cupertino";
-import { BarSpace, Page } from "../components/Page";
+import { Page } from "../components/Page";
 import { SourceMark } from "../components/SourceMark";
 import { NavContext } from "../nav";
 import { deleteSource, rotateSource, serverInbox, setSourceEnabled, sources, testSource } from "../notify";
@@ -33,6 +33,7 @@ export function SourcesPage() {
   const add = () => nav.stack.push({ name: "addSource" });
   return (
     <Page
+      background="system-grouped-background"
       title={t("sources.title")}
       back={t("common.back")}
       onBack={nav.close}
@@ -43,8 +44,7 @@ export function SourcesPage() {
       }
       testID="sources"
     >
-      <List>
-        <BarSpace />
+      <List scroll={false}>
         <If
           when={serverInbox()}
           else={
