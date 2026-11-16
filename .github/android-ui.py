@@ -468,6 +468,10 @@ def swipe_archive(row, tries=3):
         x1, y1, x2, y2 = row
         y = (y1 + y2) // 2
         before = first_row()
+        # The shot above may have left the row's Archive action open, and a swipe that starts on an
+        # open action does nothing: a short swipe the other way closes it first (too short to reveal Delete).
+        adb("shell", "input", "swipe", str(x2 - 200), str(y), str(x2 - 260), str(y), "300")
+        quiet(1)
         # Slow enough that the distance alone (past the 35% mark) archives, whatever the measured velocity.
         adb("shell", "input", "swipe", str((x1 + x2) // 2 - (x2 - x1) // 4), str(y), str(x2 - 60), str(y), "400")
         end = time.time() + 6
