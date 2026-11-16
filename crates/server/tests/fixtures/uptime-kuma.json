@@ -1,5 +1,15 @@
 {
-  "heartbeat": { "status": 0, "msg": "connect ECONNREFUSED 10.0.0.4:993" },
-  "monitor": { "name": "imap.bangwu.me", "url": "https://uptime.example.com/status/imap", "hostname": "imap.bangwu.me" },
+  "heartbeat": {
+    "status": 0,
+    "time": "2026-11-16 09:41:03.123",
+    "msg": "connect ECONNREFUSED 10.0.0.4:993",
+    "duration": 1.2,
+    "important": false
+  },
+  "monitor": {
+    "name": "imap.bangwu.me",
+    "url": "https://uptime.example.com/status/imap",
+    "hostname": "imap.bangwu.me"
+  },
   "msg": "[Down] imap.bangwu.me"
 }

@@ -212,6 +212,14 @@ pub fn router(state: Arc<AppState>) -> Router {
             "/message",
             post(ingest::gotify).layer(DefaultBodyLimit::max(ingest::BODY_LIMIT)),
         )
+        // The root is the web client's index page, and also ntfy's JSON publish with the topic in
+        // the body (Uptime Kuma's notifier posts there when its URL has no `/{topic}`).
+        .route(
+            "/",
+            get(ingest::web_index)
+                .post(ingest::ntfy_root)
+                .layer(DefaultBodyLimit::max(ingest::BODY_LIMIT)),
+        )
         .route(
             "/{topic}",
             get(ingest::web_asset)

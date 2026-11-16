@@ -17,6 +17,7 @@ use axum::{
     http::{HeaderMap, StatusCode, header},
     response::{IntoResponse, Response},
 };
+use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use futures_util::stream;
 use mail_core::feed::{FeedMessage, NewFeedMessage, Source, now_ms, sanitize_html};
 use mail_core::secrets::SecretStore;
@@ -168,7 +169,14 @@ async fn webhook_inner(
     let doc = parse_body(&headers, &body, query.format.as_deref())
         .map_err(|e| refused(StatusCode::BAD_REQUEST, &e))?;
     let mapping = Mapping::of(&source.config);
-    let n = mapping.normalise(&doc, &source);
+    let mut n = mapping.normalise(&doc, &source);
+    // GitHub sends one delivery id per event and reuses it for retries; its payload's issue id
+    // alone would drop the next event of that issue (opened, then closed).
+    if mapping.preset.as_deref() == Some("github")
+        && let Some(delivery) = header_opt(&headers, "x-github-delivery")
+    {
+        n.message.external_id = Some(delivery);
+    }
     store(&state, &source, n)
 }
 
@@ -213,13 +221,16 @@ fn verify_signature(
     Ok(())
 }
 
-/// Gotify's `POST /message?token=`: its JSON in, its JSON out.
+/// Gotify's `POST /message?token=`: its JSON in, its JSON out. The token also comes in
+/// `X-Gotify-Key` or as the password of HTTP basic auth, as Gotify's own clients send it, and the
+/// body may be a form or multipart post, as `curl -F` scripts send it.
 pub async fn gotify(
     State(state): State<std::sync::Arc<AppState>>,
     Query(query): Query<IngestQuery>,
+    headers: HeaderMap,
     body: Bytes,
 ) -> Response {
-    match gotify_inner(state, query, body).await {
+    match gotify_inner(state, query, headers, body).await {
         Ok(message) => {
             let date = rfc3339(message.received_at);
             let body = json!({
@@ -236,40 +247,64 @@ pub async fn gotify(
     }
 }
 
+/// `?token=`, `X-Gotify-Key`, or basic auth with the token as the password.
+fn gotify_token(query: &IngestQuery, headers: &HeaderMap) -> Option<String> {
+    query
+        .token
+        .clone()
+        .or_else(|| header_opt(headers, "x-gotify-key"))
+        .or_else(|| basic_password(headers))
+        .filter(|t| !t.trim().is_empty())
+}
+
+fn basic_password(headers: &HeaderMap) -> Option<String> {
+    let header = header_opt(headers, "authorization")?;
+    let (scheme, encoded) = header.trim().split_once(' ')?;
+    if !scheme.eq_ignore_ascii_case("basic") {
+        return None;
+    }
+    let decoded = BASE64.decode(encoded.trim()).ok()?;
+    let decoded = String::from_utf8(decoded).ok()?;
+    let (_, password) = decoded.split_once(':')?;
+    Some(password.to_string())
+}
+
 async fn gotify_inner(
     state: std::sync::Arc<AppState>,
     query: IngestQuery,
+    headers: HeaderMap,
     body: Bytes,
 ) -> Result<FeedMessage, Response> {
-    let token = query
-        .token
-        .as_deref()
-        .ok_or_else(|| refused(StatusCode::UNAUTHORIZED, "missing token"))?;
-    let source = source_for(&state, token, "gotify", &state.rate_limits)?;
-    let doc: Value = serde_json::from_slice(&body)
-        .map_err(|e| refused(StatusCode::BAD_REQUEST, &format!("body is not JSON: {e}")))?;
-    let text = |key: &str| doc.get(key).and_then(Value::as_str).map(str::to_string);
+    let token = gotify_token(&query, &headers).ok_or_else(|| {
+        refused(
+            StatusCode::UNAUTHORIZED,
+            "missing token: send it as ?token=, X-Gotify-Key, or basic auth with the token as the password",
+        )
+    })?;
+    let source = source_for(&state, &token, "gotify", &state.rate_limits)?;
+    let doc = parse_body(&headers, &body, query.format.as_deref())
+        .map_err(|e| refused(StatusCode::BAD_REQUEST, &e))?;
+    let text = |key: &str| doc.get(key).and_then(defaults::text_of);
     let mut message = NewFeedMessage {
         source_id: source.id.clone(),
         title: text("title").unwrap_or_else(|| "(no title)".into()),
         body_text: text("message"),
         priority: doc
             .get("priority")
-            .and_then(Value::as_i64)
+            .map(priority_of)
             .unwrap_or(0)
             .clamp(0, 10),
         received_at: now_ms(),
         payload: Some(body.slice(..body.len().min(64 * 1024)).to_vec()),
         ..Default::default()
     };
-    if let Some(html) = doc
+    if doc
         .get("extras")
         .and_then(|e| e.get("client::display"))
         .and_then(|d| d.get("contentType"))
         .and_then(Value::as_str)
-        .filter(|c| c.contains("html"))
+        .is_some_and(|c| c.contains("html"))
     {
-        let _ = html;
         message.body_html = text("message");
         message.body_text = None;
     }
@@ -283,23 +318,33 @@ pub async fn web_asset(
     State(state): State<std::sync::Arc<AppState>>,
     Path(topic): Path<String>,
 ) -> Response {
+    serve_web_file(&state, &topic).await
+}
+
+/// `GET /`: the web client's entry page. The root is also the ntfy JSON alias, so its GET has to
+/// keep serving the site instead of falling to the directory fallback.
+pub async fn web_index(State(state): State<std::sync::Arc<AppState>>) -> Response {
+    serve_web_file(&state, "index.html").await
+}
+
+async fn serve_web_file(state: &AppState, name: &str) -> Response {
     let Some(dir) = &state.config.web_dir else {
         return (StatusCode::NOT_FOUND, "not found").into_response();
     };
-    if topic.is_empty() || topic.starts_with('.') || topic.contains(['/', '\\']) {
+    if name.is_empty() || name.starts_with('.') || name.contains(['/', '\\']) {
         return (StatusCode::NOT_FOUND, "not found").into_response();
     }
-    let Ok(bytes) = tokio::fs::read(dir.join(&topic)).await else {
+    let Ok(bytes) = tokio::fs::read(dir.join(name)).await else {
         return (StatusCode::NOT_FOUND, "not found").into_response();
     };
-    let cache = if topic.ends_with(".html") {
+    let cache = if name.ends_with(".html") {
         "no-cache"
     } else {
         "public, max-age=3600"
     };
     (
         [
-            (header::CONTENT_TYPE, content_type(&topic)),
+            (header::CONTENT_TYPE, content_type(name)),
             (header::CACHE_CONTROL, cache),
         ],
         bytes,
@@ -333,7 +378,33 @@ pub async fn ntfy_publish(
     headers: HeaderMap,
     body: Bytes,
 ) -> Response {
-    match ntfy_inner(state, topic, query, headers, body).await {
+    reply(ntfy_inner(state, topic, query, headers, body).await)
+}
+
+/// `POST /`: ntfy's JSON publish with the topic in the body, which is what Uptime Kuma's ntfy
+/// notifier sends when its URL has no `/{topic}`. Accepted only for a topic that is one of our
+/// source tokens, so the root cannot be used to publish anywhere else.
+pub async fn ntfy_root(
+    State(state): State<std::sync::Arc<AppState>>,
+    Query(query): Query<IngestQuery>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
+    let topic = serde_json::from_slice::<Value>(&body)
+        .ok()
+        .and_then(|doc| doc.get("topic").and_then(Value::as_str).map(str::to_string))
+        .filter(|t| !t.trim().is_empty());
+    let Some(topic) = topic else {
+        return refused(
+            StatusCode::BAD_REQUEST,
+            "POST / is ntfy's JSON alias: send {\"topic\": …} with a topic that is a source token, or publish to /{token}",
+        );
+    };
+    reply(ntfy_inner(state, topic, query, headers, body).await)
+}
+
+fn reply(result: Result<FeedMessage, Response>) -> Response {
+    match result {
         Ok(message) => {
             let body = json!({
                 "id": message.id,
@@ -347,7 +418,7 @@ pub async fn ntfy_publish(
             });
             (StatusCode::OK, axum::Json(body)).into_response()
         }
-        Err(e) => e.into_response(),
+        Err(e) => e,
     }
 }
 
@@ -368,6 +439,7 @@ async fn ntfy_inner(
             .and_then(Value::as_str)
             .map(str::to_string)
     };
+    let from_json_node = |key: &str| json.as_ref().and_then(|j| j.get(key));
     let message_text = query
         .message
         .clone()
@@ -389,7 +461,8 @@ async fn ntfy_inner(
             .priority
             .clone()
             .or_else(|| header_opt(&headers, "priority"))
-            .and_then(|p| p.parse::<f64>().ok())
+            .and_then(|p| p.trim().parse::<f64>().ok())
+            .or_else(|| from_json_node("priority").map(|v| priority_of(v) as f64))
             .map(|p| {
                 if p <= 5.0 {
                     ntfy_to_priority(p as i64)
@@ -397,7 +470,8 @@ async fn ntfy_inner(
                     p.round() as i64
                 }
             })
-            .unwrap_or(2),
+            // ntfy's default priority is 3, which is 6 on the feed's 0–10 scale.
+            .unwrap_or(6),
         tags: query
             .tags
             .clone()
@@ -408,6 +482,7 @@ async fn ntfy_inner(
                     .filter(|s| !s.is_empty())
                     .collect()
             })
+            .or_else(|| from_json_node("tags").map(tags_of))
             .unwrap_or_default(),
         received_at: now_ms(),
         payload: Some(body.slice(..body.len().min(64 * 1024)).to_vec()),
@@ -502,27 +577,33 @@ fn ntfy_to_priority(ntfy: i64) -> i64 {
 }
 
 /// One field of a source's mapping: JSON path, `a || b` fallback chain, or `{{ template }}`.
-struct Mapping(Value);
+struct Mapping {
+    fields: Value,
+    preset: Option<String>,
+}
 
 impl Mapping {
     fn of(config: &Value) -> Self {
         let preset = config.get("preset").and_then(Value::as_str);
         let own = config.get("mapping").cloned().unwrap_or(Value::Null);
         let base = preset.and_then(presets::get).unwrap_or(Value::Null);
-        Mapping(match (base, own) {
-            (Value::Object(mut base), Value::Object(own)) => {
-                for (k, v) in own {
-                    base.insert(k, v);
+        Mapping {
+            fields: match (base, own) {
+                (Value::Object(mut base), Value::Object(own)) => {
+                    for (k, v) in own {
+                        base.insert(k, v);
+                    }
+                    Value::Object(base)
                 }
-                Value::Object(base)
-            }
-            (Value::Object(base), _) => Value::Object(base),
-            (_, own) => own,
-        })
+                (Value::Object(base), _) => Value::Object(base),
+                (_, own) => own,
+            },
+            preset: preset.map(str::to_string),
+        }
     }
 
     fn field(&self, name: &str) -> Option<&str> {
-        self.0.get(name)?.as_str()
+        self.fields.get(name)?.as_str()
     }
 
     fn normalise(&self, doc: &Value, source: &Source) -> Normalised {
@@ -542,7 +623,11 @@ impl Mapping {
         Normalised {
             message: NewFeedMessage {
                 source_id: source.id.clone(),
-                external_id: text("externalId").or_else(|| defaults::external_id(doc)),
+                // A template that resolved to nothing but its separators would dedup every
+                // message of the source into one, so an id needs at least one real character.
+                external_id: text("externalId")
+                    .filter(|e| e.chars().any(char::is_alphanumeric))
+                    .or_else(|| defaults::external_id(doc)),
                 sender: text("sender").or_else(|| defaults::sender(doc)),
                 title,
                 body_text,
@@ -791,6 +876,42 @@ fn form_value(body: &[u8]) -> Result<Value, String> {
     Ok(Value::Object(map))
 }
 
+/// `multipart/form-data` fields (`curl -F title=… -F message=…`), flat like a form: files are
+/// taken as text, which is what a notification body is anyway.
+fn multipart_value(content_type: &str, body: &[u8]) -> Result<Value, String> {
+    let Some(boundary) = boundary_of(content_type) else {
+        return Err("multipart body has no boundary".into());
+    };
+    let text = std::str::from_utf8(body).map_err(|_| "body is not UTF-8".to_string())?;
+    let mut map = serde_json::Map::new();
+    for part in text.split(&format!("--{boundary}")).skip(1) {
+        let Some((head, value)) = part.split_once("\r\n\r\n") else {
+            continue;
+        };
+        let Some(name) = part_name(head) else {
+            continue;
+        };
+        let value = value.strip_suffix("\r\n").unwrap_or(value);
+        map.insert(name, Value::String(value.to_string()));
+    }
+    Ok(Value::Object(map))
+}
+
+fn boundary_of(content_type: &str) -> Option<String> {
+    let lower = content_type.to_ascii_lowercase();
+    let at = lower.find("boundary=")? + "boundary=".len();
+    let value = content_type[at..].split(';').next()?.trim();
+    Some(value.trim_matches('"').to_string()).filter(|b| !b.is_empty())
+}
+
+fn part_name(head: &str) -> Option<String> {
+    let at = head.to_ascii_lowercase().find("content-disposition:")?;
+    let line = &head[at..];
+    let at = line.to_ascii_lowercase().find("name=\"")? + "name=\"".len();
+    let rest = &line[at..];
+    Some(rest[..rest.find('"')?].to_string())
+}
+
 fn percent_decode(s: &str) -> String {
     let bytes = s.as_bytes();
     let mut out = Vec::with_capacity(bytes.len());
@@ -821,22 +942,24 @@ fn percent_decode(s: &str) -> String {
 }
 
 fn parse_body(headers: &HeaderMap, body: &[u8], format: Option<&str>) -> Result<Value, String> {
+    let content_type = headers
+        .get(header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or_default();
     let kind = format
         .map(|f| f.to_ascii_lowercase())
-        .or_else(|| {
-            headers
-                .get(header::CONTENT_TYPE)
-                .and_then(|v| v.to_str().ok())
-                .map(|v| v.to_ascii_lowercase())
-        })
-        .unwrap_or_default();
+        .unwrap_or_else(|| content_type.to_ascii_lowercase());
+    if kind.contains("multipart/form-data") {
+        return multipart_value(content_type, body);
+    }
     if kind.contains("form") {
         return form_value(body);
     }
     if body.is_empty() {
         return Ok(Value::Object(Default::default()));
     }
-    serde_json::from_slice(body).map_err(|e| format!("body is neither JSON nor a form: {e}"))
+    serde_json::from_slice(body)
+        .map_err(|e| format!("body is neither JSON, a form nor multipart: {e}"))
 }
 
 pub fn hmac_sha256(key: &[u8], message: &[u8]) -> [u8; 32] {
@@ -917,7 +1040,9 @@ pub mod presets {
                 "body": "{{issue.body || pull_request.body || release.body || workflow_run.conclusion || repository.description || action}}",
                 "sender": "$.sender.login || $.pusher.name",
                 "link": "$.issue.html_url || $.pull_request.html_url || $.release.html_url || $.workflow_run.html_url || $.repository.html_url",
-                "externalId": "$.issue.id || $.pull_request.id || $.release.id || $.workflow_run.id || $.after",
+                // The action is part of the key, so one issue's opened and closed events are two
+                // messages. The delivery header replaces this when GitHub sends it.
+                "externalId": "{{$.issue.id || $.pull_request.id || $.release.id || $.workflow_run.id || $.after}}:{{$.action}}",
                 "priority": "3",
                 "tags": "$.action"
             }),
@@ -931,12 +1056,12 @@ pub mod presets {
                 "tags": "$.object_kind"
             }),
             "sentry" => json!({
-                "title": "{{project_name}}: {{data.issue.title || issue.title || title}}",
-                "body": "$.data.issue.culprit || $.message",
-                "sender": "$.data.issue.project.name || $.project_name",
-                "link": "$.data.issue.permalink || $.url",
-                "externalId": "$.data.issue.id || $.id",
-                "priority": "$.level",
+                "title": "$.data.issue.title || $.data.issue.culprit || $.data.issue.shortId || $.issue.title || $.title",
+                "body": "$.data.issue.culprit || $.data.issue.metadata.value || $.message",
+                "sender": "$.data.actor.name || $.actor.name || $.data.issue.project.name || $.project.name || $.project_name",
+                "link": "$.data.issue.permalink || $.data.issue.web_url || $.url",
+                "externalId": "$.data.issue.id || $.issue.id || $.id",
+                "priority": "$.data.issue.level || $.level",
                 "tags": "$.data.issue.project.slug || $.project_slug"
             }),
             "grafana" => json!({
@@ -953,7 +1078,9 @@ pub mod presets {
                 "body": "$.heartbeat.msg || $.monitor.name",
                 "sender": "$.monitor.name",
                 "link": "$.monitor.url",
-                "externalId": "$.heartbeat.msg || $.monitor.name",
+                // One heartbeat, one message: the monitor name is the same for every outage, so
+                // only the heartbeat's own time can tell a second outage from a retry.
+                "externalId": "$.heartbeat.time",
                 "priority": "3",
                 "tags": "$.monitor.name"
             }),

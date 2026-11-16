@@ -23,3 +23,4 @@ English | [简体中文](next.zh-CN.md)
 ## Fixed
 
 ---
+- **GitHub, Uptime Kuma and Sentry sources keep every real event.** An issue that opens and closes is two notifications, a second outage of the same monitor is not swallowed, and Sentry's issue webhook no longer arrives as ": " with priority 0. Gotify clients may now authenticate with `X-Gotify-Key` or basic auth and post forms (`curl -F`), ntfy publishes without a priority arrive as the normal priority 3, and Uptime Kuma's ntfy notifier works when its URL points at the server root.

@@ -55,21 +55,23 @@
 
 `POST /hooks/{token}`，一个 source 一个 URL，token 32 字节随机数，库里只有哈希。
 
-- 请求体：JSON 或表单；`?format=` 可强制指定。表单会变成一个扁平对象，所以同一套路径都能用。
+- 请求体：JSON、表单或 multipart；`?format=` 可强制指定。表单和 multipart 都会变成一个扁平对象，所以同一套路径都能用。
 - 映射：source 的 `config.mapping` 里每个字段一条表达式——`sender`、`title`、`body`、`bodyHtml`、`link`、`priority`、`tags`、`externalId`。表达式可以是路径（`$.issue.title`、`.a.b[0].c`、`$['a']`）、回退链（`a || b`，取第一个有值且非空的）、模板（`{{repository.full_name}}: {{action}}`）或字面量（`3`）。路径只做普通取值，没有过滤器和通配符。`priority` 取 0–10，也可以给级别（`error`、`warning`、`info`、`debug`、`critical`、`alerting`、`ok`）。
 - 没配置字段时的默认值：`title` 取 `title`/`subject`/`message`/`text`/`name` 里第一个；`sender` 取 `sender`/`from`/`author`/`app`/`service`/`user`；`link` 取 `url`/`link`/`html_url`/`permalink`；`externalId` 取 `id`/`event_id`/`guid`/`uuid`/`fingerprint`；`priority` 取 `priority` 或级别；`body` 是 JSON 其余部分的 pretty 文本。
 - 预设（内置可改，`GET /v1/sources/presets`）：GitHub（issue、PR、Actions、release）、GitLab（pipeline、MR）、Sentry、Grafana、Uptime Kuma。source 用 `config.preset` 选一个，`config.mapping` 覆盖单个字段。`POST /v1/sources` 和 `PATCH /v1/sources/{id}` 的顶层也接受 `preset`，含义相同：都会写成 `config.preset`，创建时以顶层为准，patch 里 `preset: ""` 表示去掉。
+- 各预设的去重键（`externalId`）：GitHub 优先用 `X-GitHub-Delivery`（GitHub 重试时沿用同一个），没有时用 `<issue/PR/release/run id>:<action>`，所以同一个 issue 的 `opened` 和 `closed` 是两条；GitLab 用对象 id；Sentry 用 issue id；Grafana 用 fingerprint；Uptime Kuma 用心跳时间，所以同一监控的第二次故障也会再来一条。没有时间的心跳则每次都入库，丢一次故障比重复更糟。
+- Sentry 的 integration-platform issue webhook 把告警放在 `data` 下：标题取 `data.issue.title`（再退到 `culprit`、`shortId`），级别取 `data.issue.level`（再退到顶层 `level`），发送者取 `data.actor.name`（再退到项目名）。
 - 接口不认识的字段，或没有任何预设对应的 `preset` 名字，直接返回 `400` 并在消息里列出可用的值。如果忽略，source 就没有映射，之后每条通知都只能以原始 JSON 到达。
 - 可选签名校验：source 配了 secret 时，`X-Hub-Signature-256`（GitHub 风格 HMAC-SHA256，对原始请求体）必须匹配，否则 `401`。
 - 返回 `202 {"id": "…"}`（`externalId` 重复时同样返回、不入库）；`401` token 或签名错、`403` source 已暂停、`413` 超过 256 KiB、`429` 超过每 source 限流（60/分，突发 120）。
 
 ### Gotify 兼容（`kind = gotify`）
 
-`POST /message?token={token}`，请求体用 Gotify 的 JSON（`title`、`message`、`priority`、`extras`），返回 Gotify 的结构（`id`、`appid`、`message`、`title`、`priority`、`date`）；`id` 是 feed 里按用户的 `seq`，`date` 是 RFC 3339。`extras["client::display"].contentType = "text/html"` 时按清洗后的 HTML 存储。现有 `curl` 脚本和 Gotify 客户端改个地址就能用。
+`POST /message`，token 可以放在 `?token=`、`X-Gotify-Key`，或 HTTP basic auth 的密码位置（用户名忽略）；请求体可以是 Gotify 的 JSON（`title`、`message`、`priority`、`extras`），也可以是表单或 multipart（`curl -F title=… -F message=…`），`priority` 数字和字符串都收。返回 Gotify 的结构（`id`、`appid`、`message`、`title`、`priority`、`date`）；`id` 是 feed 里按用户的 `seq`，`date` 是 RFC 3339。`extras["client::display"].contentType = "text/html"` 时按清洗后的 HTML 存储。只调 `/message` 的推送客户端和 `curl` 脚本，改个主机就能用。Gotify 自己的 App 和网页界面还会调 `/application`、`/client`、`/version` 并开 websocket，这些本服务没有实现，所以它们不能指向这里。
 
 ### ntfy 兼容（`kind = ntfy`）
 
-`PUT|POST /{topic}`，topic 就是 source 的 token，用 ntfy 的请求头（`Title`、`Priority`、`Tags`、`Click`、`X-Title`、`X-Message`）、JSON 发布格式或直接正文，返回 ntfy 的消息 JSON。ntfy 的 1–5 优先级在 feed 里是 2–10。`GET /{topic}/json` 按 ntfy 的方式输出 NDJSON：先用 `?since=<seq>` 补发，然后跟随该 source 的实时消息，每 30 秒一个空行。`ntfy publish` 改个地址即可。
+`PUT|POST /{topic}`，topic 就是 source 的 token，用 ntfy 的请求头（`Title`、`Priority`、`Tags`、`Click`、`X-Title`、`X-Message`）、JSON 发布格式（`title`、`message`、`priority`、`tags`、`click` 写在 body 里）或直接正文，返回 ntfy 的消息 JSON。ntfy 的 1–5 优先级在 feed 里是 2–10；不带优先级时按 ntfy 的默认值 3（feed 里 6）。`POST /` 也接受 JSON 发布，前提是 body 里的 `topic` 是某个 source 的 token——Uptime Kuma 的 ntfy 通知就发到服务根地址；其他 topic 或没有 topic 的根地址发布会被拒（`401`、`400`）。`GET /{topic}/json` 按 ntfy 的方式输出 NDJSON：先用 `?since=<seq>` 补发，然后跟随该 source 的实时消息，每 30 秒一个空行。`ntfy publish` 和 `ntfy subscribe <topic>` 改个主机就能用；ntfy 的手机和桌面 App 及其账号功能走 `/v1/…` 接口（登录、订阅、附件），本服务没有实现。
 
 ### IM 来源（`telegram`、`discord`、`slack`、`feishu`、`dingtalk`、`wecom`）
 

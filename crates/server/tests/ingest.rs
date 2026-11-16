@@ -197,7 +197,7 @@ async fn presets_map_real_payloads() {
         (
             include_str!("fixtures/sentry-issue-alert.json"),
             "sentry",
-            "agentinbox-web: TypeError: cannot read property 'id' of undefined",
+            "TypeError: cannot read property 'id' of undefined",
             "agentinbox-web",
             6,
         ),
@@ -561,6 +561,222 @@ async fn gotify_compatible() {
             .status(),
         StatusCode::UNAUTHORIZED
     );
+
+    // Gotify's clients send the token as `X-Gotify-Key`…
+    let res = server
+        .http
+        .post(format!("{}/message", server.origin))
+        .header("x-gotify-key", &token)
+        .json(&json!({ "title": "Header key", "message": "from a client" }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+
+    // …or as the password of basic auth (`curl -u user:token`).
+    let res = server
+        .http
+        .post(format!("{}/message", server.origin))
+        .basic_auth("robot", Some(&token))
+        .json(&json!({ "title": "Basic auth" }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+
+    // A form post, priority as the string the form always sends.
+    let res = server
+        .http
+        .post(format!("{}/message?token={token}", server.origin))
+        .form(&[
+            ("title", "Form post"),
+            ("message", "a=1"),
+            ("priority", "7"),
+        ])
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let body: Value = res.json().await.unwrap();
+    assert_eq!(body["title"], "Form post");
+    assert_eq!(body["priority"], 7);
+
+    // `curl -F title=… -F message=…`.
+    let boundary = "----agentinbox-boundary";
+    let multipart = format!(
+        "--{boundary}\r\nContent-Disposition: form-data; name=\"title\"\r\n\r\nMultipart title\r\n\
+         --{boundary}\r\nContent-Disposition: form-data; name=\"message\"\r\n\r\nmultipart body\r\n\
+         --{boundary}\r\nContent-Disposition: form-data; name=\"priority\"\r\n\r\n9\r\n\
+         --{boundary}--\r\n"
+    );
+    let res = server
+        .http
+        .post(format!("{}/message?token={token}", server.origin))
+        .header(
+            "content-type",
+            format!("multipart/form-data; boundary={boundary}"),
+        )
+        .body(multipart)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let body: Value = res.json().await.unwrap();
+    assert_eq!(body["title"], "Multipart title");
+    assert_eq!(body["message"], "multipart body");
+    assert_eq!(body["priority"], 9);
+
+    let titles: Vec<String> = server
+        .feed(&server.source_id_of(&token))
+        .into_iter()
+        .map(|row| row.0)
+        .collect();
+    assert_eq!(
+        titles,
+        [
+            "Backup done",
+            "Header key",
+            "Basic auth",
+            "Form post",
+            "Multipart title"
+        ]
+    );
+}
+
+/// One issue that opens and later closes is two messages. GitHub's delivery id is the dedup key
+/// when it arrives (GitHub retries with the same one), and the preset keeps the action in the key
+/// when it does not.
+#[tokio::test]
+async fn github_events_of_one_issue_are_two_messages() {
+    let server = start(temp_dir()).await;
+    let session = server.signup("owner@test.local").await;
+    let opened: Value = serde_json::from_str(include_str!("fixtures/github-issue.json")).unwrap();
+    let mut closed = opened.clone();
+    closed["action"] = json!("closed");
+
+    let (token, url) = server
+        .source(&session, "webhook", json!({ "preset": "github" }), None)
+        .await;
+    for event in [&opened, &closed, &closed] {
+        let res = server
+            .http
+            .post(server.at(&url))
+            .json(event)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::ACCEPTED);
+    }
+    let feed = server.feed(&server.source_id_of(&token));
+    assert_eq!(
+        feed.len(),
+        2,
+        "opened and closed are two events, the retry is not"
+    );
+    assert_eq!(feed[0].5.as_deref(), Some("2300470027:opened"));
+    assert_eq!(feed[1].5.as_deref(), Some("2300470027:closed"));
+
+    let (token, url) = server
+        .source(&session, "webhook", json!({ "preset": "github" }), None)
+        .await;
+    for (event, delivery) in [(&opened, "d-1"), (&closed, "d-2"), (&closed, "d-2")] {
+        let res = server
+            .http
+            .post(server.at(&url))
+            .header("x-github-delivery", delivery)
+            .json(event)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::ACCEPTED);
+    }
+    let feed = server.feed(&server.source_id_of(&token));
+    assert_eq!(feed.len(), 2, "a redelivered event is one message");
+    assert_eq!(feed[0].5.as_deref(), Some("d-1"));
+    assert_eq!(feed[1].5.as_deref(), Some("d-2"));
+}
+
+/// Two outages of one monitor carry the same text; only the heartbeat's time tells them apart.
+#[tokio::test]
+async fn kuma_repeated_outage_is_two_messages() {
+    let server = start(temp_dir()).await;
+    let session = server.signup("owner@test.local").await;
+    let (token, url) = server
+        .source(
+            &session,
+            "webhook",
+            json!({ "preset": "uptime-kuma" }),
+            None,
+        )
+        .await;
+    let first: Value = serde_json::from_str(include_str!("fixtures/uptime-kuma.json")).unwrap();
+    let mut second = first.clone();
+    second["heartbeat"]["time"] = json!("2026-11-16 10:21:17.004");
+
+    for event in [&first, &second, &first] {
+        let res = server
+            .http
+            .post(server.at(&url))
+            .json(event)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::ACCEPTED);
+    }
+    let feed = server.feed(&server.source_id_of(&token));
+    assert_eq!(feed.len(), 2);
+    assert_eq!(feed[0].5.as_deref(), Some("2026-11-16 09:41:03.123"));
+    assert_eq!(feed[1].5.as_deref(), Some("2026-11-16 10:21:17.004"));
+
+    // A heartbeat without a time is stored every time: no dedup is better than losing an outage.
+    let (token, url) = server
+        .source(
+            &session,
+            "webhook",
+            json!({ "preset": "uptime-kuma" }),
+            None,
+        )
+        .await;
+    let mut untimed = first.clone();
+    untimed["heartbeat"].as_object_mut().unwrap().remove("time");
+    for _ in 0..2 {
+        server
+            .http
+            .post(server.at(&url))
+            .json(&untimed)
+            .send()
+            .await
+            .unwrap();
+    }
+    assert_eq!(server.feed(&server.source_id_of(&token)).len(), 2);
+}
+
+/// Sentry's integration-platform issue webhook has no `project_name` and keeps the level under
+/// `data.issue`: the mapping must not turn that into ": " and priority 0.
+#[tokio::test]
+async fn sentry_issue_webhook_without_project_name() {
+    let server = start(temp_dir()).await;
+    let session = server.signup("owner@test.local").await;
+    let (token, url) = server
+        .source(&session, "webhook", json!({ "preset": "sentry" }), None)
+        .await;
+    let res = server
+        .http
+        .post(server.at(&url))
+        .body(include_str!("fixtures/sentry-issue-webhook.json"))
+        .header("content-type", "application/json")
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::ACCEPTED);
+    let feed = server.feed(&server.source_id_of(&token));
+    assert_eq!(
+        feed[0].0,
+        "TypeError: cannot read property 'id' of undefined"
+    );
+    assert_eq!(feed[0].2.as_deref(), Some("Bang Wu"));
+    assert_eq!(feed[0].4, 4, "warning is priority 4");
+    assert_eq!(feed[0].5.as_deref(), Some("5566778899"));
 }
 
 #[tokio::test]
@@ -642,6 +858,93 @@ async fn ntfy_compatible() {
             .status(),
         StatusCode::UNAUTHORIZED
     );
+}
+
+/// ntfy's default priority is 3, and its JSON publish may arrive at the server root with the topic
+/// in the body (Uptime Kuma's notifier does that).
+#[tokio::test]
+async fn ntfy_default_priority_and_root_publish() {
+    let server = start(temp_dir()).await;
+    let session = server.signup("owner@test.local").await;
+    let (topic, _) = server.source(&session, "ntfy", json!({}), None).await;
+    let id = server.source_id_of(&topic);
+
+    let res = server
+        .http
+        .post(format!("{}/{topic}", server.origin))
+        .body("no priority")
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    assert_eq!(res.json::<Value>().await.unwrap()["priority"], 3);
+
+    let res = server
+        .http
+        .post(format!("{}/{topic}", server.origin))
+        .json(&json!({
+            "title": "JSON publish",
+            "message": "from json",
+            "priority": "5",
+            "tags": ["a", "b"],
+            "click": "https://example.com/x"
+        }))
+        .send()
+        .await
+        .unwrap();
+    let body: Value = res.json().await.unwrap();
+    assert_eq!(body["title"], "JSON publish");
+    assert_eq!(body["priority"], 5);
+    assert_eq!(body["tags"], json!(["a", "b"]));
+
+    let feed = server.feed(&id);
+    assert_eq!(feed.len(), 2);
+    assert_eq!(feed[0].4, 6, "ntfy's default priority 3 is 6 in the feed");
+    assert_eq!(feed[1].4, 10);
+    assert_eq!(feed[1].3.as_deref(), Some("https://example.com/x"));
+
+    let res = server
+        .http
+        .post(format!("{}/", server.origin))
+        .json(&json!({
+            "topic": topic,
+            "title": "Root publish",
+            "message": "to the root",
+            "priority": 4
+        }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let feed = server.feed(&id);
+    assert_eq!(feed.len(), 3);
+    assert_eq!(feed[2].0, "Root publish");
+    assert_eq!(feed[2].4, 8);
+
+    // The root is not a publish endpoint for anything else.
+    assert_eq!(
+        server
+            .http
+            .post(format!("{}/", server.origin))
+            .json(&json!({ "topic": "nope", "message": "x" }))
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::UNAUTHORIZED
+    );
+    assert_eq!(
+        server
+            .http
+            .post(format!("{}/", server.origin))
+            .json(&json!({ "message": "x" }))
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(server.feed(&id).len(), 3);
 }
 
 /// The web client's files live at the same level as an ntfy topic (`/app.<hash>.js`), so a GET
