@@ -55,11 +55,11 @@ Notifications arrive on URLs outside `/v1`; each one is a source, and the token 
 
 | Front end | URL | Notes |
 |---|---|---|
-| Webhook | `POST /hooks/{token}` | JSON or form; a preset — `preset` at the top level of the source or `config.preset` (`github`, `gitlab`, `sentry`, `grafana`, `uptime-kuma`) — or `config.mapping` (`sender`, `title`, `body`, `bodyHtml`, `link`, `priority`, `tags`, `externalId` as a path, `a || b` chain, `{{template}}` or literal). Answers `202 {"id": …}`. |
-| Gotify | `POST /message?token={token}` | Gotify's JSON in, Gotify's JSON out. |
-| ntfy | `PUT|POST /{topic}` | The topic is the token; ntfy headers, JSON publish or plain body. `GET /{topic}/json` streams NDJSON, replaying from `?since=<seq>`. |
+| Webhook | `POST /hooks/{token}` | JSON, form-encoded or multipart; a preset — `preset` at the top level of the source or `config.preset` (`github`, `gitlab`, `sentry`, `grafana`, `uptime-kuma`) — or `config.mapping` (`sender`, `title`, `body`, `bodyHtml`, `link`, `priority`, `tags`, `externalId` as a path, `a || b` chain, `{{template}}` or literal). Answers `202 {"id": …}`. |
+| Gotify | `POST /message` | The token as `?token=`, `X-Gotify-Key` or basic auth (`token` as the password); a JSON, form-encoded or multipart body with `title`, `message`, `priority`, `extras`. Gotify's JSON back. |
+| ntfy | `PUT|POST /{topic}` | The topic is the token; ntfy headers, JSON publish or plain body. `GET /{topic}/json` streams NDJSON, replaying from `?since=<seq>`. `POST /` accepts the JSON publish form with `topic` in the body, for clients that post to the server root (Uptime Kuma's ntfy notifier). |
 
-The web client's files sit at the same level as a topic (`/app.<hash>.js`, `/nsh.<hash>.wasm`), so `GET /{topic}` serves them from `AGENTINBOX_WEB_DIR`; only `PUT` and `POST` on that path are ntfy publishes.
+The web client's files sit at the same level as a topic (`/app.<hash>.js`, `/nsh.<hash>.wasm`), so `GET /` and `GET /{topic}` serve them from `AGENTINBOX_WEB_DIR`; only `PUT` and `POST` on those paths are publishes.
 
 Limits per source: 256 KiB a request, 60 messages a minute with a burst of 120. A source's `secret` (write-only, `hasSecret` in responses) turns on the `X-Hub-Signature-256` check for its webhook; it is stored AES-256-GCM in `users/notify.secrets.json`, which key rotation covers like the mail secrets. Ingested HTML goes through the same sanitizer as mail, with remote images removed; `externalId` makes a sender's retry a no-op; duplicates still answer `202` with the existing id.
 
@@ -68,7 +68,7 @@ Limits per source: 256 KiB a request, 60 messages a minute with a burst of 120. 
 `server.sqlite` gains `sources` and `feed_messages` at start; the migration is idempotent and verifies that the projection holds exactly one row per mail message (drafts and trash excluded). The projection is derived data:
 
 ```sh
-docker compose exec app agentinbox-server rebuild-feed   # prints counts as JSON
+docker compose exec server agentinbox-server rebuild-feed   # prints counts as JSON
 ```
 
 Use it if the feed is ever wrong; mail rows are only read. `AGENTINBOX_DATA_DIR` selects the database.

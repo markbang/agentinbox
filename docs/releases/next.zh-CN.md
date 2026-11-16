@@ -18,3 +18,4 @@
 ## 修复
 
 ---
+- **GitHub、Uptime Kuma、Sentry 来源不再丢真实事件。**同一 issue 的打开和关闭是两条通知，同一监控的第二次故障不会被吞掉，Sentry 的 issue webhook 也不再以 ": "、优先级 0 到达。Gotify 客户端可以用 `X-Gotify-Key` 或 basic auth 认证、用表单（`curl -F`）发送；ntfy 不带优先级时按默认的 3 级到达；Uptime Kuma 的 ntfy 通知把地址指向服务根地址也能收到。

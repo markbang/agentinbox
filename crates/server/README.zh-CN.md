@@ -55,11 +55,11 @@ curl localhost:8080/healthz
 
 | 入口 | 地址 | 说明 |
 |---|---|---|
-| Webhook | `POST /hooks/{token}` | JSON 或表单；用预设——source 顶层的 `preset` 或 `config.preset`（`github`、`gitlab`、`sentry`、`grafana`、`uptime-kuma`）——或 `config.mapping`（`sender`、`title`、`body`、`bodyHtml`、`link`、`priority`、`tags`、`externalId`，取值可以写路径、`a || b` 回退链、`{{模板}}` 或字面量）。返回 `202 {"id": …}`。 |
-| Gotify | `POST /message?token={token}` | 收 Gotify 的 JSON，回 Gotify 的 JSON。 |
-| ntfy | `PUT|POST /{topic}` | topic 就是 token；支持 ntfy 请求头、JSON 发布或直接正文。`GET /{topic}/json` 输出 NDJSON，可用 `?since=<seq>` 补发。 |
+| Webhook | `POST /hooks/{token}` | JSON、表单或 multipart；用预设——source 顶层的 `preset` 或 `config.preset`（`github`、`gitlab`、`sentry`、`grafana`、`uptime-kuma`）——或 `config.mapping`（`sender`、`title`、`body`、`bodyHtml`、`link`、`priority`、`tags`、`externalId`，取值可以写路径、`a || b` 回退链、`{{模板}}` 或字面量）。返回 `202 {"id": …}`。 |
+| Gotify | `POST /message` | token 可以是 `?token=`、`X-Gotify-Key`，或 HTTP basic auth 的密码；请求体可以是 JSON、表单或 multipart，字段 `title`、`message`、`priority`、`extras`。返回 Gotify 的 JSON 结构。 |
+| ntfy | `PUT|POST /{topic}` | topic 就是 token；支持 ntfy 请求头、JSON 发布或直接正文。`GET /{topic}/json` 输出 NDJSON，可用 `?since=<seq>` 补发。`POST /` 接受 topic 写在 body 里的 JSON 发布格式，给直接发到服务根地址的客户端用（Uptime Kuma 的 ntfy 通知就是这样）。 |
 
-Web 客户端的文件和 topic 在同一层（`/app.<hash>.js`、`/nsh.<hash>.wasm`），所以 `GET /{topic}` 从 `AGENTINBOX_WEB_DIR` 提供这些文件，只有 `PUT` 和 `POST` 才是 ntfy 发布。
+Web 客户端的文件和 topic 在同一层（`/app.<hash>.js`、`/nsh.<hash>.wasm`），所以 `GET /` 和 `GET /{topic}` 从 `AGENTINBOX_WEB_DIR` 提供这些文件，只有这些路径上的 `PUT` 和 `POST` 才是发布。
 
 每个 source 的限制：单次 256 KiB，每分钟 60 条、突发 120 条。source 的 `secret`（只写，响应里只有 `hasSecret`）会开启 webhook 的 `X-Hub-Signature-256` 校验；它和邮件密钥一样用主密钥 AES-256-GCM 存在 `users/notify.secrets.json`，密钥轮换同样覆盖。接收来的 HTML 走和邮件相同的清洗（远程图片一律去掉）；`externalId` 让发送方的重试变成空操作，重复时同样返回 `202` 和已有的 id。
 
@@ -68,7 +68,7 @@ Web 客户端的文件和 topic 在同一层（`/app.<hash>.js`、`/nsh.<hash>.w
 启动时 `server.sqlite` 会新增 `sources` 和 `feed_messages`；迁移可重复执行，并校验投影里正好每封邮件一行（草稿箱和垃圾箱除外）。投影是派生数据：
 
 ```sh
-docker compose exec app agentinbox-server rebuild-feed   # 以 JSON 打印行数
+docker compose exec server agentinbox-server rebuild-feed   # 以 JSON 打印行数
 ```
 
 feed 出错时用它重建，邮件表只读。`AGENTINBOX_DATA_DIR` 指定数据库位置。
