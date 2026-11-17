@@ -4,3 +4,7 @@ target/
 .env
 /data/
 node_modules/
+
+# Python bytecode from the CI drivers
+__pycache__/
+*.pyc

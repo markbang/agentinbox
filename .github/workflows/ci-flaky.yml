@@ -1,0 +1,30 @@
+name: CI flaky
+
+# Keeps a flaky Android UI step visible instead of re-running it away: reads the last 40 Android UI
+# runs and, when one step failed 3 runs in a row on a branch or 2 in a row on main, opens (or
+# updates) the issue `CI: Android UI <step> is flaky` labelled `ci` and `flaky`, with the run links
+# and the failure log. One open issue per step: a repeat is a comment, not a second issue.
+on:
+  workflow_run:
+    workflows: ["Android UI"]
+    types: [completed]
+  schedule:
+    - cron: "17 7 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  issues: write
+
+jobs:
+  triage:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Report repeated step failures
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: python3 .github/ci-flaky.py

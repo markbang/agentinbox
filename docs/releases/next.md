@@ -38,6 +38,8 @@ English | [简体中文](next.zh-CN.md)
   composer's footer (attach, discard) rides on the keyboard rather than under it.
 - The reader's toolbar has a hairline, so it reads as a bar on the white mail card.
 - The search field is glass where it floats over results (the Search tab).
+- The Android screenshots that check every release come from a run that stops at the first broken
+  screen and names it, in a fraction of the time it took.
 
 ## Fixed
 

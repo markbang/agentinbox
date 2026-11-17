@@ -1,9 +1,19 @@
 name: Android UI
 
-# The app on an Android emulator, light and dark: a release build with the
-# demo mailbox (`--cfg nshmail_demo`), driven by .github/android-ui.py, its
-# screenshots uploaded as the `android-ui` artifact. On main, its inbox and
-# reader also go to main/ on the `screenshots` branch, where README.md links them.
+# The app on an Android emulator, light and dark: a release build with the demo mailbox
+# (`--cfg nshmail_demo`), driven by .github/android-ui.py, its screenshots uploaded as the
+# `android-ui` artifact. On main, its inbox and reader also go to main/ on the `screenshots` branch,
+# where README.md links them.
+#
+# When it runs: on every push to main and on a v* tag; on a pull request only when the PR carries
+# the `android-ui` label (add it to ask for Android screens) and again on each push to such a PR.
+# Adding any other label does not start it.
+#
+# What bounds it: the job 20 minutes, the emulator step 17, each screen the driver drives 2 and the
+# drive 10 after boot (its retry gets what is left of the 17). The drive stops at its first failure and leaves,
+# in the `android-ui` artifact, the screenshot, the UI dump, the logcat since the step began and
+# `steps.txt`. It is then retried once after a fresh APK install; a retry that passes says `flaky`
+# in the job summary, so the flakiness stays visible.
 on:
   workflow_dispatch:
     inputs:
@@ -11,14 +21,15 @@ on:
         description: "Only measure frames: skip the screenshots."
         default: "false"
   pull_request:
+    types: [opened, labeled, synchronize, reopened]
+  push:
+    branches: [main]
+    tags: ["v*"]
     paths: &paths
       - app/**
       - .github/android-ui.py
       - .github/android-perf.py
       - .github/workflows/android-ui.yml
-  push:
-    branches: [main]
-    paths: *paths
 
 permissions:
   contents: read
@@ -40,7 +51,8 @@ defaults:
 jobs:
   emulator:
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 20
+    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'android-ui')
     steps:
       - uses: actions/checkout@v7
         with:
@@ -52,6 +64,15 @@ jobs:
           targets: x86_64-linux-android
       - name: Install the Android platform
         run: (yes || :) | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" > /dev/null
+      - name: Restore the APKs for this source
+        id: apk
+        uses: actions/cache/restore@v6
+        with:
+          # Exact key only: an APK restored from other sources would screenshot the wrong app.
+          path: |
+            app/.nsh/ui
+            app/.nsh/perf
+          key: android-ui-apk-${{ runner.os }}-${{ env.NSH_VERSION }}-${{ hashFiles('app/App.tsx', 'app/*.ts', 'app/*.tsx', 'app/Cargo.toml', 'app/Cargo.lock', 'app/nsh.json', 'app/theme.json', 'app/src/**', 'app/pages/**', 'app/components/**', 'app/lib/**', 'app/locales/**', 'app/assets/**', 'app/web/**', 'vendor/**') }}
       - id: cache
         uses: actions/cache/restore@v6
         with:
@@ -68,12 +89,19 @@ jobs:
           [ -x ~/.nsh/bin/nsh ] || curl -fsSL https://nsh.dev/install.sh | sh
           echo "$HOME/.nsh/bin" >> "$GITHUB_PATH"
       - name: Package for the emulator (x86_64, demo mailbox)
+        if: steps.apk.outputs.cache-hit != 'true'
+        timeout-minutes: 12
         run: |
           RUSTFLAGS="--cfg nshmail_demo" nsh package App.tsx --target android --abi x86_64 --out .nsh/ui
           # The frame measurements scroll the large mailbox (10,000 messages, 2,000 conversations).
-          mv .nsh/ui/AgentInbox.apk .nsh/ui/agentinbox-demo.apk
           RUSTFLAGS="--cfg nshmail_demo --cfg nshmail_demo_large" nsh package App.tsx --target android --abi x86_64 --out .nsh/perf
-          mv .nsh/ui/agentinbox-demo.apk .nsh/ui/AgentInbox.apk
+      - uses: actions/cache/save@v6
+        if: steps.apk.outputs.cache-hit != 'true'
+        with:
+          path: |
+            app/.nsh/ui
+            app/.nsh/perf
+          key: android-ui-apk-${{ runner.os }}-${{ env.NSH_VERSION }}-${{ hashFiles('app/App.tsx', 'app/*.ts', 'app/*.tsx', 'app/Cargo.toml', 'app/Cargo.lock', 'app/nsh.json', 'app/theme.json', 'app/src/**', 'app/pages/**', 'app/components/**', 'app/lib/**', 'app/locales/**', 'app/assets/**', 'app/web/**', 'vendor/**') }}
       - uses: actions/cache/save@v6
         if: github.ref == 'refs/heads/main' && steps.cache.outputs.cache-hit != 'true'
         with:
@@ -91,6 +119,8 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
       - name: Drive the app in light and dark
+        id: drive
+        timeout-minutes: 17
         uses: reactivecircus/android-emulator-runner@v2
         with:
           # Android 15: the phones this ships to draw edge to edge by the system's rule, not the app's.
@@ -102,17 +132,59 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           working-directory: .
           script: |
+            began=$(date +%s)
+            # 10 minutes of drive, 17 for the step (boot included): a retry has what is left.
+            drive() {
+              DRIVE_BUDGET="$1" timeout -k 20 "$(( $1 + 30 ))" python3 .github/android-ui.py app/.nsh/ui screens
+            }
             # The frame measurement first, so a flaky screenshot step cannot keep it out of the log.
-            python3 .github/android-perf.py app/.nsh/perf || true
-            if [ "${{ inputs.perf_only }}" != "true" ]; then python3 .github/android-ui.py app/.nsh/ui screens; fi
-            # The floating layer, measured on the frames: an inset capsule, expanded and minimised, with the page beside it.
-            if [ "${{ inputs.perf_only }}" != "true" ]; then node tools/glass-check.mjs screens; fi
+            python3 .github/android-perf.py app/.nsh/perf || echo "::warning title=Android frames::the frame measurement failed; the screens still ran"
+            if [ "${{ inputs.perf_only }}" = "true" ]; then exit 0; fi
+            # The floating layer, checked on the frames: drawn, and the page showing through it.
+            glass() {
+              node tools/glass-check.mjs screens || { echo "::error title=Android frames::the floating layer did not pass its frame check"; return 1; }
+            }
+            if drive 600; then
+              glass
+              echo "the drive passed on its first attempt" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            left=$(( 1020 - ($(date +%s) - began) ))
+            if [ "$left" -lt 240 ]; then
+              echo "::error title=Android UI::the drive failed with $left s of the step left: no retry"
+              exit 1
+            fi
+            echo "::warning title=Android UI is flaky::the drive failed; reinstalling the APK and retrying once"
+            mv screens screens-attempt-1
+            mkdir -p screens
+            adb install -r -g app/.nsh/ui/AgentInbox.apk
+            adb shell am force-stop top.bangwu.nshmail
+            if drive "$left"; then
+              glass
+              echo "**flaky**: the drive failed on its first attempt and passed on the retry (\`screens-attempt-1/\`)." >> "$GITHUB_STEP_SUMMARY"
+              echo "::warning title=Android UI is flaky::the drive passed on the retry"
+              exit 0
+            fi
+            echo "::error title=Android UI::the drive failed on both attempts"
+            exit 1
+      - name: The drive's step times
+        if: always()
+        working-directory: .
+        run: |
+          for f in screens/steps.txt screens-attempt-1/steps.txt; do [ -f "$f" ] && printf '\n```\n%s\n```\n' "$(cat "$f")" >> "$GITHUB_STEP_SUMMARY"; done
+      - name: Both artifact directories exist
+        if: always()
+        working-directory: .
+        run: mkdir -p screens screens-attempt-1
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          # The screens, and on a failure the screenshot and dump the script left beside them.
+          # The screens; on a failure the screenshot and dump it left beside them, the logcat since
+          # the step began, and the frames kept while the retry ran.
           name: android-ui
-          path: screens/
+          path: |
+            screens/
+            screens-attempt-1/
           if-no-files-found: warn
 
   publish:
@@ -134,7 +206,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          src="$RUNNER_TEMP/android-ui" pick="$RUNNER_TEMP/pick"
+          src="$RUNNER_TEMP/android-ui/screens" pick="$RUNNER_TEMP/pick"
           mkdir -p "$pick"
           for t in light dark; do
             for s in inbox reader; do cp "$src/$t-$s.png" "$pick/android-$s-$t.png"; done
