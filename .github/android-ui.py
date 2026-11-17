@@ -34,14 +34,20 @@ def screenshot(name):
 
 
 def nodes():
-    """The screen's nodes, re-dumped until uiautomator answers; the last dump is kept for evidence."""
+    """The screen's nodes, re-dumped until uiautomator answers whole; the last dump is kept for evidence."""
     global dump_xml
     for _ in range(3):
         adb("shell", "uiautomator", "dump", "/sdcard/ui.xml", check=False)
         xml = adb("exec-out", "cat", "/sdcard/ui.xml", check=False)
         if xml.strip().startswith("<?xml"):
+            try:
+                found = list(ET.fromstring(xml).iter("node"))
+            except ET.ParseError:
+                # A window that never idles hands back half a dump; ask again.
+                time.sleep(1)
+                continue
             dump_xml = xml
-            return list(ET.fromstring(xml).iter("node"))
+            return found
         time.sleep(1)
     return []
 
@@ -347,8 +353,9 @@ def bar_geometry():
     for what, got, want in (("left inset", left / density, 20), ("right inset", (w - right) / density, 20)):
         if abs(got - want) > 4:
             fail(f"the tab bar's {what} is {round(got)} pt, not {want}")
-    if abs((h - foot) / density - 12) > 5:
-        fail(f"the tab bar sits {round((h - foot) / density)} pt above the foot, not 12")
+    # Minimised, the bar travels 6 pt toward the foot (UIKit's shrink), so 6..12 is its own room.
+    if not 5 <= (h - foot) / density <= 13:
+        fail(f"the tab bar sits {round((h - foot) / density)} pt above the foot, not 6..12")
     if abs((foot - top) / density - 64) > 6:
         fail(f"the tab bar is {round((foot - top) / density)} pt tall, not 64")
     return (left, top, right, foot)
