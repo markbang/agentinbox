@@ -33,6 +33,7 @@ START = time.time()
 BEGIN = START
 STEP, STEP_AT, STEP_END = "start", START, START + STEP_BUDGET
 mode, out, w, h = "start", "screens", 1440, 3120
+DENSITY = 3.0  # pixels per point, from the device's own dpi, once it is known
 failures, steps = [], []  # steps: (name, seconds), for the run log
 _dump, _dump_at, _nodes = "", 0.0, []
 
@@ -215,17 +216,6 @@ def select_first_row(timeout=6):
     raise Failure("the row was never added to the selection")
 
 
-def settle_dump(timeout=6):
-    """Until two dumps in a row are the same: the page stopped changing."""
-    end, last = time.time() + timeout, None
-    while time.time() < end:
-        nodes(0)
-        if _dump and _dump == last:
-            return _dump
-        last = _dump
-        time.sleep(POLL)
-    return _dump
-
 
 def steady(before=None, timeout=6):
     """Until two screenshots in a row are the same, and not `before`: a fade or a theme swap is a
@@ -283,6 +273,13 @@ def loading_shot(name, trigger):
     gone("id:refreshing", 10) or gone("id:notify-refreshing", 10)
 
 
+def blur():
+    """Takes the focus from a text field by tapping the page's title: a blinking cursor keeps the
+    window from ever being idle, and every dump then waits its idle timeout out."""
+    adb("shell", "input", "tap", str(w // 2), str(int(h * 0.06)))
+    steady(timeout=2)
+
+
 def swipe(x1, y1, x2, y2, ms):
     adb("shell", "input", "swipe", str(x1), str(y1), str(x2), str(y2), str(ms))
 
@@ -301,8 +298,9 @@ def dismiss_anr():
 TABS = {"Mail": 0, "Notifications": 1, "Search": 2, "Mailboxes": 3, "Settings": 4}
 
 
-def prop(name):
-    return adb("shell", "getprop", name, check=False).strip()
+
+def points(px):
+    return px / DENSITY
 
 
 def tab_bar():
@@ -339,8 +337,7 @@ def bar_geometry():
     if not bar:
         raise Failure("the tab bar is not in the accessibility tree")
     foot = bar[3] if bar[3] <= h else h
-    dpi = float(prop("ro.sf.lcd_density") or 0) or 480.0
-    density = dpi / 160  # pixels per point
+    density = DENSITY
     top, left, right = bar[1], bar[0], bar[2]
     print(
         f"tab bar: x {left}..{right} of {w}, y {top}..{foot} of {h}"
@@ -359,15 +356,21 @@ def bar_geometry():
     return (left, top, right, foot)
 
 
-def tab(name, expect, tries=2):
-    """Taps a tab by its place in the bar, clear of the system's gesture area, until `expect` shows.
-
-    The bar minimises to a pill around the chosen tab as a page scrolls down, and the pill takes the
-    taps over that tab: a short drag up brings the bar back before anything is pressed."""
-    for attempt in range(1, tries + 1):
-        adb("shell", "input", "swipe", str(w // 2), str(h * 7 // 10), str(w // 2), str(h * 7 // 10 - 80), "250")
+def expanded_bar():
+    """The bar's box once it holds all its tabs. Minimised it is a pill around the chosen tab, with
+    no room for five: a tap on the pill brings the bar back, and only then does a tab have a place."""
+    bar = tab_bar()
+    if bar and points(bar[2] - bar[0]) < 300:
+        adb("shell", "input", "tap", str((bar[0] + bar[2]) // 2), str((bar[1] + bar[3]) // 2))
         steady(timeout=2)
         bar = tab_bar()
+    return bar
+
+
+def tab(name, expect, tries=2):
+    """Taps a tab by its place in the bar, clear of the system's gesture area, until `expect` shows."""
+    for attempt in range(1, tries + 1):
+        bar = expanded_bar()
         if bar:
             x1, y1, x2, _ = bar
             x, y = x1 + (2 * TABS[name] + 1) * (x2 - x1) // 10, (y1 + bar[3]) // 2
@@ -660,6 +663,7 @@ def light_walk():
     # the sheet is asked for again instead of sent for once.
     tap("id:compose-to")
     adb("shell", "input", "text", "maya@northwind.dev")
+    blur()
     # The clock's sheet is the flakiest control in the app: a tap that opens nothing is asked again,
     # and each look is given time for a dump that has to wait out the field's blinking cursor.
     for attempt in range(1, 4):
@@ -803,6 +807,7 @@ def light_walk():
     adb("shell", "input", "text", "'**Lin%sChen**'")
     adb("shell", "input", "keyevent", "66")
     adb("shell", "input", "text", "'Northwind%s-%s[northwind.dev](https://northwind.dev)'")
+    blur()
     back()  # the keyboard
     wait("id:signature-preview")
     shot(f"{theme}-signature")
@@ -889,6 +894,7 @@ def dark_walk():
     shot("dark-compose")
     tap("id:compose-to")
     adb("shell", "input", "text", "maya@northwind.dev")
+    blur()
     for attempt in range(1, 4):
         tap("id:send-later")
         if find("Tomorrow morning", 15) is not None:
@@ -985,7 +991,7 @@ def large_and_tablet():
 
 
 def main():
-    global BEGIN, w, h, mode, out
+    global BEGIN, DENSITY, w, h, mode, out
     apk_dir = sys.argv[1]
     out = sys.argv[2]
     os.makedirs(out, exist_ok=True)
@@ -1007,6 +1013,7 @@ def main():
         adb("shell", "settings", "put", "global", "hide_error_dialogs", "1")
         adb("shell", "pm", "disable-user", "--user", "0", "com.google.android.apps.nexuslauncher", check=False)
         w, h = map(int, adb("shell", "wm", "size").split()[-1].split("x"))
+        DENSITY = (float(adb("shell", "getprop", "ro.sf.lcd_density", check=False).strip() or 0) or 480.0) / 160
         drive()
     except Exception as e:
         if not isinstance(e, Failure):
