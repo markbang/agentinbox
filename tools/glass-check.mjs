@@ -32,8 +32,13 @@ function frame(name, least, check) {
   const scale = png.width / points;
   const fail = (what) => failures.push(`${name}: ${what}`);
   try {
-    const middle = shades(png, Math.round(png.height / 2), 0, png.width);
-    if (middle < least) fail(`the frame holds ${middle} colours on its middle row: nothing was drawn`);
+    // A row of the page can be blank between two messages: count the frame on a grid instead.
+    const seen = new Set();
+    for (let gy = 1; gy < 40; gy++) {
+      const y = Math.round((png.height * gy) / 40);
+      for (let gx = 0; gx < 24; gx++) seen.add(png.pixel(Math.round((png.width * gx) / 24), y).join(","));
+    }
+    if (seen.size < least) fail(`the frame holds ${seen.size} colours: nothing was drawn`);
     check(png, scale, fail, name);
   } catch (e) {
     fail(String(e));
@@ -43,7 +48,7 @@ function frame(name, least, check) {
 for (const mode of ["light", "dark"]) {
   // At rest at the top: the page and the bars, drawn.
   frame(`${mode}-inbox`, 8, (png, scale, fail, name) => {
-    log(`${name}: ${shades(png, Math.round(png.height / 2), 0, png.width)} colours`);
+    log(`${name}: drawn`);
   });
 
   // Scrolled: rows pass under the tab bar and are visible through it. A bar drawn
