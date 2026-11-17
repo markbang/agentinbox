@@ -644,20 +644,19 @@ def drive():
         wait("id:compose-to")
         shot(f"{theme}-compose")
         # Schedule send from the top bar's clock: the presets' sheet, then the snackbar with Undo.
+        # The keyboard is up after the address, and its dismissal takes the first tap on the bar:
+        # the sheet is asked for again instead of sent for once.
         tap("id:compose-to")
         adb("shell", "input", "text", "maya@northwind.dev")
-        scheduled = False
-        tap("id:send-later")
-        if find("Tomorrow morning", 8) is not None:
-            shot(f"{theme}-schedule-menu")
-            tap("Tomorrow morning")
-            scheduled = find("id:toast-action", 6) is not None
-            if scheduled:
-                save(f"{theme}-scheduled-snackbar", frame())
-        # Whatever the schedule step left open (a sheet, the composer itself), the inbox comes back
+        tap_until("id:send-later", "Tomorrow morning", tries=3, timeout=6)
+        shot(f"{theme}-schedule-menu")
+        tap_until("Tomorrow morning", "id:toast-action", tries=2, timeout=8)
+        save(f"{theme}-scheduled-snackbar", frame())
+        # Whatever the schedule left open (a sheet, the composer itself), the inbox comes back
         # before the next screen: a stray focus would take the keystrokes meant for search.
-        if not scheduled or find("id:compose-to", 2) is not None:
+        if find("id:compose-page", 2) is not None:
             close_compose()
+        if find("id:messages", 3) is None:
             back_to("id:messages")
         wait("id:messages")
 

@@ -61,14 +61,17 @@ def excerpt(log):
 
 
 def streaks():
-    """(branch, step) -> the runs that failed it consecutively, newest first."""
+    """(branch, step) -> the runs that failed it consecutively, newest first. Only a branch's current
+    streak counts: one that a later run already ended (a fix, or a different step) is history."""
     found = {}
     seen = {}
+    newest = {}
     for run in runs():
-        branch, step = run["head_branch"] or "?", None
+        branch = run["head_branch"] or "?"
         conclusion = run["conclusion"]
-        if conclusion == "cancelled":
+        if conclusion == "cancelled" or conclusion is None:
             continue
+        newest.setdefault(branch, run["id"])
         if conclusion != "failure":
             seen[branch] = None  # a green run ends the streak
             continue
@@ -80,7 +83,7 @@ def streaks():
         current["runs"].append(run)
         seen[branch] = current
         found[(branch, step)] = current
-    return found
+    return {key: streak for key, streak in found.items() if streak["runs"][0]["id"] == newest.get(key[0])}
 
 
 def title(step):
