@@ -17,7 +17,7 @@ export function Toolbar(props: { label: string; actions: ToolbarAction[]; class?
     <View
       role="toolbar"
       accessibilityLabel={props.label}
-      class={`flex-row items-center gap-0.5 bg-material-chrome px-2 pb-[env(safe-area-inset-bottom)] shadow-sm backdrop-blur-xl ${props.class ?? ""}`}
+      class={`flex-row items-center gap-0.5 border-t border-separator bg-material-chrome px-2 pb-[env(safe-area-inset-bottom)] shadow-sm backdrop-blur-xl ${props.class ?? ""}`}
     >
       <Each of={props.actions} key={(a) => a.label}>
         {(action) => (

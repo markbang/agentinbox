@@ -194,7 +194,8 @@ export function ComposePage(props: { init: ComposeInit }) {
   return (
     <Page scroll={false} title={title()} back={t("common.close")} onBack={close} trailing={actions()} testID="compose-page">
       <View
-        class="min-h-0 flex-1 bg-system-background pt-11"
+        // The footer rides on the keyboard: the column shrinks by the keyboard's height.
+        class="min-h-0 flex-1 bg-system-background pt-11 pb-[env(keyboard-inset-height)]"
         onFileDragEnter={() => dragging.set(true)}
         onFileDragLeave={() => dragging.set(false)}
         onFileDrop={(e: { uris: string[]; mimeTypes: string[] }) => {

@@ -637,9 +637,16 @@ for mode in ("light", "dark"):
 
     if tab("Search") and wait("id:search"):
         shot(f"{mode}-search")
+        rest = tab_bar()
         tap("id:search")  # the field, before anything is typed
         adb("shell", "input", "text", "roadmap")
         wait("id:result-count", 15)
+        # The keyboard is up: the bar is either covered or where it was, never riding on the keyboard.
+        typing = tab_bar()
+        if rest and typing and abs(typing[1] - rest[1]) > 6:
+            fail(f"the tab bar moved {typing[1] - rest[1]} px while the keyboard is up")
+        print("the bar while typing:", "covered" if typing is None else f"top {typing[1]}", flush=True)
+        shot(f"{mode}-search-typing")
         back()  # the keyboard
         shot(f"{mode}-search-results")
         # A mail laid out for 600px fits the phone's width.

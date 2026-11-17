@@ -3,7 +3,7 @@
 // another shows. The bar is a capsule of glass inset from the edges, so the
 // pages scroll behind and around it, and it minimises to a pill around the
 // chosen tab as the page scrolls down. Pushed pages cover it, as they do on iOS.
-import { effect, platform, signal, untracked, View, type JSX } from "nsh";
+import { effect, keyboardFrame, platform, signal, untracked, View, type JSX } from "nsh";
 import { BackHandler } from "nsh/mobile";
 import { NavStack } from "nsh/base";
 import { t } from "nsh/i18n";
@@ -11,6 +11,7 @@ import { GlassButton, GlassTabBar } from "cupertino";
 import { NavContext, openCompose, selectedTab, selectTab, tabs, TAB, type Route } from "../nav";
 import { pageOffset, resetOffset } from "../scroll";
 import { picking } from "../store";
+import { unreadNotifications } from "../notify";
 import { Toasts } from "./Toasts";
 
 const navIcons = { mail: "tray", notifications: "bell", search: "magnifyingglass", folders: "folder", settings: "slider.horizontal.3" } as const;
@@ -36,6 +37,8 @@ export function TabShell(props: { page: (route: Route) => JSX.Element }) {
     if (!untracked(opened)[index]) opened.update((o) => ({ ...o, [index]: true }));
   });
   const covered = () => depth() > 1;
+  // iOS 26's keyboard covers the bar; it never rides up on top of it.
+  const typing = () => keyboardFrame().height > 0;
   // A page that comes back, or a tab's first page, is at its top: the bar expands.
   effect(() => {
     tabs[selectedTab()].stack.routes().length;
@@ -62,7 +65,7 @@ export function TabShell(props: { page: (route: Route) => JSX.Element }) {
         <Toasts class={covered() ? "bottom-4" : "bottom-40"} />
       </View>
       {/* Mail's compose control floats above the bar, in the same stack so neither covers the other's taps. */}
-      <If when={!covered()}>
+      <If when={!covered() && !typing()}>
         <If when={selectedTab() === TAB.mail && !picking()}>
           <View class="absolute bottom-0 left-0 right-0 items-end pr-5 pb-[calc(env(safe-area-inset-bottom)+88px)]">
             <View class="h-14 w-14">
@@ -75,6 +78,7 @@ export function TabShell(props: { page: (route: Route) => JSX.Element }) {
             value: tab.name,
             title: t(`tabs.${tab.name}`),
             icon: navIcons[tab.name],
+            badge: tab.name === "notifications" && unreadNotifications() ? (unreadNotifications() > 99 ? "99+" : String(unreadNotifications())) : undefined,
           }))}
           value={tabs[selectedTab()].name}
           scrollOffset={pageOffset()}
