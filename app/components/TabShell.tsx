@@ -58,7 +58,7 @@ export function TabShell(props: { page: (route: Route) => JSX.Element }) {
             </View>
           )}
         </Each>
-        // Above the compose control and the bar, so neither takes a tap meant for Undo.
+        {/* Above the compose control and the bar, so neither takes a tap meant for Undo. */}
         <Toasts class={covered() ? "bottom-4" : "bottom-40"} />
       </View>
       {/* Mail's compose control floats above the bar, in the same stack so neither covers the other's taps. */}
