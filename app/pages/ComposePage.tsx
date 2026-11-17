@@ -26,6 +26,11 @@ export function ComposePage(props: { init: ComposeInit }) {
   const draft = useDraft(props.init, accounts(), mailbox().account ?? accounts()[0]?.id ?? null);
   const { start, from, to, cc, bcc, subject, files } = draft;
   const body = draft.text;
+  // A composer opened before the accounts arrived (a fresh sign-in) takes the first one: sending
+  // must not answer "add an account" over an account that is on its way.
+  effect(() => {
+    if (!from() && accounts().length) from.set(mailbox().account ?? accounts()[0].id);
+  });
   const showCc = signal(!!cc() || !!bcc());
   const sending = signal(false);
   const error = signal<string | null>(null);

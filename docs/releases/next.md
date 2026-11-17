@@ -36,6 +36,9 @@ English | [简体中文](next.zh-CN.md)
 
 ## Fixed
 
+- A composer opened before the accounts had loaded (right after signing in) no
+  longer answers "Add an account before sending mail." over an account that is
+  already on its way: the draft takes the first account that arrives.
 - Push reaches every source, not only mail: a webhook, Gotify or ntfy notification
   now arrives on your phones and browsers while the app is closed, with the
   source, sender, title and link. A paused source, or one whose minimum priority
