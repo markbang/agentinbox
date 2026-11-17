@@ -680,9 +680,11 @@ def light_walk():
     # that never opens costs its two screens instead of the run.
     if sheet("id:send-later", "Tomorrow morning"):
         shot(f"{theme}-schedule-menu")
+        before = frame()
         tap("Tomorrow morning")
-        wait("id:toast-action", 15)
-        save(f"{theme}-scheduled-snackbar", frame())
+        # The snackbar lives seconds, and a dump on a screen with a text cursor is slower than it:
+        # the frame is what proves it, the Scheduled list below is what proves the schedule.
+        save(f"{theme}-scheduled-snackbar", first_change(before, 3))
     else:
         skip("Schedule send's sheet")
     # Whatever the schedule left open (a sheet, the composer itself), the inbox comes back
@@ -898,9 +900,9 @@ def dark_walk():
     adb("shell", "input", "text", "maya@northwind.dev")
     if sheet("id:send-later", "Tomorrow morning"):
         shot("dark-schedule-menu")
+        before = frame()
         tap("Tomorrow morning")
-        wait("id:toast-action", 15)
-        save("dark-scheduled-snackbar", frame())
+        save("dark-scheduled-snackbar", first_change(before, 3))
     else:
         skip("Schedule send's sheet (dark)")
     if find("id:compose-page", 2) is not None:
