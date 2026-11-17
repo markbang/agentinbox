@@ -86,14 +86,21 @@ def nodes(max_age=POLL):
     if _dump and time.time() - _dump_at <= max_age:
         return _nodes
     # One round trip for a fresh dump: the file is removed first, so a dump that fails cannot be
-    # mistaken for the screen that was there before it.
-    xml = subprocess.run(
-        ["adb", "exec-out", "rm -f /sdcard/ui.xml; uiautomator dump --compressed /sdcard/ui.xml >/dev/null 2>&1; cat /sdcard/ui.xml"],
-        check=False,
-        capture_output=True,
-        encoding="utf-8",
-        errors="replace",
-    ).stdout
+    # mistaken for the screen that was there before it. uiautomator waits for the window to go idle
+    # before it dumps, and a blinking cursor or a spinner can outlast that wait: the dump then comes
+    # back empty, which must not cost the caller its wait — it is asked for again, twice.
+    for attempt in range(1, 4):
+        xml = subprocess.run(
+            ["adb", "exec-out", "rm -f /sdcard/ui.xml; uiautomator dump --compressed /sdcard/ui.xml >/dev/null 2>&1; cat /sdcard/ui.xml"],
+            check=False,
+            capture_output=True,
+            encoding="utf-8",
+            errors="replace",
+        ).stdout
+        if xml.strip().startswith("<?xml"):
+            break
+        print("the dump came back empty, asking again", flush=True)
+        time.sleep(POLL)
     _dump_at = time.time()
     if not xml.strip().startswith("<?xml"):
         _nodes = []
@@ -653,12 +660,20 @@ def light_walk():
     # the sheet is asked for again instead of sent for once.
     tap("id:compose-to")
     adb("shell", "input", "text", "maya@northwind.dev")
-    tap_until("id:send-later", "Tomorrow morning", tries=2, timeout=8)
+    # The clock's sheet is the flakiest control in the app: a tap that opens nothing is asked again,
+    # and each look is given time for a dump that has to wait out the field's blinking cursor.
+    for attempt in range(1, 4):
+        tap("id:send-later")
+        if find("Tomorrow morning", 15) is not None:
+            break
+        print(f"the schedule sheet did not open (attempt {attempt})", flush=True)
+    else:
+        raise Failure("the schedule sheet never opened")
     shot(f"{theme}-schedule-menu")
-    if find("Tomorrow morning", 2) is None:  # the sheet closed under the shot
-        tap_until("id:send-later", "Tomorrow morning", tries=2, timeout=8)
+    if find("Tomorrow morning", 3) is None:  # the sheet closed under the shot
+        tap_until("id:send-later", "Tomorrow morning", tries=2, timeout=15)
     tap("Tomorrow morning")
-    wait("id:toast-action", 8)
+    wait("id:toast-action", 15)
     save(f"{theme}-scheduled-snackbar", frame())
     # Whatever the schedule left open (a sheet, the composer itself), the inbox comes back
     # before the next screen: a stray focus would take the keystrokes meant for search.
@@ -739,7 +754,15 @@ def light_walk():
     during(["swipe", str(w // 2), str(h * 8 // 10), str(w // 2), str(h * 5 // 10), "1200"], f"{theme}-notifications-mid-scroll")
     swipe(w // 2, h * 7 // 10, w // 2, h * 3 // 10, 300)
     shot(f"{theme}-notifications-scrolled")
-    tap_until("id:notify-more", "id:notify-menu", tries=2, timeout=8)  # its menu, for the shot
+    # The menu's own testID is not in the accessibility tree, so the sheet is known by its first
+    # action; nothing else on this page offers it.
+    for attempt in range(1, 4):
+        tap("id:notify-more")
+        if find("Sources", 15) is not None:
+            break
+        print(f"the notifications menu did not open (attempt {attempt})", flush=True)
+    else:
+        raise Failure("the notifications menu never opened")
     shot(f"{theme}-notifications-menu")
     tap("Sources")
     wait("id:sources", 10)
@@ -866,12 +889,18 @@ def dark_walk():
     shot("dark-compose")
     tap("id:compose-to")
     adb("shell", "input", "text", "maya@northwind.dev")
-    tap_until("id:send-later", "Tomorrow morning", tries=2, timeout=8)
+    for attempt in range(1, 4):
+        tap("id:send-later")
+        if find("Tomorrow morning", 15) is not None:
+            break
+        print(f"the schedule sheet did not open (attempt {attempt})", flush=True)
+    else:
+        raise Failure("the schedule sheet never opened")
     shot("dark-schedule-menu")
-    if find("Tomorrow morning", 2) is None:
-        tap_until("id:send-later", "Tomorrow morning", tries=2, timeout=8)
+    if find("Tomorrow morning", 3) is None:
+        tap_until("id:send-later", "Tomorrow morning", tries=2, timeout=15)
     tap("Tomorrow morning")
-    wait("id:toast-action", 8)
+    wait("id:toast-action", 15)
     save("dark-scheduled-snackbar", frame())
     if find("id:compose-page", 2) is not None:
         close_compose()
