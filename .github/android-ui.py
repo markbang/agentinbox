@@ -34,14 +34,20 @@ def screenshot(name):
 
 
 def nodes():
-    """The screen's nodes, re-dumped until uiautomator answers; the last dump is kept for evidence."""
+    """The screen's nodes, re-dumped until uiautomator answers whole; the last dump is kept for evidence."""
     global dump_xml
     for _ in range(3):
         adb("shell", "uiautomator", "dump", "/sdcard/ui.xml", check=False)
         xml = adb("exec-out", "cat", "/sdcard/ui.xml", check=False)
         if xml.strip().startswith("<?xml"):
+            try:
+                found = list(ET.fromstring(xml).iter("node"))
+            except ET.ParseError:
+                # A window that never idles hands back half a dump; ask again.
+                time.sleep(1)
+                continue
             dump_xml = xml
-            return list(ET.fromstring(xml).iter("node"))
+            return found
         time.sleep(1)
     return []
 
@@ -310,11 +316,11 @@ def loading_shot(name, trigger):
 
 
 def tab_bar():
-    """The bar's box, from its own label or, when the dump carries no such node, from the top of its
-    items' buttons: the bar is 49 pt over the safe area, and its items fill it from that top."""
+    """The bar's box: the floating capsule's own node (20 pt in from the sides, 64 pt tall, 12 pt
+    above the foot), or, when the dump carries none, the extent of its tabs' buttons."""
     found = nodes()
     for n in found:
-        if (n.get("content-desc") or n.get("text")) == "Tabs" and box(n):
+        if n.get("resource-id") == "tab-bar" and box(n):
             return box(n)
     labels = {"Mail", "Notifications", "Search", "Mailboxes", "Settings"}
     items = [box(n) for n in found if n.get("clickable") == "true" and (n.get("text") in labels or n.get("content-desc") in labels) and box(n)]
@@ -326,8 +332,52 @@ def tab_bar():
     return (left, top, right, h)
 
 
+def bar_box():
+    """The tab bar's own node, and only that: while the keyboard is up the bar is hidden, and a
+    fallback would read the page instead."""
+    for n in nodes():
+        if n.get("resource-id") == "tab-bar" and box(n):
+            return box(n)
+    return None
+
+
+def bar_geometry():
+    """The floating tab bar's shape, from the accessibility tree: 20 pt in from the
+    sides, 64 pt tall, 12 pt above the home indicator (nsh-cupertino's GlassTabBar).
+    A bar drawn edge to edge, or as a band, is what this catches."""
+    bar = tab_bar()
+    if not bar:
+        fail("the tab bar is not in the accessibility tree")
+        return None
+    foot = bar[3] if bar[3] <= h else h
+    dpi = float(prop("ro.sf.lcd_density") or 0) or 480.0
+    density = dpi / 160  # pixels per point
+    top, left, right = bar[1], bar[0], bar[2]
+    print(
+        f"tab bar: x {left}..{right} of {w}, y {top}..{foot} of {h}"
+        f" — side insets {round(left / density)}/{round((w - right) / density)} pt,"
+        f" {round((foot - top) / density)} pt tall, {round((h - foot) / density)} pt from the foot",
+        flush=True,
+    )
+    for what, got, want in (("left inset", left / density, 20), ("right inset", (w - right) / density, 20)):
+        if abs(got - want) > 4:
+            fail(f"the tab bar's {what} is {round(got)} pt, not {want}")
+    # Minimised, the bar travels 6 pt toward the foot (UIKit's shrink), so 6..12 is its own room.
+    if not 5 <= (h - foot) / density <= 13:
+        fail(f"the tab bar sits {round((h - foot) / density)} pt above the foot, not 6..12")
+    if abs((foot - top) / density - 64) > 6:
+        fail(f"the tab bar is {round((foot - top) / density)} pt tall, not 64")
+    return (left, top, right, foot)
+
+
 def tab(name):
-    """Taps a tab by its place in the bar, clear of the system's gesture area."""
+    """Taps a tab by its place in the bar, clear of the system's gesture area.
+
+    The bar minimises to a pill around the chosen tab as a page scrolls down, and
+    the pill takes the taps over that tab: a short drag up brings the bar back
+    before anything is pressed."""
+    adb("shell", "input", "swipe", str(w // 2), str(h * 7 // 10), str(w // 2), str(h * 7 // 10 - 80), "250")
+    quiet(1)
     bar = tab_bar()
     if bar:
         x1, y1, x2, _ = bar
@@ -485,6 +535,7 @@ for mode in ("light", "dark"):
     adb("shell", "cmd", "uimode", "night", "yes" if mode == "dark" else "no")
     launch()
     shot(f"{mode}-inbox")
+    bar_geometry()
     # The loading state: one indicator, the bar's Cupertino one (the demo's refresh waits 800 ms).
     loading_shot(f"{mode}-refreshing", "id:refresh")
 
@@ -586,12 +637,25 @@ for mode in ("light", "dark"):
     during(["swipe", str(w // 2), str(h * 8 // 10), str(w // 2), str(h * 5 // 10), "1200"], f"{mode}-inbox-mid-scroll", 0.6)
     adb("shell", "input", "swipe", str(w // 2), str(h * 7 // 10), str(w // 2), str(h * 3 // 10), "300")
     shot(f"{mode}-inbox-scrolled")
+    # Deeper: the bar minimises to a pill around the chosen tab, the page showing either side of it.
+    adb("shell", "input", "swipe", str(w // 2), str(h * 7 // 10), str(w // 2), str(h * 4 // 10), "400")
+    quiet(2)
+    shot(f"{mode}-inbox-tabmin")
+    bar_geometry()
+    scroll_up_to("id:message-.*")
 
     if tab("Search") and wait("id:search"):
         shot(f"{mode}-search")
+        rest = bar_box()
         tap("id:search")  # the field, before anything is typed
         adb("shell", "input", "text", "roadmap")
         wait("id:result-count", 15)
+        # The keyboard is up: the bar is either covered or where it was, never riding on the keyboard.
+        typing = bar_box()
+        if rest and typing and abs(typing[1] - rest[1]) > 6:
+            fail(f"the tab bar moved {typing[1] - rest[1]} px while the keyboard is up")
+        print("the bar while typing:", "covered" if typing is None else f"top {typing[1]}", flush=True)
+        shot(f"{mode}-search-typing")
         back()  # the keyboard
         shot(f"{mode}-search-results")
         # A mail laid out for 600px fits the phone's width.
@@ -671,6 +735,14 @@ for mode in ("light", "dark"):
         during(["swipe", str(w // 2), str(h * 8 // 10), str(w // 2), str(h * 5 // 10), "1200"], f"{mode}-settings-mid-scroll", 0.6)
         adb("shell", "input", "swipe", str(w // 2), str(h * 7 // 10), str(w // 2), str(h * 3 // 10), "300")
         shot(f"{mode}-settings-scrolled")
+        # The bar minimised here, then another tab and back: the pill must be Settings' own
+        # icon at Settings' slot (nsh-cupertino 0.4.1 reads the live selection).
+        if tab("Mail"):
+            wait("id:messages", 20)
+            if tab("Settings"):
+                wait("id:settings", 20)
+                quiet(2)
+                shot(f"{mode}-settings-pill")
         # The shots scrolled the list: the account row the next steps use is back at the top.
         scroll_up_to("Accounts")
         # The first account's signature, then a new message that carries it.

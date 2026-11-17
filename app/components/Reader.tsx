@@ -4,9 +4,10 @@
 // HTML in a web view, or its text) and its attachments. Remote images stay
 // blocked until the reader asks for them. Archive, delete, read and flag act
 // on the whole conversation; reply and forward on the message.
-import { createMotion, Image, reduceMotion, signal, Text, View } from "nsh";
+import { createMotion, Image, reduceMotion, Scroll, signal, Text, View } from "nsh";
 import { t } from "nsh/i18n";
 import { ActionSheet, Button, Icon, ScrollView } from "cupertino";
+import { PageScroll } from "../scroll";
 import { Mail, type Attachment, type Message, type Summary } from "agentinbox/native";
 import { AccountMark, Monogram } from "./Marks";
 import { MailView, webViewAvailable } from "./MailView";
@@ -176,6 +177,7 @@ function CollapsedList(props: { messages: Summary[]; threadId: string; testID: s
 }
 
 export function Reader(props: ReaderProps) {
+  const reportScroll = PageScroll();
   const m = () => props.message;
   const target = (): Target => ({ message: m(), thread: threadOf(m(), props.conversation) });
   const at = () => target().thread?.findIndex((s) => s.id === m().id) ?? -1;
@@ -198,9 +200,16 @@ export function Reader(props: ReaderProps) {
 
   return (
     <View class="flex-1">
-      <ScrollView class="flex-1" testID="reader">
+      {/* The page's floating layer follows the mail: the scroll edge dissolves what passes under the group. */}
+      <Scroll
+        class="flex-1"
+        keyboardDismissMode="interactive"
+        keyboardShouldPersistTaps="handled"
+        onScroll={(event: { offset: { y: number } }) => reportScroll(event.offset.y)}
+        testID="reader"
+      >
         {/* Under the page's floating bar on a phone: the message scrolls under the glass. */}
-        <View class={`gap-3 pb-8 ${props.phone ? "pt-11" : "pt-3"}`} style={enter.style}>
+        <View class={`w-full bg-system-background gap-3 pb-8 ${props.phone ? "pt-11" : "pt-3"}`} style={enter.style}>
           <View class="flex-row items-start gap-2 px-4">
             <Text role="header" class="flex-1 text-title2 font-semibold text-label">
               {subject()}
@@ -270,7 +279,7 @@ export function Reader(props: ReaderProps) {
             <CollapsedList messages={newer()} threadId={m().threadId} testID="thread-newer" />
           </If>
         </View>
-      </ScrollView>
+      </Scroll>
       <ActionSheet
         open={menu()}
         title={t("thread.messageActions")}

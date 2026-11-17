@@ -1,13 +1,17 @@
-// Phones and narrow windows: iOS's tab bar over a navigation stack per
+// Phones and narrow windows: iOS's floating tab bar over a navigation stack per
 // section (Mail, Notifications, Search, Mailboxes, Settings), each kept while
-// another shows. Pushed pages cover the bar, as they do on iOS.
-import { effect, platform, signal, untracked, View, type JSX } from "nsh";
+// another shows. The bar is a capsule of glass inset from the edges, so the
+// pages scroll behind and around it, and it minimises to a pill around the
+// chosen tab as the page scrolls down. Pushed pages cover it, as they do on iOS.
+import { effect, keyboardFrame, platform, signal, untracked, View, type JSX } from "nsh";
 import { BackHandler } from "nsh/mobile";
 import { NavStack } from "nsh/base";
 import { t } from "nsh/i18n";
-import { GlassButton, TabBar } from "cupertino";
+import { GlassButton, GlassTabBar } from "cupertino";
 import { NavContext, openCompose, selectedTab, selectTab, tabs, TAB, type Route } from "../nav";
+import { pageOffset, resetOffset } from "../scroll";
 import { picking } from "../store";
+import { unreadNotifications } from "../notify";
 import { Toasts } from "./Toasts";
 
 const navIcons = { mail: "tray", notifications: "bell", search: "magnifyingglass", folders: "folder", settings: "slider.horizontal.3" } as const;
@@ -33,6 +37,13 @@ export function TabShell(props: { page: (route: Route) => JSX.Element }) {
     if (!untracked(opened)[index]) opened.update((o) => ({ ...o, [index]: true }));
   });
   const covered = () => depth() > 1;
+  // iOS 26's keyboard covers the bar; it never rides up on top of it.
+  const typing = () => keyboardFrame().height > 0;
+  // A page that comes back, or a tab's first page, is at its top: the bar expands.
+  effect(() => {
+    tabs[selectedTab()].stack.routes().length;
+    resetOffset();
+  });
   return (
     <View class="h-full flex-col overflow-hidden bg-system-background">
       {/* min-h-0: a long list must scroll inside the pane, not push the bar off the screen. */}
@@ -50,34 +61,31 @@ export function TabShell(props: { page: (route: Route) => JSX.Element }) {
             </View>
           )}
         </Each>
-        <Toasts class={covered() ? "bottom-4" : "bottom-24"} />
+        {/* Above the compose control and the bar, so neither takes a tap meant for Undo. */}
+        <Toasts class={covered() ? "bottom-4" : "bottom-40"} />
       </View>
-      {/* The bar is glass and floats: the lists end under it, as Mail's do. Mail's compose control
-          is a floating button of glass above it — in the same stack, so neither covers the other's taps. */}
-      <If when={!covered()}>
-        <View class="absolute bottom-0 left-0 right-0">
-          <If when={selectedTab() === TAB.mail && !picking()}>
-            <View class="items-end pr-4 pb-3">
-              <View class="h-14 w-14">
-                <GlassButton class="h-full w-full" icon="square.and.pencil" label={t("actions.compose")} onPress={() => openCompose({ mode: "new" })} testID="compose" />
-              </View>
+      {/* Mail's compose control floats above the bar, in the same stack so neither covers the other's taps. */}
+      <If when={!covered() && !typing()}>
+        <If when={selectedTab() === TAB.mail && !picking()}>
+          <View class="absolute bottom-0 left-0 right-0 items-end pr-5 pb-[calc(env(safe-area-inset-bottom)+88px)]">
+            <View class="h-14 w-14">
+              <GlassButton class="h-full w-full" icon="square.and.pencil" label={t("actions.compose")} onPress={() => openCompose({ mode: "new" })} testID="compose" />
             </View>
-          </If>
-          <TabBar
-            items={tabs.map((tab) => ({
-              value: tab.name,
-              title: t(`tabs.${tab.name}`),
-              icon: navIcons[tab.name],
-            }))}
-            value={tabs[selectedTab()].name}
-            onChange={({ value, index }: { value: string; index: number }) => choose(index)}
-            label={t("tabs.label")}
-            testID="tab-bar"
-          />
-        </View>
-      </If>
-      <If when={covered() && picking()}>
-        <View />
+          </View>
+        </If>
+        <GlassTabBar
+          items={tabs.map((tab) => ({
+            value: tab.name,
+            title: t(`tabs.${tab.name}`),
+            icon: navIcons[tab.name],
+            badge: tab.name === "notifications" && unreadNotifications() ? (unreadNotifications() > 99 ? "99+" : String(unreadNotifications())) : undefined,
+          }))}
+          value={tabs[selectedTab()].name}
+          scrollOffset={pageOffset()}
+          onChange={({ value, index }: { value: string; index: number }) => choose(index)}
+          label={t("tabs.label")}
+          testID="tab-bar"
+        />
       </If>
     </View>
   );

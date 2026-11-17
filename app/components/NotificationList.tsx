@@ -13,6 +13,7 @@ import { wide } from "../layout";
 import { archiveNotifications, markNotifications, sourceById } from "../notify";
 import { PullIndicator, PULL_HEIGHT, pullValue } from "./PullIndicator";
 import { PriorityDot, SourceMark, Tags } from "./SourceMark";
+import { PageScroll } from "../scroll";
 
 /** A heading for a day, or a notification under it. */
 interface FeedRow {
@@ -53,6 +54,7 @@ export function NotificationList(props: {
   contentClass?: string;
 }) {
   const oneLine = () => !wide();
+  const reportScroll = PageScroll();
   // The pull indicator follows this; the platform's own spinner stays off.
   const pull = pullValue();
   const actions = signal<Notification | null>(null);
@@ -78,6 +80,8 @@ export function NotificationList(props: {
         pullValue={pull}
         refreshIndicator={{ height: PULL_HEIGHT }}
         onLoadMore={props.onLoadMore}
+        // The page's floating layer follows this list: the scroll edge dissolves what passes under the group, the tab bar minimises on the way down.
+        onScroll={(event: { offset: { y: number } }) => reportScroll(event.offset.y)}
         testID={props.testID}
         empty={props.empty}
         class="flex-1"

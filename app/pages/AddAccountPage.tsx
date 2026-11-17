@@ -51,7 +51,7 @@ export function AddAccountPage() {
   };
   return (
     <Page title={t("accounts.add")} back={t("common.back")} onBack={nav.close} testID="add-account">
-      <View class="gap-4 px-4 pb-4 pt-11">
+      <View class="gap-4 px-4 pb-4">
         <View class="gap-1">
           <Text role="header" class="text-title3 font-semibold text-label">
             {t("accounts.addTitle")}

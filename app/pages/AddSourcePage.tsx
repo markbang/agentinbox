@@ -3,7 +3,7 @@
 import { t } from "nsh/i18n";
 import type { SourceKind } from "agentinbox/native";
 import { List, ListTile, Section } from "cupertino";
-import { BarSpace, Page } from "../components/Page";
+import { Page } from "../components/Page";
 import { kindIcon } from "../components/SourceMark";
 import { NavContext } from "../nav";
 
@@ -23,9 +23,8 @@ const kinds: { kind: SourceKind; enabled: boolean }[] = [
 export function AddSourcePage() {
   const nav = NavContext();
   return (
-    <Page title={t("sources.add")} back={t("common.back")} onBack={nav.close} testID="add-source">
-      <List>
-        <BarSpace />
+    <Page background="system-grouped-background" title={t("sources.add")} back={t("common.back")} onBack={nav.close} testID="add-source">
+      <List scroll={false}>
         <Section footer={t("sources.chooseKind")}>
           <Each of={kinds} key={(k) => k.kind}>
             {(entry, index) => (

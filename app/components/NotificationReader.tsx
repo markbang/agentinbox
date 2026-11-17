@@ -1,9 +1,10 @@
 // One notification, whole: its source, sender and time, the tags, the body,
 // and its actions (read, archive, open the link, open the mail it came from).
-import { openUrl, Text, View } from "nsh";
+import { openUrl, Scroll, Text, View } from "nsh";
 import { t } from "nsh/i18n";
 import type { Notification, Source } from "agentinbox/native";
-import { Button, Icon, ScrollView } from "cupertino";
+import { Button, Icon } from "cupertino";
+import { PageScroll } from "../scroll";
 import { fullDate } from "../lib/format";
 import { SourceMark, Tags } from "./SourceMark";
 
@@ -15,9 +16,16 @@ export function NotificationReader(props: {
   onOpenMail?: () => void;
 }) {
   const n = () => props.note;
+  const reportScroll = PageScroll();
   return (
-    <ScrollView class="flex-1" testID="notify-reader">
-      <View class="gap-4 px-4 pb-10 pt-11" testID="notify-scroll">
+    <Scroll
+      class="flex-1"
+      keyboardDismissMode="interactive"
+      keyboardShouldPersistTaps="handled"
+      onScroll={(event: { offset: { y: number } }) => reportScroll(event.offset.y)}
+      testID="notify-reader"
+    >
+      <View class="w-full bg-system-background gap-4 px-4 pb-10 pt-11" testID="notify-scroll">
         <View class="flex-row items-center gap-2">
           <If when={props.source}>{(s) => <SourceMark source={s()} size="sm" />}</If>
           <Text class="text-footnote font-semibold text-secondary-label" testID="notify-source">
@@ -71,6 +79,6 @@ export function NotificationReader(props: {
           {n().body}
         </Text>
       </View>
-    </ScrollView>
+    </Scroll>
   );
 }

@@ -44,7 +44,6 @@ export function InboxPage() {
   // The selection's actions are the bar's: glass over the rows, as Mail has them.
   const selectionActions = () => (
     <>
-      <Button title={t("common.cancel")} variant="plain" onPress={clearPicked} testID="end-selection" />
       <If when={mailbox().folder !== "archive" && mailbox().folder !== "trash"}>
         <Button icon="archivebox" label={t("actions.archive")} variant="plain" onPress={() => move("archive")} testID="picked-archive" />
       </If>
@@ -75,6 +74,9 @@ export function InboxPage() {
   );
   return (
     <Page
+      scroll={false}
+      // A selection leaves with Cancel at the leading edge; the actions take the trailing capsule.
+      leading={picking() ? <Button title={t("common.cancel")} variant="plain" size="medium" onPress={clearPicked} testID="end-selection" /> : undefined}
       title={picking() ? t("actions.selected", { count: pickedIds().length }) : mailboxTitle()}
       titleTestID={picking() ? "selection-count" : undefined}
       trailing={picking() ? selectionActions() : barActions()}

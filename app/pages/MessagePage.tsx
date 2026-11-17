@@ -15,6 +15,7 @@ export function MessagePage(props: { id: string }) {
   const compose = (mode: ComposeMode) => openCompose({ mode, source: message() });
   return (
     <Page
+      scroll={false}
       title={message()?.subject ?? ""}
       back={t("common.back")}
       onBack={nav.close}

@@ -105,6 +105,8 @@ jobs:
             # The frame measurement first, so a flaky screenshot step cannot keep it out of the log.
             python3 .github/android-perf.py app/.nsh/perf || true
             if [ "${{ inputs.perf_only }}" != "true" ]; then python3 .github/android-ui.py app/.nsh/ui screens; fi
+            # The floating layer, measured on the frames: an inset capsule, expanded and minimised, with the page beside it.
+            if [ "${{ inputs.perf_only }}" != "true" ]; then node tools/glass-check.mjs screens; fi
       - uses: actions/upload-artifact@v7
         if: always()
         with:

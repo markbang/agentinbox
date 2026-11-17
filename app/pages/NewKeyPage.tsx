@@ -3,7 +3,7 @@
 import { signal, View } from "nsh";
 import { t } from "nsh/i18n";
 import { ActionSheet, Button, List, ListTile, Section, Switch } from "cupertino";
-import { BarSpace, Page } from "../components/Page";
+import { Page } from "../components/Page";
 import { FieldRow, FormNote } from "../components/Fields";
 import { NavContext } from "../nav";
 import { createKey, sources } from "../notify";
@@ -51,9 +51,8 @@ export function NewKeyPage() {
 
   const expiryLabel = () => t(`keys.${expiry.find((e) => e.value === expires())?.key ?? "never"}`);
   return (
-    <Page title={t("keys.new")} back={t("common.back")} onBack={nav.close} testID="new-key">
-      <List>
-        <BarSpace />
+    <Page background="system-grouped-background" title={t("keys.new")} back={t("common.back")} onBack={nav.close} testID="new-key">
+      <List scroll={false}>
         <Section footer={t("keys.nameHint")}>
           <FieldRow label={t("keys.name")} value={name()} onChange={name.set} autoFocus testID="key-name" />
         </Section>

@@ -26,6 +26,11 @@ export function ComposePage(props: { init: ComposeInit }) {
   const draft = useDraft(props.init, accounts(), mailbox().account ?? accounts()[0]?.id ?? null);
   const { start, from, to, cc, bcc, subject, files } = draft;
   const body = draft.text;
+  // A composer opened before the accounts arrived (a fresh sign-in) takes the first one: sending
+  // must not answer "add an account" over an account that is on its way.
+  effect(() => {
+    if (!from() && accounts().length) from.set(mailbox().account ?? accounts()[0].id);
+  });
   const showCc = signal(!!cc() || !!bcc());
   const sending = signal(false);
   const error = signal<string | null>(null);
@@ -187,9 +192,10 @@ export function ComposePage(props: { init: ComposeInit }) {
   // What the user writes goes above the quote and the signature.
   const caretAtTop = replying || !draft.edited();
   return (
-    <Page title={title()} back={t("common.close")} onBack={close} trailing={actions()} testID="compose-page">
+    <Page scroll={false} title={title()} back={t("common.close")} onBack={close} trailing={actions()} testID="compose-page">
       <View
-        class="min-h-0 flex-1 bg-system-background pt-11"
+        // The footer rides on the keyboard: the column shrinks by the keyboard's height.
+        class="min-h-0 flex-1 bg-system-background pt-11 pb-[env(keyboard-inset-height)]"
         onFileDragEnter={() => dragging.set(true)}
         onFileDragLeave={() => dragging.set(false)}
         onFileDrop={(e: { uris: string[]; mimeTypes: string[] }) => {
