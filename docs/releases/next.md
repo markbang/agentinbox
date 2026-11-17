@@ -3,7 +3,7 @@ English | [简体中文](next.zh-CN.md)
 ## Added
 
 - **Liquid Glass, as iOS 26 has it.** The floating layer is Apple's glass from
-  `nsh-cupertino` 0.4.0 — the tab bar, the page's navigation controls, sheets,
+  `nsh-cupertino` 0.4.1 — the tab bar, the page's navigation controls, sheets,
   action sheets, alerts and the search field where it floats — bending, blurring
   and tinting what is behind them on the GPU, with a lit rim that follows the
   light. Content stays on solid paper: a list row, a message body, the reader's

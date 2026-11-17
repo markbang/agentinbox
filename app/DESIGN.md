@@ -34,7 +34,7 @@ stop. Nothing Material remains: no ripples, no M3 shapes.
 
 Liquid Glass is the app's design language, not a material: the floating layer
 moves out of the content's way as the page scrolls. It comes from `nsh-cupertino`
-0.4.0 (`Glass`, `GlassTabBar`, `ScrollEdge`, the floating navigation group).
+0.4.1 (`Glass`, `GlassTabBar`, `ScrollEdge`, the floating navigation group).
 
 - **The tab bar is a capsule that floats** (`GlassTabBar`): 64 pt tall, radius
   32, 20 pt in from the sides and 12 pt above the home indicator, so the page

@@ -64,6 +64,25 @@ for (const mode of ["light", "dark"]) {
   frame(`${mode}-inbox-tabmin`, 8, (png, scale, fail, name) => {
     log(`${name}: drawn`);
   });
+
+  // Minimised after the chosen tab changed (Mail -> Settings and back): the pill sits at the
+  // chosen tab's slot, near the trailing edge, not at the bar's first one. The pill is a 50 pt
+  // disc: the brightest window of that width on the bar's row is where it is.
+  frame(`${mode}-settings-pill`, 8, (png, scale, fail, name) => {
+    if (mode !== "dark") return; // a white pill on a white page has no luminance edge; read that one by eye
+    const y = Math.round(png.height - (12 + 32) * scale);
+    const width = Math.round(50 * scale);
+    let best = { at: 0, mean: -1 };
+    for (let x = 0; x + width <= png.width; x += Math.max(1, Math.round(2 * scale))) {
+      let sum = 0;
+      for (let i = x; i < x + width; i++) sum += png.luminance(i, y);
+      const mean = sum / width;
+      if (mean > best.mean) best = { at: x + width / 2, mean };
+    }
+    const centre = best.at / png.width;
+    if (centre < 0.7) fail(`the minimised pill sits at ${Math.round(centre * 100)} % of the width: not at the chosen tab`);
+    log(`${name}: the pill sits at ${Math.round(centre * 100)} % of the width`);
+  });
 }
 
 if (failures.length) {

@@ -726,6 +726,14 @@ for mode in ("light", "dark"):
         during(["swipe", str(w // 2), str(h * 8 // 10), str(w // 2), str(h * 5 // 10), "1200"], f"{mode}-settings-mid-scroll", 0.6)
         adb("shell", "input", "swipe", str(w // 2), str(h * 7 // 10), str(w // 2), str(h * 3 // 10), "300")
         shot(f"{mode}-settings-scrolled")
+        # The bar minimised here, then another tab and back: the pill must be Settings' own
+        # icon at Settings' slot (nsh-cupertino 0.4.1 reads the live selection).
+        if tab("Mail"):
+            wait("id:messages", 20)
+            if tab("Settings"):
+                wait("id:settings", 20)
+                quiet(2)
+                shot(f"{mode}-settings-pill")
         # The shots scrolled the list: the account row the next steps use is back at the top.
         scroll_up_to("Accounts")
         # The first account's signature, then a new message that carries it.
