@@ -310,11 +310,11 @@ def loading_shot(name, trigger):
 
 
 def tab_bar():
-    """The bar's box, from its own label or, when the dump carries no such node, from the top of its
-    items' buttons: the bar is 49 pt over the safe area, and its items fill it from that top."""
+    """The bar's box: the floating capsule's own node (20 pt in from the sides, 64 pt tall, 12 pt
+    above the foot), or, when the dump carries none, the extent of its tabs' buttons."""
     found = nodes()
     for n in found:
-        if (n.get("content-desc") or n.get("text")) == "Tabs" and box(n):
+        if n.get("resource-id") == "tab-bar" and box(n):
             return box(n)
     labels = {"Mail", "Notifications", "Search", "Mailboxes", "Settings"}
     items = [box(n) for n in found if n.get("clickable") == "true" and (n.get("text") in labels or n.get("content-desc") in labels) and box(n)]
@@ -519,6 +519,7 @@ for mode in ("light", "dark"):
     adb("shell", "cmd", "uimode", "night", "yes" if mode == "dark" else "no")
     launch()
     shot(f"{mode}-inbox")
+    bar_geometry()
     # The loading state: one indicator, the bar's Cupertino one (the demo's refresh waits 800 ms).
     loading_shot(f"{mode}-refreshing", "id:refresh")
 
