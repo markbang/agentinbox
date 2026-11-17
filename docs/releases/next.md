@@ -3,7 +3,7 @@ English | [简体中文](next.zh-CN.md)
 ## Added
 
 - **Liquid Glass, as iOS 26 has it.** The floating layer is Apple's glass from
-  `nsh-cupertino` 0.4.1 — the tab bar, the page's navigation controls, sheets,
+  `nsh-cupertino` 0.4.2 — the tab bar, the page's navigation controls, sheets,
   action sheets, alerts and the search field where it floats — bending, blurring
   and tinting what is behind them on the GPU, with a lit rim that follows the
   light. Content stays on solid paper: a list row, a message body, the reader's
@@ -21,15 +21,20 @@ English | [简体中文](next.zh-CN.md)
   capsule of glass beside it, and nothing but the page under them. A large title
   scrolls away and the compact title fades into the group — Settings and
   Mailboxes keep theirs.
-- **The scroll edge.** Content passing under those controls dissolves through a
-  graduated blur and fade — 20 pt of blur at the edge, sharp 110 pt in, fading
-  into the page's own background — and the effect is off while a page rests at
-  its top.
+- **The scroll edge.** Content passing under those controls dissolves into the
+  page's own colour — a graduated blur and fade, opaque at the edge, clear
+  below the bar with no seam — and the effect is off while a page rests at its
+  top.
 - **Compose is a sheet** on every shell, as Mail has it, with the app's glass
   behind it on a phone.
 
 ## Improved
 
+- The floating layer reads as a surface over white paper: text behind the bar
+  and the minimised pill is a soft haze rather than legible strokes, the light
+  glass lifts toward white with a hairline and the iOS 27 shadow, the pill is a
+  page-coloured disc with a rim, and the selected tab's capsule no longer has a
+  blue-violet fringe.
 - Search on a large mailbox: about five times faster at 50,000 messages (1–3 ms for a word that matches thousands of them, 10 ms for one that matches every message), with paging past the first 50 results (`before`) and quoted phrases. CJK substrings, prefixes and accented words are covered by tests.
 - The lists keep the room the floating bars need: 44 pt at the top of a page and
   64 + 12 + the safe area at the foot of a tab's own page, so the first row sits
