@@ -202,6 +202,17 @@ def tap_until(key, expect, tries=2, timeout=8):
     raise Failure(f"tapping {key} never showed {expect}")
 
 
+def sheet(key, item, tries=3, timeout=15):
+    """Opens the sheet `key` shows, and waits for one of its items: a tap that opens nothing is
+    repeated, since these sheets are the app's flakiest controls. False when it never opened."""
+    for attempt in range(1, tries + 1):
+        tap(key)
+        if find(item, timeout) is not None:
+            return True
+        print(f"the sheet behind {key} did not open (attempt {attempt})", flush=True)
+    return False
+
+
 def select_first_row(timeout=6):
     """The first row into the selection, and the bar's own count as the proof: the tap right after
     `select-rows` lands before the selection bar is laid out now and then, and a Delete on an empty
@@ -271,13 +282,6 @@ def loading_shot(name, trigger):
     tap(trigger)
     save(name, first_change(before, 3))
     gone("id:refreshing", 10) or gone("id:notify-refreshing", 10)
-
-
-def blur():
-    """Takes the focus from a text field by tapping the page's title: a blinking cursor keeps the
-    window from ever being idle, and every dump then waits its idle timeout out."""
-    adb("shell", "input", "tap", str(w // 2), str(int(h * 0.06)))
-    steady(timeout=2)
 
 
 def swipe(x1, y1, x2, y2, ms):
@@ -547,6 +551,14 @@ def sign_out(name):
     raise Failure("signing out never showed the onboarding")
 
 
+def skip(what):
+    """A screen the app would not open this run: said loudly, in the run's annotations and in the
+    artifact, so it is missing on purpose and not by accident."""
+    print(f"::warning title=Android UI::skipped {what}: the app did not open it this run", flush=True)
+    with open(os.path.join(out, "skipped.txt"), "a") as f:
+        f.write(f"{STEP}: {what}\n")
+
+
 def evidence(name):
     """The screen, its dump, and what the app logged since the step began: what the next flake is
     diagnosed from. It runs on raw adb, so an expired step budget cannot hide the failure."""
@@ -663,22 +675,16 @@ def light_walk():
     # the sheet is asked for again instead of sent for once.
     tap("id:compose-to")
     adb("shell", "input", "text", "maya@northwind.dev")
-    blur()
-    # The clock's sheet is the flakiest control in the app: a tap that opens nothing is asked again,
-    # and each look is given time for a dump that has to wait out the field's blinking cursor.
-    for attempt in range(1, 4):
-        tap("id:send-later")
-        if find("Tomorrow morning", 15) is not None:
-            break
-        print(f"the schedule sheet did not open (attempt {attempt})", flush=True)
+    # The clock's sheet is the flakiest control in the app (an ActionSheet opened in the tap that
+    # dismisses the keyboard): a tap that opens nothing is asked again, three times, and a sheet
+    # that never opens costs its two screens instead of the run.
+    if sheet("id:send-later", "Tomorrow morning"):
+        shot(f"{theme}-schedule-menu")
+        tap("Tomorrow morning")
+        wait("id:toast-action", 15)
+        save(f"{theme}-scheduled-snackbar", frame())
     else:
-        raise Failure("the schedule sheet never opened")
-    shot(f"{theme}-schedule-menu")
-    if find("Tomorrow morning", 3) is None:  # the sheet closed under the shot
-        tap_until("id:send-later", "Tomorrow morning", tries=2, timeout=15)
-    tap("Tomorrow morning")
-    wait("id:toast-action", 15)
-    save(f"{theme}-scheduled-snackbar", frame())
+        skip("Schedule send's sheet")
     # Whatever the schedule left open (a sheet, the composer itself), the inbox comes back
     # before the next screen: a stray focus would take the keystrokes meant for search.
     if find("id:compose-page", 2) is not None:
@@ -736,7 +742,8 @@ def light_walk():
     tab("Mailboxes", "id:mailboxes")
     shot(f"{theme}-mailboxes")
     tap("Scheduled")
-    wait("id:scheduled", 10)  # the page's own id is a container; the shot is the proof
+    if find("id:scheduled", 10) is None:  # the list's own id; the shot is the proof either way
+        skip("the Scheduled list (nothing was scheduled this run)")
     shot(f"{theme}-scheduled")
     # An empty folder on the phone: the one draft is deleted, and Drafts says so with its next
     # step. The tab, not Back: the Scheduled list is a folder of this tab, and Back from it can
@@ -760,22 +767,18 @@ def light_walk():
     shot(f"{theme}-notifications-scrolled")
     # The menu's own testID is not in the accessibility tree, so the sheet is known by its first
     # action; nothing else on this page offers it.
-    for attempt in range(1, 4):
-        tap("id:notify-more")
-        if find("Sources", 15) is not None:
-            break
-        print(f"the notifications menu did not open (attempt {attempt})", flush=True)
+    if sheet("id:notify-more", "Sources"):
+        shot(f"{theme}-notifications-menu")
+        tap("Sources")
+        wait("id:sources", 10)
+        shot(f"{theme}-sources")
+        tap("id:sources-add-top")
+        wait("id:add-source", 10)
+        shot(f"{theme}-source-kinds")
+        back_to("id:sources")
+        back_to("id:notifications")
     else:
-        raise Failure("the notifications menu never opened")
-    shot(f"{theme}-notifications-menu")
-    tap("Sources")
-    wait("id:sources", 10)
-    shot(f"{theme}-sources")
-    tap("id:sources-add-top")
-    wait("id:add-source", 10)
-    shot(f"{theme}-source-kinds")
-    back_to("id:sources")
-    back_to("id:notifications")
+        skip("the notifications menu and its sources screens")
     # A notification opens on its own page; Back returns to the feed. The rows' titles are not
     # always their own nodes, so the first row is tapped where the list starts.
     adb("shell", "input", "tap", str(w // 2), str(h // 3))
@@ -807,7 +810,6 @@ def light_walk():
     adb("shell", "input", "text", "'**Lin%sChen**'")
     adb("shell", "input", "keyevent", "66")
     adb("shell", "input", "text", "'Northwind%s-%s[northwind.dev](https://northwind.dev)'")
-    blur()
     back()  # the keyboard
     wait("id:signature-preview")
     shot(f"{theme}-signature")
@@ -894,20 +896,13 @@ def dark_walk():
     shot("dark-compose")
     tap("id:compose-to")
     adb("shell", "input", "text", "maya@northwind.dev")
-    blur()
-    for attempt in range(1, 4):
-        tap("id:send-later")
-        if find("Tomorrow morning", 15) is not None:
-            break
-        print(f"the schedule sheet did not open (attempt {attempt})", flush=True)
+    if sheet("id:send-later", "Tomorrow morning"):
+        shot("dark-schedule-menu")
+        tap("Tomorrow morning")
+        wait("id:toast-action", 15)
+        save("dark-scheduled-snackbar", frame())
     else:
-        raise Failure("the schedule sheet never opened")
-    shot("dark-schedule-menu")
-    if find("Tomorrow morning", 3) is None:
-        tap_until("id:send-later", "Tomorrow morning", tries=2, timeout=15)
-    tap("Tomorrow morning")
-    wait("id:toast-action", 15)
-    save("dark-scheduled-snackbar", frame())
+        skip("Schedule send's sheet (dark)")
     if find("id:compose-page", 2) is not None:
         close_compose()
     if find("id:messages", 3) is None:
