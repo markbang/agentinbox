@@ -30,7 +30,7 @@ Budgets, so a stuck run cannot burn an hour:
 | The job | 20 minutes |
 | The emulator step (boot, frames, screens) | 15 minutes |
 | One screen in the driver | 2 minutes |
-| The whole drive | 9 minutes after boot (`DRIVE_BUDGET`) |
+| The whole drive | 12 minutes after boot (`DRIVE_BUDGET`) |
 | The frame measurement | its own waits, 4 minutes at most |
 
 The drive stops at its **first** failure instead of carrying on into a broken app. It then prints

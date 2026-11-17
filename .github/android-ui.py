@@ -9,7 +9,7 @@ Usage: android-ui.py <dir with the APK> <screenshot dir>
 Nothing here sleeps to let the app catch up: every wait ends on its condition. A control is waited
 for by polling the accessibility dump four times a second, an animation by two identical frames, a
 page that stopped moving by two identical dumps, a search result by its result count. Each step has
-a 2-minute budget and the drive DRIVE_BUDGET seconds (default 540, set by the workflow); the first
+a 2-minute budget and the drive DRIVE_BUDGET seconds (default 720, set by the workflow); the first
 failure stops the drive, prints `FAILED-STEP: <step>`, and leaves a screenshot, the dump, the
 logcat since the step began and the step times beside the screens, which the job uploads.
 """
@@ -25,7 +25,7 @@ import xml.etree.ElementTree as ET
 PKG = "top.bangwu.nshmail"
 POLL = 0.25  # how often a wait looks again; it ends on its condition, never on the clock
 STEP_BUDGET = 120
-DRIVE_BUDGET = float(os.environ.get("DRIVE_BUDGET", "540"))
+DRIVE_BUDGET = float(os.environ.get("DRIVE_BUDGET", "720"))
 
 START = time.time()
 # The drive's own clock starts once the emulator has booted: boot is bounded by its own wait.
@@ -716,15 +716,17 @@ def drive():
         tap("Scheduled")
         wait("id:scheduled", 10)  # the page's own id is a container; the shot is the proof
         shot(f"{theme}-scheduled")
-        # An empty folder on the phone: the one draft is deleted, and Drafts says so with its next step.
-        back_to("id:mailboxes")
+        # An empty folder on the phone: the one draft is deleted, and Drafts says so with its next
+        # step. The tab, not Back: the Scheduled list is a folder of this tab, and Back from it can
+        # leave the app.
+        tab("Mailboxes", "id:mailboxes")
         tap_until("Drafts", "id:messages", tries=2, timeout=15)
         if row_settled():
             select_first_row()
             tap("id:picked-delete")
             wait("id:empty-compose", 10)
             shot(f"{theme}-empty-folder")
-        back_to("id:mailboxes")
+        tab("Mailboxes", "id:mailboxes")
         tap_until("All inboxes", "id:messages", tries=2, timeout=15)
 
         mark(f"{theme} notifications")

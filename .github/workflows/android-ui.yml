@@ -10,7 +10,7 @@ name: Android UI
 # Adding any other label does not start it.
 #
 # What bounds it: the job 20 minutes, the emulator step 17, each screen the driver drives 2 and the
-# drive 10 after boot (its retry gets what is left of the 17). The drive stops at its first failure and leaves,
+# drive 12 after boot (its retry gets what is left of the 17). The drive stops at its first failure and leaves,
 # in the `android-ui` artifact, the screenshot, the UI dump, the logcat since the step began and
 # `steps.txt`. It is then retried once after a fresh APK install; a retry that passes says `flaky`
 # in the job summary, so the flakiness stays visible.

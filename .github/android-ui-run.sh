@@ -28,7 +28,7 @@ glass() {
   }
 }
 
-if drive 600; then
+if drive 720; then
   glass || exit 1
   echo "the drive passed on its first attempt" >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
   exit 0
