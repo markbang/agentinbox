@@ -9,8 +9,8 @@ name: Android UI
 # the `android-ui` label (add it to ask for Android screens) and again on each push to such a PR.
 # Adding any other label does not start it.
 #
-# What bounds it: the job 20 minutes, the emulator step 17, each screen the driver drives 2 and the
-# drive 12 after boot (its retry gets what is left of the 17). The drive stops at its first failure and leaves,
+# What bounds it: the job 20 minutes, the emulator step 14, each screen the driver drives 2 and the
+# drive 11 after boot (its retry gets what is left of the 14). The drive stops at its first failure and leaves,
 # in the `android-ui` artifact, the screenshot, the UI dump, the logcat since the step began and
 # `steps.txt`. It is then retried once after a fresh APK install; a retry that passes says `flaky`
 # in the job summary, so the flakiness stays visible.
@@ -120,7 +120,7 @@ jobs:
           sudo udevadm trigger --name-match=kvm
       - name: Drive the app in light and dark
         id: drive
-        timeout-minutes: 17
+        timeout-minutes: 14
         uses: reactivecircus/android-emulator-runner@v2
         with:
           # Android 15: the phones this ships to draw edge to edge by the system's rule, not the app's.

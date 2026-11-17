@@ -28,9 +28,9 @@ Budgets, so a stuck run cannot burn an hour:
 | Where | Bound |
 |---|---|
 | The job | 20 minutes |
-| The emulator step (boot, frames, screens) | 15 minutes |
+| The emulator step (boot, frames, screens) | 14 minutes |
 | One screen in the driver | 2 minutes |
-| The whole drive | 12 minutes after boot (`DRIVE_BUDGET`) |
+| The whole drive | 11 minutes after boot (`DRIVE_BUDGET`) |
 | The frame measurement | its own waits, 4 minutes at most |
 
 The drive stops at its **first** failure instead of carrying on into a broken app. It then prints
@@ -48,6 +48,12 @@ left, without restarting the emulator (`.github/android-ui-run.sh`, which the st
 because that action runs its `script:` one line at a time). The first attempt's screenshots stay in
 `screens-attempt-1/`. A retry that passes marks the run **flaky** in its summary and as a warning
 annotation, so a flaky screen stays visible instead of looking green.
+
+**What it captures**: the light pass walks every screen (48 frames); the dark pass covers the
+surfaces where dark is a design of its own — the shells, the reading, the writing, the glass, the
+floating bar and the onboarding (23 frames) — because the two passes otherwise cost twice the
+minutes for the same layout. Running the full walk in dark too is a one-line change in
+`.github/android-ui.py` (`dark_walk`), at about four more minutes of drive.
 
 **APKs are cached** by the hash of the app's sources, so a run that only changes the driver or a
 document does not rebuild the app. Only the exact key is restored: an APK from other sources would

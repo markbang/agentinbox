@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
-"""Drives AgentInbox on a running emulator and screenshots each screen, in light and dark mode:
+"""Drives AgentInbox on a running emulator and screenshots it: the light walk through every screen —
 inbox, swipe to archive and Undo, selection, pull to refresh, reader, a conversation, compose,
 Schedule send, search, mailboxes, Scheduled, settings, a signature, a tab switch that keeps the
-inbox's scroll position; then larger text and a tablet-sized screen.
+inbox's scroll position — then the dark pass over the surfaces dark is its own design on, then
+larger text and a tablet-sized screen.
 
 Usage: android-ui.py <dir with the APK> <screenshot dir>
 
 Nothing here sleeps to let the app catch up: every wait ends on its condition. A control is waited
 for by polling the accessibility dump four times a second, an animation by two identical frames, a
 page that stopped moving by two identical dumps, a search result by its result count. Each step has
-a 2-minute budget and the drive DRIVE_BUDGET seconds (default 720, set by the workflow); the first
+a 2-minute budget and the drive DRIVE_BUDGET seconds (default 660, set by the workflow); the first
 failure stops the drive, prints `FAILED-STEP: <step>`, and leaves a screenshot, the dump, the
 logcat since the step began and the step times beside the screens, which the job uploads.
 """
@@ -25,7 +26,7 @@ import xml.etree.ElementTree as ET
 PKG = "top.bangwu.nshmail"
 POLL = 0.25  # how often a wait looks again; it ends on its condition, never on the clock
 STEP_BUDGET = 120
-DRIVE_BUDGET = float(os.environ.get("DRIVE_BUDGET", "720"))
+DRIVE_BUDGET = float(os.environ.get("DRIVE_BUDGET", "660"))
 
 START = time.time()
 # The drive's own clock starts once the emulator has booted: boot is bounded by its own wait.
@@ -179,19 +180,16 @@ def tap(key, timeout=15):
 
 
 def tap_until(key, expect, tries=2, timeout=8):
-    """Taps `key` until `expect` shows. Under load the emulator drops a tap now and then, and a tap
-    that only stopped a fling opens nothing: those are retried. A tap that did take — its own control
-    is gone from the screen — is given more time instead, since the page it opened may still be
-    sliding in, and tapping again would press something else."""
+    """Taps `key` until `expect` shows. The tap gets the whole `timeout` before it is repeated: a
+    sheet that opens slowly must not be closed again by the next tap, and half these controls are
+    toggles. A tap that took — what it pressed is gone from the screen — is waited for longer still,
+    since the page it opened may only be sliding in."""
     for attempt in range(1, tries + 1):
         tap(key)
-        end = time.time() + timeout
-        while time.time() < end:
-            if find(expect, 1) is not None:
-                return
-            if find(key, 0.5) is None:
-                wait(expect, timeout)
-                return
+        if find(expect, timeout) is not None:
+            return
+        if find(key, 1) is None and find(expect, timeout) is not None:
+            return
         print(f"the tap on {key} did not show {expect} (attempt {attempt})", flush=True)
     raise Failure(f"tapping {key} never showed {expect}")
 
@@ -380,11 +378,9 @@ def scroll_up_to(key, tries=4, timeout=2):
     for _ in range(tries):
         if find(key, timeout) is not None:
             return True
-        nodes(0)
-        before = _dump
+        before = steady(timeout=2)
         swipe(w // 2, h * 4 // 10, w // 2, h * 8 // 10, 300)
-        settle_dump(2)
-        if _dump == before:  # the page has nothing above it
+        if steady(before, timeout=2) == before:  # the page has nothing above it
             return False
     return find(key, timeout) is not None
 
@@ -394,11 +390,9 @@ def scroll_to(key, tries=4, timeout=2):
     for _ in range(tries):
         if find(key, timeout) is not None:
             return True
-        nodes(0)
-        before = _dump
+        before = steady(timeout=2)
         swipe(w // 2, h * 8 // 10, w // 2, h * 4 // 10, 300)
-        settle_dump(2)
-        if _dump == before:  # the page has nothing below it
+        if steady(before, timeout=2) == before:  # the page has nothing below it
             return False
     return find(key, timeout) is not None
 
@@ -406,11 +400,9 @@ def scroll_to(key, tries=4, timeout=2):
 def scroll_to_end(tries=5):
     """Swipes the page up until nothing moves: the end of its content."""
     for _ in range(tries):
-        nodes(0)
-        before = _dump
+        before = steady(timeout=2)
         swipe(w // 2, h * 8 // 10, w // 2, h * 4 // 10, 300)
-        settle_dump(2)
-        if _dump == before:
+        if steady(before, timeout=2) == before:
             return
 
 
@@ -565,276 +557,384 @@ def evidence(name):
 
 
 def drive():
-    """The whole drive."""
+    """The light walk — every screen — then the dark pass over the surfaces dark is its own design
+    on, then larger text and a tablet."""
     global mode
-    for theme in ("light", "dark"):
-        mode = theme
-        adb("shell", "cmd", "uimode", "night", "yes" if theme == "dark" else "no")
+    mode = "light"
+    light_walk()
+    dark_walk()
+    large_and_tablet()
 
-        mark(f"{theme} inbox")
-        launch()
-        shot(f"{theme}-inbox")
-        bar_geometry()
-        loading_shot(f"{theme}-refreshing", "id:refresh")
 
-        mark(f"{theme} swipe to archive")
-        # Swipe the first row right: Archive, with Undo. Swipes start mid-row: the screen's edges
-        # are the system's back gesture. A full swipe needs the content to travel past 66 % of the
-        # row's width (cupertino's swipe.rs): about 2/3 of the screen, clear of those edges.
-        row = row_settled()
-        if not row:
-            raise Failure("the inbox shows no rows")
-        x1, y1, x2, y2 = row
-        y, mid, quarter = (y1 + y2) // 2, (x1 + x2) // 2, (x2 - x1) // 4
-        undo = None
-        for start, end, ms in ((120, x2 - 100, "800"), (70, x2 - 70, "1000"), (70, x2 - 70, "1600")):
-            swipe(x1 + start, y, end, y, ms)
-            undo = find("id:toast-action", 4)
-            if undo is not None:
-                break
-            print(f"the swipe {start}->{end} over {ms} ms revealed without archiving", flush=True)
-        if undo is None:
-            raise Failure("the swipe did not archive the first row")
-        # The snackbar lives seconds: the shot and the tap go straight at its own bounds.
-        save(f"{theme}-archived-snackbar", frame())
-        adb("shell", "input", "tap", *map(str, centre(undo)))
-        gone("id:toast-action", 6)  # Undo: the row is back once its snackbar has gone
-        # The swipe in flight, for the action row it reveals; Delete is not fired.
-        during(["swipe", str(mid + quarter), str(y), str(mid), str(y), "1500"], f"{theme}-swipe-delete")
-        gone("id:toast-action")  # the deletion's Undo leaves before the next gesture
+def light_walk():
+    """Every screen, once: the functional sub-flows (folders, sources, keys, rules) are walked here,
+    and the dark pass reads the shells they set up."""
+    global mode
+    mode = "light"
+    theme = "light"
+    adb("shell", "cmd", "uimode", "night", "no")
 
-        mark(f"{theme} selection")
-        # Select, then a tap picks a row; back ends the selection.
-        select_first_row()
-        shot(f"{theme}-selection")
+    mark(f"{theme} inbox")
+    launch()
+    shot(f"{theme}-inbox")
+    bar_geometry()
+    loading_shot(f"{theme}-refreshing", "id:refresh")
+
+    mark(f"{theme} swipe to archive")
+    # Swipe the first row right: Archive, with Undo. Swipes start mid-row: the screen's edges
+    # are the system's back gesture. A full swipe needs the content to travel past 66 % of the
+    # row's width (cupertino's swipe.rs): about 2/3 of the screen, clear of those edges.
+    row = row_settled()
+    if not row:
+        raise Failure("the inbox shows no rows")
+    x1, y1, x2, y2 = row
+    y, mid, quarter = (y1 + y2) // 2, (x1 + x2) // 2, (x2 - x1) // 4
+    undo = None
+    for start, end, ms in ((120, x2 - 100, "800"), (70, x2 - 70, "1000"), (70, x2 - 70, "1600")):
+        swipe(x1 + start, y, end, y, ms)
+        undo = find("id:toast-action", 4)
+        if undo is not None:
+            break
+        print(f"the swipe {start}->{end} over {ms} ms revealed without archiving", flush=True)
+    if undo is None:
+        raise Failure("the swipe did not archive the first row")
+    # The snackbar lives seconds: the shot and the tap go straight at its own bounds.
+    save(f"{theme}-archived-snackbar", frame())
+    adb("shell", "input", "tap", *map(str, centre(undo)))
+    gone("id:toast-action", 6)  # Undo: the row is back once its snackbar has gone
+    # The swipe in flight, for the action row it reveals; Delete is not fired.
+    during(["swipe", str(mid + quarter), str(y), str(mid), str(y), "1500"], f"{theme}-swipe-delete")
+    gone("id:toast-action")  # the deletion's Undo leaves before the next gesture
+
+    mark(f"{theme} selection")
+    # Select, then a tap picks a row; back ends the selection.
+    select_first_row()
+    shot(f"{theme}-selection")
+    back()
+
+    mark(f"{theme} pull to refresh")
+    during(["swipe", str(w // 2), str(y1), str(w // 2), str(y1 + h // 3), "1200"], f"{theme}-pull-refresh")
+
+    mark(f"{theme} reader")
+    tap_until("id:message-.*", "id:reader", tries=2, timeout=8)
+    shot(f"{theme}-reader")
+    during(["swipe", str(w // 2), str(h * 8 // 10), str(w // 2), str(h * 5 // 10), "1200"], f"{theme}-reader-mid-scroll")
+    swipe(w // 2, h * 7 // 10, w // 2, h * 3 // 10, 400)
+    shot(f"{theme}-reader-scrolled")
+    tap("id:message-more")
+    shot(f"{theme}-reader-menu")
+    # The menu is a sheet over the reader: one Back closes it, the next leaves the reader.
+    if not back_to("id:messages", tries=3):
+        raise Failure("the reader's menu never came back to the inbox")
+
+    mark(f"{theme} conversation")
+    # A conversation: its latest message expanded, the earlier ones collapsed above; a tap
+    # expands one. The inbox may be scrolled past it: look above, and skip the screen.
+    subject = "Offsite in March: Lisbon or Porto?"
+    if find(subject, 2) is None:
+        scroll_up_to(subject)
+    if find(subject, 2) is not None:
+        tap_until(subject, "id:reader", tries=2, timeout=8)
+        shot(f"{theme}-reader-conversation")
+        # The earlier messages collapse under a bar of their own; a tap expands them.
+        tap("id:thread-older")
+        wait("id:thread-newer", 8)
+        shot(f"{theme}-thread-older")
         back()
+        wait("id:messages")
+    else:
+        print("the conversation row is not on screen", flush=True)
 
-        mark(f"{theme} pull to refresh")
-        during(["swipe", str(w // 2), str(y1), str(w // 2), str(y1 + h // 3), "1200"], f"{theme}-pull-refresh")
-
-        mark(f"{theme} reader")
-        tap_until("id:message-.*", "id:reader", tries=2, timeout=8)
-        shot(f"{theme}-reader")
-        during(["swipe", str(w // 2), str(h * 8 // 10), str(w // 2), str(h * 5 // 10), "1200"], f"{theme}-reader-mid-scroll")
-        swipe(w // 2, h * 7 // 10, w // 2, h * 3 // 10, 400)
-        shot(f"{theme}-reader-scrolled")
-        tap("id:message-more")
-        shot(f"{theme}-reader-menu")
-        # The menu is a sheet over the reader: one Back closes it, the next leaves the reader.
-        if not back_to("id:messages", tries=3):
-            raise Failure("the reader's menu never came back to the inbox")
-
-        mark(f"{theme} conversation")
-        # A conversation: its latest message expanded, the earlier ones collapsed above; a tap
-        # expands one. The inbox may be scrolled past it: look above, and skip the screen.
-        subject = "Offsite in March: Lisbon or Porto?"
-        if find(subject, 2) is None:
-            scroll_up_to(subject)
-        if find(subject, 2) is not None:
-            tap_until(subject, "id:reader", tries=2, timeout=8)
-            shot(f"{theme}-reader-conversation")
-            # The earlier messages collapse under a bar of their own; a tap expands them.
-            tap("id:thread-older")
-            wait("id:thread-newer", 8)
-            shot(f"{theme}-thread-older")
-            back()
-            wait("id:messages")
-        else:
-            print("the conversation row is not on screen", flush=True)
-
-        mark(f"{theme} compose")
-        tap_until("id:compose", "id:compose-to", tries=2, timeout=8)
-        shot(f"{theme}-compose")
-        # Schedule send from the top bar's clock: the presets' sheet, then the snackbar with Undo.
-        # The keyboard is up after the address, and its dismissal takes the first tap on the bar:
-        # the sheet is asked for again instead of sent for once.
-        tap("id:compose-to")
-        adb("shell", "input", "text", "maya@northwind.dev")
+    mark(f"{theme} compose")
+    tap_until("id:compose", "id:compose-to", tries=2, timeout=8)
+    shot(f"{theme}-compose")
+    # Schedule send from the top bar's clock: the presets' sheet, then the snackbar with Undo.
+    # The keyboard is up after the address, and its dismissal takes the first tap on the bar:
+    # the sheet is asked for again instead of sent for once.
+    tap("id:compose-to")
+    adb("shell", "input", "text", "maya@northwind.dev")
+    tap_until("id:send-later", "Tomorrow morning", tries=2, timeout=8)
+    shot(f"{theme}-schedule-menu")
+    if find("Tomorrow morning", 2) is None:  # the sheet closed under the shot
         tap_until("id:send-later", "Tomorrow morning", tries=2, timeout=8)
-        shot(f"{theme}-schedule-menu")
-        if find("Tomorrow morning", 2) is None:  # the sheet closed under the shot
-            tap_until("id:send-later", "Tomorrow morning", tries=2, timeout=8)
-        tap("Tomorrow morning")
-        wait("id:toast-action", 8)
-        save(f"{theme}-scheduled-snackbar", frame())
-        # Whatever the schedule left open (a sheet, the composer itself), the inbox comes back
-        # before the next screen: a stray focus would take the keystrokes meant for search.
-        if find("id:compose-page", 2) is not None:
-            close_compose()
-        if find("id:messages", 3) is None:
-            back_to("id:messages")
-        wait("id:messages")
-
-        mark(f"{theme} inbox scrolled")
-        # The inbox scrolled: rows under the glass bar at the top and the glass tab bar at the foot,
-        # a frame taken while the finger is still dragging, and one once it settled.
-        during(["swipe", str(w // 2), str(h * 8 // 10), str(w // 2), str(h * 5 // 10), "1200"], f"{theme}-inbox-mid-scroll")
-        swipe(w // 2, h * 7 // 10, w // 2, h * 3 // 10, 300)
-        shot(f"{theme}-inbox-scrolled")
-        # Deeper: the bar minimises to a pill around the chosen tab, the page showing either side of it.
-        swipe(w // 2, h * 7 // 10, w // 2, h * 4 // 10, 400)
-        shot(f"{theme}-inbox-tabmin")
-        bar_geometry()
-        scroll_up_to("id:message-.*")
-
-        mark(f"{theme} search")
-        tab("Search", "id:search")
-        shot(f"{theme}-search")
-        rest = bar_box()
-        tap("id:search")  # the field, before anything is typed
-        adb("shell", "input", "text", "roadmap")
-        wait("id:result-count", 15)
-        # The keyboard is up: the bar is either covered or where it was, never riding on the keyboard.
-        typing = bar_box()
-        if rest and typing and abs(typing[1] - rest[1]) > 6:
-            raise Failure(f"the tab bar moved {typing[1] - rest[1]} px while the keyboard is up")
-        print("the bar while typing:", "covered" if typing is None else f"top {typing[1]}", flush=True)
-        shot(f"{theme}-search-typing")
-        back()  # the keyboard
-        shot(f"{theme}-search-results")
-        # A mail laid out for 600px fits the phone's width.
-        tap("id:search")
-        adb("shell", "input", "keyevent", "123", *["67"] * 8)  # end, then delete "roadmap"
-        adb("shell", "input", "text", "receipt")
-        wait("Your receipt from Fastmail", 15)
-        back()
-        # The first tap may only take the focus from the search field.
-        tap_until("Your receipt from Fastmail", "id:reader", tries=2, timeout=8)
-        shot(f"{theme}-reader-fit")
-        back()
-        # A search that finds nothing says so, and clears back to the hint.
-        tap("id:search")
-        adb("shell", "input", "keyevent", "123", *["67"] * 10)
-        adb("shell", "input", "text", "zzzzqqq")
-        wait("id:search-empty", 15)
-        back()
-        shot(f"{theme}-search-none")
-
-        mark(f"{theme} mailboxes")
-        tab("Mailboxes", "id:mailboxes")
-        shot(f"{theme}-mailboxes")
-        tap("Scheduled")
-        wait("id:scheduled", 10)  # the page's own id is a container; the shot is the proof
-        shot(f"{theme}-scheduled")
-        # An empty folder on the phone: the one draft is deleted, and Drafts says so with its next
-        # step. The tab, not Back: the Scheduled list is a folder of this tab, and Back from it can
-        # leave the app.
-        tab("Mailboxes", "id:mailboxes")
-        tap_until("Drafts", "id:messages", tries=2, timeout=15)
-        if row_settled():
-            select_first_row()
-            tap("id:picked-delete")
-            wait("id:empty-compose", 10)
-            shot(f"{theme}-empty-folder")
-        tab("Mailboxes", "id:mailboxes")
-        tap_until("All inboxes", "id:messages", tries=2, timeout=15)
-
-        mark(f"{theme} notifications")
-        # The notification inbox: the feed, a chip, a notification, its sources.
-        tab("Notifications", "Search notifications")
-        shot(f"{theme}-notifications")
-        during(["swipe", str(w // 2), str(h * 8 // 10), str(w // 2), str(h * 5 // 10), "1200"], f"{theme}-notifications-mid-scroll")
-        swipe(w // 2, h * 7 // 10, w // 2, h * 3 // 10, 300)
-        shot(f"{theme}-notifications-scrolled")
-        tap_until("id:notify-more", "id:notify-menu", tries=2, timeout=8)  # its menu, for the shot
-        shot(f"{theme}-notifications-menu")
-        tap("Sources")
-        wait("id:sources", 10)
-        shot(f"{theme}-sources")
-        tap("id:sources-add-top")
-        wait("id:add-source", 10)
-        shot(f"{theme}-source-kinds")
-        back_to("id:sources")
-        back_to("id:notifications")
-        # A notification opens on its own page; Back returns to the feed. The rows' titles are not
-        # always their own nodes, so the first row is tapped where the list starts.
-        adb("shell", "input", "tap", str(w // 2), str(h // 3))
-        if find("id:notify-reader", 6) is not None:
-            shot(f"{theme}-notification")
-            back()
-        find("Search notifications", 10)
-
-        mark(f"{theme} settings")
-        tab("Settings", "id:signed-in-as")
-        shot(f"{theme}-settings")
-        # The large title scrolls away under the bar; the rows continue under it.
-        during(["swipe", str(w // 2), str(h * 8 // 10), str(w // 2), str(h * 5 // 10), "1200"], f"{theme}-settings-mid-scroll")
-        swipe(w // 2, h * 7 // 10, w // 2, h * 3 // 10, 300)
-        shot(f"{theme}-settings-scrolled")
-        # The bar minimised here, then another tab and back: the pill must be Settings' own icon at
-        # Settings' slot (nsh-cupertino 0.4.1 reads the live selection).
-        tab("Mail", "id:messages")
-        tab("Settings", "id:settings")
-        shot(f"{theme}-settings-pill")
-        # The shots scrolled the list: the account row the next steps use is back at the top.
-        scroll_up_to("id:account-more-0")
-
-        mark(f"{theme} signature")
-        # The first account's signature, then a new message that carries it.
-        tap_until("id:account-more-0", "Signature…", tries=2, timeout=8)
-        tap_until("Signature…", "id:signature-text", tries=1, timeout=8)
-        tap("id:signature-text")
-        adb("shell", "input", "text", "'**Lin%sChen**'")
-        adb("shell", "input", "keyevent", "66")
-        adb("shell", "input", "text", "'Northwind%s-%s[northwind.dev](https://northwind.dev)'")
-        back()  # the keyboard
-        wait("id:signature-preview")
-        shot(f"{theme}-signature")
-        tap_until("id:signature-save", "id:signed-in-as", tries=2, timeout=8)
-
-        mark(f"{theme} api keys")
-        # The notification settings: the keys agents read the feed with, and the rules.
-        if scroll_to("API keys"):
-            tap("API keys")
-            wait("id:api-keys", 10)
-            shot(f"{theme}-api-keys")
-            tap("id:keys-add-top")
-            wait("New API key", 10)
-            shot(f"{theme}-new-key")
-            back_to("id:api-keys")
-
-        mark(f"{theme} notification rules")
-        if scroll_to("Per source and priority"):
-            tap("Per source and priority")
-            wait("id:notify-rules", 10)
-            shot(f"{theme}-notify-rules")
-            back_to("Per source and priority")
-        # The end of the list: the last row must clear the tab bar, not go under it.
-        settings_bottom(f"{theme}-settings-bottom")
-
-        mark(f"{theme} compose with signature")
-        tab("Mail", "id:messages")
-        shot(f"{theme}-tab-back-to-mail")
-        tap_until("id:compose", "id:compose-to", tries=2, timeout=8)
-        shot(f"{theme}-compose-signature")
-        back()  # the keyboard, when the field took the focus
+    tap("Tomorrow morning")
+    wait("id:toast-action", 8)
+    save(f"{theme}-scheduled-snackbar", frame())
+    # Whatever the schedule left open (a sheet, the composer itself), the inbox comes back
+    # before the next screen: a stray focus would take the keystrokes meant for search.
+    if find("id:compose-page", 2) is not None:
         close_compose()
-        wait("id:messages")
+    if find("id:messages", 3) is None:
+        back_to("id:messages")
+    wait("id:messages")
 
-        mark(f"{theme} theme swap")
-        # The appearance changes while the app runs: a colour change, so this waits on the pixels.
-        other = "light" if theme == "dark" else "dark"
-        before = frame()
-        adb("shell", "cmd", "uimode", "night", "yes" if other == "dark" else "no")
-        save(f"{theme}-then-{other}-live", steady(before))
-        adb("shell", "cmd", "uimode", "night", "yes" if theme == "dark" else "no")
-        steady()  # this theme's appearance again, before the screen is touched
+    mark(f"{theme} inbox scrolled")
+    # The inbox scrolled: rows under the glass bar at the top and the glass tab bar at the foot,
+    # a frame taken while the finger is still dragging, and one once it settled.
+    during(["swipe", str(w // 2), str(h * 8 // 10), str(w // 2), str(h * 5 // 10), "1200"], f"{theme}-inbox-mid-scroll")
+    swipe(w // 2, h * 7 // 10, w // 2, h * 3 // 10, 300)
+    shot(f"{theme}-inbox-scrolled")
+    # Deeper: the bar minimises to a pill around the chosen tab, the page showing either side of it.
+    swipe(w // 2, h * 7 // 10, w // 2, h * 4 // 10, 400)
+    shot(f"{theme}-inbox-tabmin")
+    bar_geometry()
+    scroll_up_to("id:message-.*")
 
-        mark(f"{theme} sign out")
-        # Signing out shows the onboarding.
-        sign_out(f"{theme}-sign-out-dialog")
-        # The first screen of the onboarding, painted: where mail comes from, and its way on.
-        wait("id:mode-local", 10)
-        wait("id:onboarding-go", 10)
-        shot(f"{theme}-onboarding")
-        # The cloud form: the server address and the sign-in/sign-up choice are painted before
-        # anything is typed into it.
-        tap("id:mode-cloud")
-        wait("id:server", 10)
-        wait("id:cloud-email", 10)
-        wait("Create account", 10)
-        shot(f"{theme}-onboarding-cloud")
+    mark(f"{theme} search")
+    tab("Search", "id:search")
+    shot(f"{theme}-search")
+    rest = bar_box()
+    tap("id:search")  # the field, before anything is typed
+    adb("shell", "input", "text", "roadmap")
+    wait("id:result-count", 15)
+    # The keyboard is up: the bar is either covered or where it was, never riding on the keyboard.
+    typing = bar_box()
+    if rest and typing and abs(typing[1] - rest[1]) > 6:
+        raise Failure(f"the tab bar moved {typing[1] - rest[1]} px while the keyboard is up")
+    print("the bar while typing:", "covered" if typing is None else f"top {typing[1]}", flush=True)
+    shot(f"{theme}-search-typing")
+    back()  # the keyboard
+    shot(f"{theme}-search-results")
+    # A mail laid out for 600px fits the phone's width.
+    tap("id:search")
+    adb("shell", "input", "keyevent", "123", *["67"] * 8)  # end, then delete "roadmap"
+    adb("shell", "input", "text", "receipt")
+    wait("Your receipt from Fastmail", 15)
+    back()
+    # The first tap may only take the focus from the search field.
+    tap_until("Your receipt from Fastmail", "id:reader", tries=2, timeout=8)
+    shot(f"{theme}-reader-fit")
+    back()
+    # A search that finds nothing says so, and clears back to the hint.
+    tap("id:search")
+    adb("shell", "input", "keyevent", "123", *["67"] * 10)
+    adb("shell", "input", "text", "zzzzqqq")
+    wait("id:search-empty", 15)
+    back()
+    shot(f"{theme}-search-none")
 
+    mark(f"{theme} mailboxes")
+    tab("Mailboxes", "id:mailboxes")
+    shot(f"{theme}-mailboxes")
+    tap("Scheduled")
+    wait("id:scheduled", 10)  # the page's own id is a container; the shot is the proof
+    shot(f"{theme}-scheduled")
+    # An empty folder on the phone: the one draft is deleted, and Drafts says so with its next
+    # step. The tab, not Back: the Scheduled list is a folder of this tab, and Back from it can
+    # leave the app.
+    tab("Mailboxes", "id:mailboxes")
+    tap_until("Drafts", "id:messages", tries=2, timeout=15)
+    if row_settled():
+        select_first_row()
+        tap("id:picked-delete")
+        wait("id:empty-compose", 10)
+        shot(f"{theme}-empty-folder")
+    tab("Mailboxes", "id:mailboxes")
+    tap_until("All inboxes", "id:messages", tries=2, timeout=15)
+
+    mark(f"{theme} notifications")
+    # The notification inbox: the feed, a chip, a notification, its sources.
+    tab("Notifications", "Search notifications")
+    shot(f"{theme}-notifications")
+    during(["swipe", str(w // 2), str(h * 8 // 10), str(w // 2), str(h * 5 // 10), "1200"], f"{theme}-notifications-mid-scroll")
+    swipe(w // 2, h * 7 // 10, w // 2, h * 3 // 10, 300)
+    shot(f"{theme}-notifications-scrolled")
+    tap_until("id:notify-more", "id:notify-menu", tries=2, timeout=8)  # its menu, for the shot
+    shot(f"{theme}-notifications-menu")
+    tap("Sources")
+    wait("id:sources", 10)
+    shot(f"{theme}-sources")
+    tap("id:sources-add-top")
+    wait("id:add-source", 10)
+    shot(f"{theme}-source-kinds")
+    back_to("id:sources")
+    back_to("id:notifications")
+    # A notification opens on its own page; Back returns to the feed. The rows' titles are not
+    # always their own nodes, so the first row is tapped where the list starts.
+    adb("shell", "input", "tap", str(w // 2), str(h // 3))
+    if find("id:notify-reader", 6) is not None:
+        shot(f"{theme}-notification")
+        back()
+    find("Search notifications", 10)
+
+    mark(f"{theme} settings")
+    tab("Settings", "id:signed-in-as")
+    shot(f"{theme}-settings")
+    # The large title scrolls away under the bar; the rows continue under it.
+    during(["swipe", str(w // 2), str(h * 8 // 10), str(w // 2), str(h * 5 // 10), "1200"], f"{theme}-settings-mid-scroll")
+    swipe(w // 2, h * 7 // 10, w // 2, h * 3 // 10, 300)
+    shot(f"{theme}-settings-scrolled")
+    # The bar minimised here, then another tab and back: the pill must be Settings' own icon at
+    # Settings' slot (nsh-cupertino 0.4.1 reads the live selection).
+    tab("Mail", "id:messages")
+    tab("Settings", "id:settings")
+    shot(f"{theme}-settings-pill")
+    # The shots scrolled the list: the account row the next steps use is back at the top.
+    scroll_up_to("id:account-more-0")
+
+    mark(f"{theme} signature")
+    # The first account's signature, then a new message that carries it.
+    tap_until("id:account-more-0", "Signature…", tries=2, timeout=8)
+    tap_until("Signature…", "id:signature-text", tries=1, timeout=8)
+    tap("id:signature-text")
+    adb("shell", "input", "text", "'**Lin%sChen**'")
+    adb("shell", "input", "keyevent", "66")
+    adb("shell", "input", "text", "'Northwind%s-%s[northwind.dev](https://northwind.dev)'")
+    back()  # the keyboard
+    wait("id:signature-preview")
+    shot(f"{theme}-signature")
+    tap_until("id:signature-save", "id:signed-in-as", tries=2, timeout=8)
+
+    mark(f"{theme} api keys")
+    # The notification settings: the keys agents read the feed with, and the rules.
+    if scroll_to("API keys"):
+        tap("API keys")
+        wait("id:api-keys", 10)
+        shot(f"{theme}-api-keys")
+        tap("id:keys-add-top")
+        wait("New API key", 10)
+        shot(f"{theme}-new-key")
+        back_to("id:api-keys")
+
+    mark(f"{theme} notification rules")
+    if scroll_to("Per source and priority"):
+        tap("Per source and priority")
+        wait("id:notify-rules", 10)
+        shot(f"{theme}-notify-rules")
+        back_to("Per source and priority")
+    # The end of the list: the last row must clear the tab bar, not go under it.
+    settings_bottom(f"{theme}-settings-bottom")
+
+    mark(f"{theme} compose with signature")
+    tab("Mail", "id:messages")
+    shot(f"{theme}-tab-back-to-mail")
+    tap_until("id:compose", "id:compose-to", tries=2, timeout=8)
+    shot(f"{theme}-compose-signature")
+    back()  # the keyboard, when the field took the focus
+    close_compose()
+    wait("id:messages")
+
+    mark(f"{theme} theme swap")
+    # The appearance changes while the app runs: a colour change, so this waits on the pixels.
+    other = "light" if theme == "dark" else "dark"
+    before = frame()
+    adb("shell", "cmd", "uimode", "night", "yes" if other == "dark" else "no")
+    save(f"{theme}-then-{other}-live", steady(before))
+    adb("shell", "cmd", "uimode", "night", "yes" if theme == "dark" else "no")
+    steady()  # this theme's appearance again, before the screen is touched
+
+    mark(f"{theme} sign out")
+    # Signing out shows the onboarding.
+    sign_out(f"{theme}-sign-out-dialog")
+    # The first screen of the onboarding, painted: where mail comes from, and its way on.
+    wait("id:mode-local", 10)
+    wait("id:onboarding-go", 10)
+    shot(f"{theme}-onboarding")
+    # The cloud form: the server address and the sign-in/sign-up choice are painted before
+    # anything is typed into it.
+    tap("id:mode-cloud")
+    wait("id:server", 10)
+    wait("id:cloud-email", 10)
+    wait("Create account", 10)
+    shot(f"{theme}-onboarding-cloud")
+
+
+def dark_walk():
+    """The dark pass: the shells, the reading, the writing, the glass and the onboarding — the
+    surfaces where dark is a design of its own, not every functional sub-flow the light walk has
+    already been through (that walk is what costs the minutes, and dark changes no layout). Its
+    frames are what the contrast, the glass and the floating bar are read from."""
+    global mode
+    mode, theme = "dark", "dark"
+    adb("shell", "cmd", "uimode", "night", "yes")
+
+    mark("dark inbox")
+    launch()
+    shot("dark-inbox")
+    bar_geometry()
+    loading_shot("dark-refreshing", "id:refresh")
+
+    mark("dark reader")
+    tap_until("id:message-.*", "id:reader", tries=2, timeout=8)
+    shot("dark-reader")
+    swipe(w // 2, h * 7 // 10, w // 2, h * 3 // 10, 400)
+    shot("dark-reader-scrolled")
+    back_to("id:messages")
+
+    mark("dark compose")
+    tap_until("id:compose", "id:compose-to", tries=2, timeout=8)
+    shot("dark-compose")
+    tap("id:compose-to")
+    adb("shell", "input", "text", "maya@northwind.dev")
+    tap_until("id:send-later", "Tomorrow morning", tries=2, timeout=8)
+    shot("dark-schedule-menu")
+    if find("Tomorrow morning", 2) is None:
+        tap_until("id:send-later", "Tomorrow morning", tries=2, timeout=8)
+    tap("Tomorrow morning")
+    wait("id:toast-action", 8)
+    save("dark-scheduled-snackbar", frame())
+    if find("id:compose-page", 2) is not None:
+        close_compose()
+    if find("id:messages", 3) is None:
+        back_to("id:messages")
+
+    mark("dark inbox scrolled")
+    during(["swipe", str(w // 2), str(h * 8 // 10), str(w // 2), str(h * 5 // 10), "1200"], "dark-inbox-mid-scroll")
+    swipe(w // 2, h * 7 // 10, w // 2, h * 3 // 10, 300)
+    shot("dark-inbox-scrolled")
+    swipe(w // 2, h * 7 // 10, w // 2, h * 4 // 10, 400)
+    shot("dark-inbox-tabmin")
+    bar_geometry()
+    scroll_up_to("id:message-.*")
+
+    mark("dark search")
+    tab("Search", "id:search")
+    shot("dark-search")
+    tap("id:search")
+    adb("shell", "input", "text", "roadmap")
+    wait("id:result-count", 15)
+    back()  # the keyboard
+    shot("dark-search-results")
+
+    mark("dark notifications")
+    tab("Notifications", "Search notifications")
+    shot("dark-notifications")
+    during(["swipe", str(w // 2), str(h * 8 // 10), str(w // 2), str(h * 5 // 10), "1200"], "dark-notifications-mid-scroll")
+    swipe(w // 2, h * 7 // 10, w // 2, h * 3 // 10, 300)
+    shot("dark-notifications-scrolled")
+
+    mark("dark settings")
+    tab("Settings", "id:signed-in-as")
+    shot("dark-settings")
+    during(["swipe", str(w // 2), str(h * 8 // 10), str(w // 2), str(h * 5 // 10), "1200"], "dark-settings-mid-scroll")
+    swipe(w // 2, h * 7 // 10, w // 2, h * 3 // 10, 300)
+    shot("dark-settings-scrolled")
+    # The minimised bar around the chosen tab, which the frame check reads from the dark frames.
+    tab("Mail", "id:messages")
+    tab("Settings", "id:settings")
+    shot("dark-settings-pill")
+
+    mark("dark theme swap")
+    before = frame()
+    adb("shell", "cmd", "uimode", "night", "no")
+    save("dark-then-light-live", steady(before))
+    adb("shell", "cmd", "uimode", "night", "yes")
+    steady()
+
+    mark("dark sign out")
+    sign_out("dark-sign-out-dialog")
+    wait("id:mode-local", 10)
+    wait("id:onboarding-go", 10)
+    shot("dark-onboarding")
+    tap("id:mode-cloud")
+    wait("id:server", 10)
+    wait("id:cloud-email", 10)
+    wait("Create account", 10)
+    shot("dark-onboarding-cloud")
+
+
+def large_and_tablet():
+    global mode
     mode = "large"
     mark("large text")
     # Larger text (Android's font size at 130%), then a tablet-sized screen (1280 x 800 dp).

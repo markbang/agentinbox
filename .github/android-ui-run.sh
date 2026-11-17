@@ -28,14 +28,14 @@ glass() {
   }
 }
 
-if drive 720; then
+if drive 660; then
   glass || exit 1
   echo "the drive passed on its first attempt" >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
   exit 0
 fi
 
-# 17 minutes for the step, 60 s kept for the emulator to go down cleanly.
-left=$(( 960 - ($(date +%s) - began) ))
+# 14 minutes for the step, 60 s kept for the emulator to go down cleanly.
+left=$(( 840 - ($(date +%s) - began) ))
 if [ "$left" -lt 300 ]; then
   echo "::error title=Android UI::the drive failed with $left s of the step left: no retry"
   exit 1
