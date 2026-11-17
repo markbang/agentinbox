@@ -606,8 +606,9 @@ def drive():
         shot(f"{theme}-reader-scrolled")
         tap("id:message-more")
         shot(f"{theme}-reader-menu")
-        back()
-        wait("id:messages")
+        # The menu is a sheet over the reader: one Back closes it, the next leaves the reader.
+        if not back_to("id:messages", tries=3):
+            raise Failure("the reader's menu never came back to the inbox")
 
         mark(f"{theme} conversation")
         # A conversation: its latest message expanded, the earlier ones collapsed above; a tap
