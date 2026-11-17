@@ -606,8 +606,7 @@ def drive():
         during(["swipe", str(w // 2), str(y1), str(w // 2), str(y1 + h // 3), "1200"], f"{theme}-pull-refresh")
 
         mark(f"{theme} reader")
-        tap("id:message-.*")
-        wait("id:reader")
+        tap_until("id:message-.*", "id:reader", tries=2, timeout=8)
         shot(f"{theme}-reader")
         during(["swipe", str(w // 2), str(h * 8 // 10), str(w // 2), str(h * 5 // 10), "1200"], f"{theme}-reader-mid-scroll")
         swipe(w // 2, h * 7 // 10, w // 2, h * 3 // 10, 400)
@@ -624,11 +623,8 @@ def drive():
         subject = "Offsite in March: Lisbon or Porto?"
         if find(subject, 2) is None:
             scroll_up_to(subject)
-        at = find(subject, 2)
-        if at is not None:
-            x, y = centre(at)
-            adb("shell", "input", "tap", str(x), str(y))
-            wait("id:reader", 8)
+        if find(subject, 2) is not None:
+            tap_until(subject, "id:reader", tries=2, timeout=8)
             shot(f"{theme}-reader-conversation")
             # The earlier messages collapse under a bar of their own; a tap expands them.
             tap("id:thread-older")
@@ -640,17 +636,19 @@ def drive():
             print("the conversation row is not on screen", flush=True)
 
         mark(f"{theme} compose")
-        tap("id:compose")
-        wait("id:compose-to")
+        tap_until("id:compose", "id:compose-to", tries=2, timeout=8)
         shot(f"{theme}-compose")
         # Schedule send from the top bar's clock: the presets' sheet, then the snackbar with Undo.
         # The keyboard is up after the address, and its dismissal takes the first tap on the bar:
         # the sheet is asked for again instead of sent for once.
         tap("id:compose-to")
         adb("shell", "input", "text", "maya@northwind.dev")
-        tap_until("id:send-later", "Tomorrow morning", tries=3, timeout=6)
+        tap_until("id:send-later", "Tomorrow morning", tries=2, timeout=8)
         shot(f"{theme}-schedule-menu")
-        tap_until("Tomorrow morning", "id:toast-action", tries=2, timeout=8)
+        if find("Tomorrow morning", 2) is None:  # the sheet closed under the shot
+            tap_until("id:send-later", "Tomorrow morning", tries=2, timeout=8)
+        tap("Tomorrow morning")
+        wait("id:toast-action", 8)
         save(f"{theme}-scheduled-snackbar", frame())
         # Whatever the schedule left open (a sheet, the composer itself), the inbox comes back
         # before the next screen: a stray focus would take the keystrokes meant for search.
@@ -693,10 +691,8 @@ def drive():
         adb("shell", "input", "text", "receipt")
         wait("Your receipt from Fastmail", 15)
         back()
-        tap("Your receipt from Fastmail")
-        if find("id:reader", 8) is None:
-            tap("Your receipt from Fastmail")  # the first tap may only take the focus from the field
-        wait("id:reader", 8)
+        # The first tap may only take the focus from the search field.
+        tap_until("Your receipt from Fastmail", "id:reader", tries=2, timeout=8)
         shot(f"{theme}-reader-fit")
         back()
         # A search that finds nothing says so, and clears back to the hint.
@@ -732,16 +728,15 @@ def drive():
         during(["swipe", str(w // 2), str(h * 8 // 10), str(w // 2), str(h * 5 // 10), "1200"], f"{theme}-notifications-mid-scroll")
         swipe(w // 2, h * 7 // 10, w // 2, h * 3 // 10, 300)
         shot(f"{theme}-notifications-scrolled")
-        tap("id:notify-more")
-        wait("Sources", 8)  # its menu, before it is screenshotted
+        tap_until("id:notify-more", "id:notify-menu", tries=2, timeout=8)  # its menu, for the shot
         shot(f"{theme}-notifications-menu")
         tap("Sources")
-        wait("Sources", 10)
+        wait("id:sources", 10)
         shot(f"{theme}-sources")
         tap("id:sources-add-top")
         wait("id:add-source", 10)
         shot(f"{theme}-source-kinds")
-        back_to("Sources")
+        back_to("id:sources")
         back_to("id:notifications")
         # A notification opens on its own page; Back returns to the feed. The rows' titles are not
         # always their own nodes, so the first row is tapped where the list starts.
@@ -783,17 +778,17 @@ def drive():
         # The notification settings: the keys agents read the feed with, and the rules.
         if scroll_to("API keys"):
             tap("API keys")
-            wait("id:keys-add-top", 10)
+            wait("id:api-keys", 10)
             shot(f"{theme}-api-keys")
             tap("id:keys-add-top")
             wait("New API key", 10)
             shot(f"{theme}-new-key")
-            back_to("API keys")
+            back_to("id:api-keys")
 
         mark(f"{theme} notification rules")
         if scroll_to("Per source and priority"):
             tap("Per source and priority")
-            wait("Per source and priority", 10)
+            wait("id:notify-rules", 10)
             shot(f"{theme}-notify-rules")
             back_to("Per source and priority")
         # The end of the list: the last row must clear the tab bar, not go under it.
@@ -802,8 +797,7 @@ def drive():
         mark(f"{theme} compose with signature")
         tab("Mail", "id:messages")
         shot(f"{theme}-tab-back-to-mail")
-        tap("id:compose")
-        wait("id:compose-to")
+        tap_until("id:compose", "id:compose-to", tries=2, timeout=8)
         shot(f"{theme}-compose-signature")
         back()  # the keyboard, when the field took the focus
         close_compose()
@@ -839,8 +833,7 @@ def drive():
     adb("shell", "settings", "put", "system", "font_scale", "1.3")
     launch()
     shot("large-text-inbox")
-    tap("id:message-.*")
-    wait("id:reader")
+    tap_until("id:message-.*", "id:reader", tries=2, timeout=8)
     shot("large-text-reader")
 
     mark("tablet")
@@ -848,8 +841,7 @@ def drive():
     adb("shell", "wm", "size", "2560x1600")
     adb("shell", "wm", "density", "320")
     launch()
-    tap("id:message-.*")
-    wait("id:reader")
+    tap_until("id:message-.*", "id:reader", tries=2, timeout=8)
     shot("tablet")
     adb("shell", "wm", "size", "1440x3120")
     adb("shell", "wm", "density", "480")
