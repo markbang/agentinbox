@@ -12,7 +12,7 @@ import { wide } from "../layout";
 import { PullIndicator, PULL_HEIGHT, pullValue } from "./PullIndicator";
 import { AccountMark, Count } from "./Marks";
 import { accountIndex, accounts, ownAddresses, type Row as ListRow } from "../store";
-import { reportOffset } from "../scroll";
+import { PageScroll } from "../scroll";
 
 export interface MessageListProps {
   items: ListRow[];
@@ -47,6 +47,7 @@ export interface MessageListProps {
 
 export function MessageList(props: MessageListProps) {
   const oneLine = () => !wide();
+  const reportScroll = PageScroll();
   // The pull to refresh indicator follows this, and the platform's spinner stays off.
   const pull = pullValue();
   const terms = () => (props.highlight ?? "").split(/\s+/).filter(Boolean);
@@ -69,7 +70,7 @@ export function MessageList(props: MessageListProps) {
         refreshIndicator={{ height: PULL_HEIGHT }}
         onLoadMore={props.onLoadMore}
         // The page's floating layer follows this list: the scroll edge dissolves what passes under the group, the tab bar minimises on the way down.
-        onScroll={(event: { offset: { y: number } }) => reportOffset(event.offset.y)}
+        onScroll={(event: { offset: { y: number } }) => reportScroll(event.offset.y)}
         testID={props.testID}
         empty={props.empty}
         class="flex-1"

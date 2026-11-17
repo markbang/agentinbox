@@ -4,7 +4,7 @@ import { openUrl, Scroll, Text, View } from "nsh";
 import { t } from "nsh/i18n";
 import type { Notification, Source } from "agentinbox/native";
 import { Button, Icon } from "cupertino";
-import { reportOffset } from "../scroll";
+import { PageScroll } from "../scroll";
 import { fullDate } from "../lib/format";
 import { SourceMark, Tags } from "./SourceMark";
 
@@ -16,12 +16,13 @@ export function NotificationReader(props: {
   onOpenMail?: () => void;
 }) {
   const n = () => props.note;
+  const reportScroll = PageScroll();
   return (
     <Scroll
       class="flex-1"
       keyboardDismissMode="interactive"
       keyboardShouldPersistTaps="handled"
-      onScroll={(event: { offset: { y: number } }) => reportOffset(event.offset.y)}
+      onScroll={(event: { offset: { y: number } }) => reportScroll(event.offset.y)}
       testID="notify-reader"
     >
       <View class="w-full bg-system-background gap-4 px-4 pb-10 pt-11" testID="notify-scroll">

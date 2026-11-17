@@ -7,7 +7,7 @@
 import { createMotion, Image, reduceMotion, Scroll, signal, Text, View } from "nsh";
 import { t } from "nsh/i18n";
 import { ActionSheet, Button, Icon, ScrollView } from "cupertino";
-import { reportOffset } from "../scroll";
+import { PageScroll } from "../scroll";
 import { Mail, type Attachment, type Message, type Summary } from "agentinbox/native";
 import { AccountMark, Monogram } from "./Marks";
 import { MailView, webViewAvailable } from "./MailView";
@@ -177,6 +177,7 @@ function CollapsedList(props: { messages: Summary[]; threadId: string; testID: s
 }
 
 export function Reader(props: ReaderProps) {
+  const reportScroll = PageScroll();
   const m = () => props.message;
   const target = (): Target => ({ message: m(), thread: threadOf(m(), props.conversation) });
   const at = () => target().thread?.findIndex((s) => s.id === m().id) ?? -1;
@@ -204,7 +205,7 @@ export function Reader(props: ReaderProps) {
         class="flex-1"
         keyboardDismissMode="interactive"
         keyboardShouldPersistTaps="handled"
-        onScroll={(event: { offset: { y: number } }) => reportOffset(event.offset.y)}
+        onScroll={(event: { offset: { y: number } }) => reportScroll(event.offset.y)}
         testID="reader"
       >
         {/* Under the page's floating bar on a phone: the message scrolls under the glass. */}
