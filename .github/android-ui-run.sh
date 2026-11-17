@@ -43,6 +43,9 @@ fi
 echo "::warning title=Android UI is flaky::the drive failed; reinstalling the APK and retrying once"
 mv screens screens-attempt-1 || true
 mkdir -p screens
+# The demo mailbox keeps what the first attempt did to it (a draft deleted, a signature saved):
+# the retry starts from the app's own first state.
+adb shell pm clear top.bangwu.nshmail
 adb install -r -g app/.nsh/ui/AgentInbox.apk
 adb shell am force-stop top.bangwu.nshmail
 if drive "$left"; then

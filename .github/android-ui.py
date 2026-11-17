@@ -189,6 +189,20 @@ def tap_until(key, expect, tries=2, timeout=8):
     raise Failure(f"tapping {key} never showed {expect}")
 
 
+def select_first_row(timeout=6):
+    """The first row into the selection, and the bar's own count as the proof: the tap right after
+    `select-rows` lands before the selection bar is laid out now and then, and a Delete on an empty
+    selection does nothing at all."""
+    tap_until("id:select-rows", "id:selection-count", tries=2, timeout=timeout)
+    zero = text_of("id:selection-count", 5)
+    for attempt in range(1, 3):
+        tap("id:message-.*")
+        if zero is None or changed("id:selection-count", zero, timeout):
+            return
+        print("the row was not added to the selection, tapping again", flush=True)
+    raise Failure("the row was never added to the selection")
+
+
 def settle_dump(timeout=6):
     """Until two dumps in a row are the same: the page stopped changing."""
     end, last = time.time() + timeout, None
@@ -532,11 +546,10 @@ def evidence(name):
             f.write(subprocess.run(["adb", "exec-out", "screencap", "-p"], check=False, capture_output=True).stdout)
         with open(os.path.join(out, f"{name}.xml"), "w") as f:
             f.write(_dump)
-        lines = []
-        for line in raw("logcat", "-d", "-v", "epoch", "-t", "1500").splitlines():
-            at = line.split(" ")[0]
-            if at.replace(".", "", 1).isdigit() and float(at) >= STEP_AT:
-                lines.append(line)
+        log = raw("logcat", "-d", "-v", "epoch", "-t", "1500").splitlines()
+        lines = [line for line in log if line.split(" ")[0].replace(".", "", 1).isdigit() and float(line.split(" ")[0]) >= STEP_AT]
+        if not lines:  # a device clock that is not the host's: the last lines still say what broke
+            lines = log[-100:]
         with open(os.path.join(out, "failure-logcat.txt"), "a") as f:
             f.write(f"===== {name}: {STEP} =====\n" + "\n".join(lines[-300:]) + "\n")
         print("evidence", name, flush=True)
@@ -584,13 +597,8 @@ def drive():
         gone("id:toast-action")  # the deletion's Undo leaves before the next gesture
 
         mark(f"{theme} selection")
-        # Select, then a tap picks a row; back ends the selection. The bar has to show the count
-        # before that tap: without it, the tap would open the message.
-        tap_until("id:select-rows", "id:selection-count", tries=1, timeout=5)
-        count = text_of("id:selection-count", 5)
-        adb("shell", "input", "tap", str(x1 + 200), str(y))
-        if count and not changed("id:selection-count", count, 6):
-            print(f"the tap below the selection did not add a row: {text_of('id:selection-count', 2)}", flush=True)
+        # Select, then a tap picks a row; back ends the selection.
+        select_first_row()
         shot(f"{theme}-selection")
         back()
 
@@ -710,11 +718,10 @@ def drive():
         # An empty folder on the phone: the one draft is deleted, and Drafts says so with its next step.
         tap("Drafts")
         wait("id:messages", 15)
-        row = row_settled()
-        if row:
-            tap("id:select-rows")
-            tap("id:message-.*")
-            tap_until("id:picked-delete", "id:empty-compose", tries=1, timeout=10)
+        if row_settled():
+            select_first_row()
+            tap("id:picked-delete")
+            wait("id:empty-compose", 10)
             shot(f"{theme}-empty-folder")
         tab("Mailboxes", "All inboxes")
         wait("id:messages", 15)
