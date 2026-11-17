@@ -145,7 +145,7 @@ jobs:
               node tools/glass-check.mjs screens || { echo "::error title=Android frames::the floating layer did not pass its frame check"; return 1; }
             }
             if drive 600; then
-              glass
+              glass || exit 1
               echo "the drive passed on its first attempt" >> "$GITHUB_STEP_SUMMARY"
               exit 0
             fi
@@ -160,7 +160,7 @@ jobs:
             adb install -r -g app/.nsh/ui/AgentInbox.apk
             adb shell am force-stop top.bangwu.nshmail
             if drive "$left"; then
-              glass
+              glass || exit 1
               echo "**flaky**: the drive failed on its first attempt and passed on the retry (\`screens-attempt-1/\`)." >> "$GITHUB_STEP_SUMMARY"
               echo "::warning title=Android UI is flaky::the drive passed on the retry"
               exit 0
