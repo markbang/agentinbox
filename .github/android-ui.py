@@ -326,6 +326,34 @@ def tab_bar():
     return (left, top, right, h)
 
 
+def bar_geometry():
+    """The floating tab bar's shape, from the accessibility tree: 20 pt in from the
+    sides, 64 pt tall, 12 pt above the home indicator (nsh-cupertino's GlassTabBar).
+    A bar drawn edge to edge, or as a band, is what this catches."""
+    bar = tab_bar()
+    if not bar:
+        fail("the tab bar is not in the accessibility tree")
+        return None
+    foot = bar[3] if bar[3] <= h else h
+    dpi = float(prop("ro.sf.lcd_density") or 0) or 480.0
+    density = dpi / 160  # pixels per point
+    top, left, right = bar[1], bar[0], bar[2]
+    print(
+        f"tab bar: x {left}..{right} of {w}, y {top}..{foot} of {h}"
+        f" — side insets {round(left / density)}/{round((w - right) / density)} pt,"
+        f" {round((foot - top) / density)} pt tall, {round((h - foot) / density)} pt from the foot",
+        flush=True,
+    )
+    for what, got, want in (("left inset", left / density, 20), ("right inset", (w - right) / density, 20)):
+        if abs(got - want) > 4:
+            fail(f"the tab bar's {what} is {round(got)} pt, not {want}")
+    if abs((h - foot) / density - 12) > 5:
+        fail(f"the tab bar sits {round((h - foot) / density)} pt above the foot, not 12")
+    if abs((foot - top) / density - 64) > 6:
+        fail(f"the tab bar is {round((foot - top) / density)} pt tall, not 64")
+    return (left, top, right, foot)
+
+
 def tab(name):
     """Taps a tab by its place in the bar, clear of the system's gesture area.
 
@@ -596,14 +624,7 @@ for mode in ("light", "dark"):
     adb("shell", "input", "swipe", str(w // 2), str(h * 7 // 10), str(w // 2), str(h * 4 // 10), "400")
     quiet(2)
     shot(f"{mode}-inbox-tabmin")
-    bar = tab_bar()
-    if bar:
-        foot = bar[3] if bar[3] <= h else h
-        print(
-            f"tab bar: x {bar[0]}..{bar[2]} of {w}, y {bar[1]}..{foot} of {h}"
-            f" ({round((bar[2] - bar[0]) / w * 100)} % of the width, {h - foot} px from the foot)",
-            flush=True,
-        )
+    bar_geometry()
     scroll_up_to("id:message-.*")
 
     if tab("Search") and wait("id:search"):

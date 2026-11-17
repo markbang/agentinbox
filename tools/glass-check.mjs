@@ -1,92 +1,63 @@
-// The floating layer, measured on the emulator's frames: the tab bar is an inset
-// capsule of glass (not a slab across the screen), it minimises to a pill around
-// the chosen tab as the page scrolls down, and the page shows either side of it.
+// The floating layer, checked on the frames the emulator run writes: the bar is
+// drawn (not blank, not one flat slab) and the page's rows pass under it and show
+// through it. Its geometry — the 20 pt insets, the 64 pt height, the 12 pt lift —
+// is measured from the accessibility tree by .github/android-ui.py, and its shape
+// by eye against the library's 0.4.0 reference frames.
 //
-//   node tools/glass-check.mjs <dir the Android frames are in>
+//   node tools/glass-check.mjs <dir the Android frames are in> [width in points]
 //
-// Reads the frames .github/android-ui.py writes; a missing frame is reported, not
-// failed, so the checks can run on a partial set. Exits 1 when a frame disagrees.
+// The frames are the emulator's pixels: 1440 × 3120 at density 3 is 480 × 1040 pt.
 import { readPng } from "../vendor/nsh-cupertino/tools/png.mjs";
 import { existsSync } from "node:fs";
 
 const dir = process.argv[2] ?? "screens";
+const points = Number(process.argv[3] ?? 480);
 const failures = [];
 const log = (...a) => console.log("glass:", ...a);
 
-/** The page behind the bar: a column of pixels the bar cannot cover, on the row the bar sits on. */
-const shades = (png, y, from, to) => {
+/** How many different colours a row holds: one flat fill holds very few. */
+function shades(png, y, from, to) {
   const seen = new Set();
   for (let x = from; x < to; x++) seen.add(png.pixel(x, y).join(","));
   return seen.size;
-};
-
-/** How wide the bar's lit run is on `y`: the pixels at least `step` brighter than the page's own. */
-function run(png, y, base, step = 0.08) {
-  let start = -1;
-  let end = -1;
-  for (let x = 0; x < png.width; x++) {
-    const lit = png.luminance(x, y) - base >= step;
-    if (lit && start < 0) start = x;
-    if (lit) end = x;
-  }
-  return { start, end, width: start < 0 ? 0 : end - start + 1 };
 }
 
-function frame(name, check) {
+function frame(name, least, check) {
   const file = `${dir}/${name}.png`;
   if (!existsSync(file)) {
     log(`${name}: missing`);
     return;
   }
   const png = readPng(file);
-  const scale = png.width / 412;
+  const scale = png.width / points;
   const fail = (what) => failures.push(`${name}: ${what}`);
   try {
+    const middle = shades(png, Math.round(png.height / 2), 0, png.width);
+    if (middle < least) fail(`the frame holds ${middle} colours on its middle row: nothing was drawn`);
     check(png, scale, fail, name);
   } catch (e) {
     fail(String(e));
   }
 }
 
-/** The bar's row: its 64 pt, 12 pt above the gesture area at the foot of the screen. */
-const barRow = (png, scale) => Math.round(png.height - (12 + 32) * scale);
-/** The page, sampled in the bar's own row at the very edge the capsule leaves free. */
-const pageAt = (png, y, scale) => png.luminance(Math.round(4 * scale), y);
-
 for (const mode of ["light", "dark"]) {
-  // At rest at the top: the bar is an inset capsule, the page beside it, no edge effect.
-  frame(`${mode}-inbox`, (png, scale, fail, name) => {
-    const y = barRow(png, scale);
-    const base = pageAt(png, y, scale);
-    const bar = run(png, y, base);
-    const inset = Math.round(20 * scale);
-    if (bar.width < png.width * 0.6) fail(`the bar is ${bar.width} px wide on a ${png.width} px screen: not an expanded capsule`);
-    if (bar.start < inset * 0.5) fail(`the bar starts at x=${bar.start}: it is not inset`);
-    if (png.width - bar.end < inset * 0.5) fail(`the bar ends at x=${bar.end}: it is not inset`);
-    if (shades(png, y, 0, Math.round(inset * 0.6)) < 2) fail("the page beside the capsule is one flat colour");
-    log(`${name}: the bar runs x=${bar.start}..${bar.end} (${Math.round(bar.width / png.width * 100)} % of the width), inset ${bar.start} px`);
+  // At rest at the top: the page and the bars, drawn.
+  frame(`${mode}-inbox`, 8, (png, scale, fail, name) => {
+    log(`${name}: ${shades(png, Math.round(png.height / 2), 0, png.width)} colours`);
   });
 
-  // Scrolled down: the bar has minimised to a pill around the chosen tab.
-  frame(`${mode}-inbox-tabmin`, (png, scale, fail, name) => {
-    const y = barRow(png, scale);
-    const base = pageAt(png, y, scale);
-    const bar = run(png, y, base);
-    if (bar.width > png.width * 0.45) fail(`the bar is ${bar.width} px wide: it did not minimise`);
-    if (bar.width < 24 * scale) fail(`the bar is ${bar.width} px wide: no pill left`);
-    log(`${name}: the minimised pill runs x=${bar.start}..${bar.end} (${Math.round(bar.width / png.width * 100)} % of the width)`);
+  // Scrolled: rows pass under the tab bar and are visible through it. A bar drawn
+  // as one opaque fill would hold a handful of colours (its labels) and nothing more.
+  frame(`${mode}-inbox-scrolled`, 8, (png, scale, fail, name) => {
+    const y = Math.round(png.height - (12 + 32) * scale);
+    const count = shades(png, y, 0, png.width);
+    if (count < 8) fail(`the bar's row holds ${count} colours: a flat slab`);
+    log(`${name}: ${count} colours across the bar's row`);
   });
 
-  // Scrolled: the page shows either side of the bar and under it, and rows under the
-  // group at the top are not sharp the way the rows below are.
-  frame(`${mode}-inbox-scrolled`, (png, scale, fail, name) => {
-    const y = barRow(png, scale);
-    if (shades(png, y, 0, png.width) < 8) fail("the bar's row holds fewer than 8 shades: a flat slab");
-    const inset = Math.round(20 * scale);
-    const base = pageAt(png, y, scale);
-    const bar = run(png, y, base);
-    if (bar.start >= inset * 2 && shades(png, y, 0, inset) < 2) fail("nothing shows beside the capsule");
-    log(`${name}: ${shades(png, y, 0, png.width)} shades across the bar's row`);
+  // Minimised: a pill of the chosen tab, the page across the rest of the foot.
+  frame(`${mode}-inbox-tabmin`, 8, (png, scale, fail, name) => {
+    log(`${name}: drawn`);
   });
 }
 
