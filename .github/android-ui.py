@@ -179,12 +179,19 @@ def tap(key, timeout=15):
 
 
 def tap_until(key, expect, tries=2, timeout=8):
-    """Taps `key` until `expect` shows: under load the emulator drops a tap now and then, and a tap
-    that only stopped a fling opens nothing."""
+    """Taps `key` until `expect` shows. Under load the emulator drops a tap now and then, and a tap
+    that only stopped a fling opens nothing: those are retried. A tap that did take — its own control
+    is gone from the screen — is given more time instead, since the page it opened may still be
+    sliding in, and tapping again would press something else."""
     for attempt in range(1, tries + 1):
         tap(key)
-        if find(expect, timeout) is not None:
-            return
+        end = time.time() + timeout
+        while time.time() < end:
+            if find(expect, 1) is not None:
+                return
+            if find(key, 0.5) is None:
+                wait(expect, timeout)
+                return
         print(f"the tap on {key} did not show {expect} (attempt {attempt})", flush=True)
     raise Failure(f"tapping {key} never showed {expect}")
 
@@ -704,22 +711,21 @@ def drive():
         shot(f"{theme}-search-none")
 
         mark(f"{theme} mailboxes")
-        tab("Mailboxes", "All inboxes")
+        tab("Mailboxes", "id:mailboxes")
         shot(f"{theme}-mailboxes")
         tap("Scheduled")
         wait("id:scheduled", 10)  # the page's own id is a container; the shot is the proof
         shot(f"{theme}-scheduled")
-        tab("Mailboxes", "All inboxes")
         # An empty folder on the phone: the one draft is deleted, and Drafts says so with its next step.
-        tap("Drafts")
-        wait("id:messages", 15)
+        back_to("id:mailboxes")
+        tap_until("Drafts", "id:messages", tries=2, timeout=15)
         if row_settled():
             select_first_row()
             tap("id:picked-delete")
             wait("id:empty-compose", 10)
             shot(f"{theme}-empty-folder")
-        tab("Mailboxes", "All inboxes")
-        wait("id:messages", 15)
+        back_to("id:mailboxes")
+        tap_until("All inboxes", "id:messages", tries=2, timeout=15)
 
         mark(f"{theme} notifications")
         # The notification inbox: the feed, a chip, a notification, its sources.
