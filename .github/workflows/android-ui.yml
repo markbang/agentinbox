@@ -132,41 +132,7 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           working-directory: .
           script: |
-            began=$(date +%s)
-            # 10 minutes of drive, 17 for the step (boot included): a retry has what is left.
-            drive() {
-              DRIVE_BUDGET="$1" timeout -k 20 "$(( $1 + 30 ))" python3 .github/android-ui.py app/.nsh/ui screens
-            }
-            # The frame measurement first, so a flaky screenshot step cannot keep it out of the log.
-            python3 .github/android-perf.py app/.nsh/perf || echo "::warning title=Android frames::the frame measurement failed; the screens still ran"
-            if [ "${{ inputs.perf_only }}" = "true" ]; then exit 0; fi
-            # The floating layer, checked on the frames: drawn, and the page showing through it.
-            glass() {
-              node tools/glass-check.mjs screens || { echo "::error title=Android frames::the floating layer did not pass its frame check"; return 1; }
-            }
-            if drive 600; then
-              glass || exit 1
-              echo "the drive passed on its first attempt" >> "$GITHUB_STEP_SUMMARY"
-              exit 0
-            fi
-            left=$(( 1020 - ($(date +%s) - began) ))
-            if [ "$left" -lt 240 ]; then
-              echo "::error title=Android UI::the drive failed with $left s of the step left: no retry"
-              exit 1
-            fi
-            echo "::warning title=Android UI is flaky::the drive failed; reinstalling the APK and retrying once"
-            mv screens screens-attempt-1
-            mkdir -p screens
-            adb install -r -g app/.nsh/ui/AgentInbox.apk
-            adb shell am force-stop top.bangwu.nshmail
-            if drive "$left"; then
-              glass || exit 1
-              echo "**flaky**: the drive failed on its first attempt and passed on the retry (\`screens-attempt-1/\`)." >> "$GITHUB_STEP_SUMMARY"
-              echo "::warning title=Android UI is flaky::the drive passed on the retry"
-              exit 0
-            fi
-            echo "::error title=Android UI::the drive failed on both attempts"
-            exit 1
+            bash .github/android-ui-run.sh "${{ inputs.perf_only }}"
       - name: The drive's step times
         if: always()
         working-directory: .

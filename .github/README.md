@@ -44,7 +44,8 @@ The drive stops at its **first** failure instead of carrying on into a broken ap
 All of it is in the `android-ui` artifact, uploaded on failure as well as on success.
 
 **Retry once.** A failed drive is retried once after reinstalling the APK, with the time the step has
-left, without restarting the emulator. The first attempt's screenshots stay in
+left, without restarting the emulator (`.github/android-ui-run.sh`, which the step calls in one line
+because that action runs its `script:` one line at a time). The first attempt's screenshots stay in
 `screens-attempt-1/`. A retry that passes marks the run **flaky** in its summary and as a warning
 annotation, so a flaky screen stays visible instead of looking green.
 
