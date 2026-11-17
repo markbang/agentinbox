@@ -332,6 +332,15 @@ def tab_bar():
     return (left, top, right, h)
 
 
+def bar_box():
+    """The tab bar's own node, and only that: while the keyboard is up the bar is hidden, and a
+    fallback would read the page instead."""
+    for n in nodes():
+        if n.get("resource-id") == "tab-bar" and box(n):
+            return box(n)
+    return None
+
+
 def bar_geometry():
     """The floating tab bar's shape, from the accessibility tree: 20 pt in from the
     sides, 64 pt tall, 12 pt above the home indicator (nsh-cupertino's GlassTabBar).
@@ -637,12 +646,12 @@ for mode in ("light", "dark"):
 
     if tab("Search") and wait("id:search"):
         shot(f"{mode}-search")
-        rest = tab_bar()
+        rest = bar_box()
         tap("id:search")  # the field, before anything is typed
         adb("shell", "input", "text", "roadmap")
         wait("id:result-count", 15)
         # The keyboard is up: the bar is either covered or where it was, never riding on the keyboard.
-        typing = tab_bar()
+        typing = bar_box()
         if rest and typing and abs(typing[1] - rest[1]) > 6:
             fail(f"the tab bar moved {typing[1] - rest[1]} px while the keyboard is up")
         print("the bar while typing:", "covered" if typing is None else f"top {typing[1]}", flush=True)
